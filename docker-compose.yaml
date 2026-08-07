@@ -4,7 +4,7 @@ services:
     working_dir: /var/www/app
     volumes:
       - ./:/var/www/app
-    command: sh -lc "npm install && npm run dev -- --host 0.0.0.0 --port 5153"
+    command: sh -lc "npm install && npm run dev -- --host 0.0.0.0 --port 5153 --strictPort"
     ports:
       - "5153:5153"
     networks:
