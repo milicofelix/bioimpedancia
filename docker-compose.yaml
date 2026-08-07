@@ -1,0 +1,41 @@
+services:
+  frontend_dev:
+    image: node:20-alpine
+    working_dir: /var/www/app
+    volumes:
+      - ./:/var/www/app
+    command: sh -lc "npm install && npm run dev -- --host 0.0.0.0 --port 5153"
+    ports:
+      - "5153:5153"
+    networks:
+      - shared
+
+  app:
+    build:
+      context: ../docker/php
+      dockerfile: Dockerfile
+    image: php82-fpm-base:1
+    container_name: ricostyemagrecimento_app
+    working_dir: /var/www/app
+    volumes:
+      - ./:/var/www/app
+    networks:
+      - shared
+
+  web:
+    image: nginx:1.27-alpine
+    container_name: ricostyemagrecimento_web
+    depends_on:
+      - app
+    ports:
+      - "8081:80"
+    volumes:
+      - ./:/var/www/app
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - shared
+
+networks:
+  shared:
+    external: true
+    name: shared_net
