@@ -1,4 +1,6 @@
 *.log
+*.zip
+.cache/
 .DS_Store
 __MACOSX/
 .env
@@ -26,6 +28,7 @@ __MACOSX/
 /storage/logs/*.log
 /storage/pail
 /vendor
+/output/releases
 Homestead.json
 Homestead.yaml
 Thumbs.db
