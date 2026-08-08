@@ -73,6 +73,16 @@ class User extends Authenticatable
         return $this->role === self::ROLE_ADMIN;
     }
 
+    public function isClinicalProfessional(): bool
+    {
+        return in_array($this->role, [self::ROLE_ADMIN, self::ROLE_PROFESSIONAL], true);
+    }
+
+    public function canCreateClinicalRecords(): bool
+    {
+        return in_array($this->role, [self::ROLE_ADMIN, self::ROLE_PROFESSIONAL, self::ROLE_RECEPTION], true);
+    }
+
     public function isActive(): bool
     {
         return $this->inactivated_at === null;

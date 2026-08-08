@@ -3,6 +3,22 @@ set -eu
 
 echo "== Ricosty production check =="
 
+run_composer() {
+    if command -v composer >/dev/null 2>&1; then
+        composer "$@"
+    else
+        docker compose exec -T app composer "$@"
+    fi
+}
+
+run_npm() {
+    if command -v npm >/dev/null 2>&1; then
+        npm "$@"
+    else
+        docker compose exec -T frontend_dev npm "$@"
+    fi
+}
+
 if [ ! -f .env ]; then
     echo "Missing .env. Copy .env.example and configure production values."
     exit 1
@@ -15,12 +31,9 @@ php artisan view:clear
 
 ./vendor/bin/pint --test
 php artisan test
-
-if command -v npm >/dev/null 2>&1; then
-    npm run build
-else
-    docker compose exec -T frontend_dev npm run build
-fi
+run_composer audit
+run_npm audit
+run_npm run build
 
 php artisan config:cache
 php artisan route:cache

@@ -1,6 +1,6 @@
 # Ricosty Emagrecimento e Estética
 
-Sistema Laravel + React para cadastro de clientes, avaliações de bioimpedância Omron HBF-514C, relatório PDF profissional, histórico corporal, compartilhamento seguro e assistente de observações com base RAG validada.
+Sistema Laravel + React para cadastro de clientes, avaliações de bioimpedância Omron HBF-514C, relatório PDF profissional, histórico corporal, compartilhamento seguro e assistente de observações fundamentado em referências parametrizadas.
 
 ## Stack
 
@@ -29,7 +29,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-4. Instale dependências, gere chave e rode migrations:
+4. Instale dependências, gere chave e rode migrations com dados demo:
 
 ```bash
 docker compose exec -T app composer install
@@ -50,6 +50,8 @@ Admin: milicofelix@gmail.com / password
 Profissional: profissional@ricosty.local / password
 Recepção: recepcao@ricosty.local / password
 ```
+
+Esses usuários demo são ignorados automaticamente quando `APP_ENV=production`.
 
 ## Desenvolvimento Frontend
 
@@ -111,6 +113,7 @@ Depois do deploy:
 
 ```bash
 php artisan migrate --force
+php artisan ricosty:create-admin
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
@@ -124,6 +127,8 @@ php artisan view:cache
 - Não publicar `storage/framework/*`.
 - Usar HTTPS em produção.
 - Manter `APP_DEBUG=false`.
+- Não executar `php artisan db:seed` em produção.
+- Criar o primeiro administrador com `php artisan ricosty:create-admin`.
 - Rodar backup de banco e storage antes de atualizar produção.
 - Revisar permissões de `storage` e `bootstrap/cache`.
 

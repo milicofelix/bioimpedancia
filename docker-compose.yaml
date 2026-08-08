@@ -12,8 +12,8 @@ services:
 
   app:
     build:
-      context: ../docker/php
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: docker/php/Dockerfile
     image: php82-fpm-base:1
     container_name: ricostyemagrecimento_app
     working_dir: /var/www/app

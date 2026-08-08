@@ -16,6 +16,12 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        if (app()->isProduction()) {
+            $this->command?->warn('Seeders demo ignorados em produção. Use php artisan ricosty:create-admin para criar o primeiro administrador.');
+
+            return;
+        }
+
         User::query()->updateOrCreate([
             'email' => 'milicofelix@gmail.com',
         ], [

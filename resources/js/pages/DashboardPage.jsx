@@ -526,6 +526,8 @@ export default function DashboardPage({ userName }) {
 	}, [assessmentForm.weight_kg, clientForm.height_cm, selectedClient]);
 	const canWrite = currentUser?.role !== 'viewer';
 	const canAdmin = Boolean(currentUser?.is_admin);
+	const canCreateClinicalRecords = ['admin', 'professional', 'reception'].includes(currentUser?.role);
+	const canClinicalProfessional = ['admin', 'professional'].includes(currentUser?.role);
 
 	async function handleLogout() {
 		await window.axios.post('/logout', {}, { headers: { Accept: 'application/json' } });
@@ -670,7 +672,7 @@ export default function DashboardPage({ userName }) {
 
 	async function submitClient(event) {
 		event.preventDefault();
-		if (!canWrite) return;
+		if (clientMode === 'edit' ? !canClinicalProfessional : !canCreateClinicalRecords) return;
 		setSavingClient(true);
 		setErrors({});
 
@@ -698,7 +700,7 @@ export default function DashboardPage({ userName }) {
 	}
 
 	async function inactivateClient(client) {
-		if (!canWrite) return;
+		if (!canClinicalProfessional) return;
 		if (!client || !window.confirm(`Inativar ${client.full_name}? O histórico será preservado.`)) return;
 
 		const { data } = await window.axios.patch(`/bioimpedance/clients/${client.id}/inactivate`);
@@ -790,7 +792,8 @@ export default function DashboardPage({ userName }) {
 
 	async function submitAssessment(event) {
 		event.preventDefault();
-		if (!selectedClient || !canWrite) return;
+		if (!selectedClient) return;
+		if (assessmentMode === 'edit' ? !canClinicalProfessional : !canCreateClinicalRecords) return;
 
 		setSavingAssessment(true);
 		setErrors({});
@@ -830,7 +833,7 @@ export default function DashboardPage({ userName }) {
 	}
 
 	async function cancelAssessment(assessment) {
-		if (!canWrite) return;
+		if (!canClinicalProfessional) return;
 		if (!assessment || assessment.is_canceled) return;
 
 		const reason = window.prompt('Informe o motivo do cancelamento da avaliação:');
@@ -873,7 +876,7 @@ export default function DashboardPage({ userName }) {
 	}
 
 	async function generateObservationSuggestion() {
-		if (!selectedAssessment || generatingObservation) return;
+		if (!selectedAssessment || !canClinicalProfessional || generatingObservation) return;
 
 		setGeneratingObservation(true);
 		try {
@@ -886,7 +889,7 @@ export default function DashboardPage({ userName }) {
 	}
 
 	async function approveObservationSuggestion() {
-		if (!selectedAssessment || !observationDraft.trim()) return;
+		if (!selectedAssessment || !canClinicalProfessional || !observationDraft.trim()) return;
 
 		const reviewAction = observationAssistant?.suggestion === observationDraft ? 'approved' : 'edited';
 		const { data } = await window.axios.patch(`/bioimpedance/assessments/${selectedAssessment.id}/observation`, {
@@ -915,7 +918,7 @@ export default function DashboardPage({ userName }) {
 	}
 
 	async function revokeShare(share) {
-		if (!share || !window.confirm('Revogar este link temporário?')) return;
+		if (!canClinicalProfessional || !share || !window.confirm('Revogar este link temporário?')) return;
 
 		const { data } = await window.axios.patch(`/bioimpedance/report-shares/${share.id}/revoke`);
 		updateAssessmentInState(data.assessment);
@@ -1006,7 +1009,7 @@ export default function DashboardPage({ userName }) {
 							<h2 className="text-base font-semibold text-slate-950">{clientMode === 'edit' ? 'Editar cliente' : 'Cadastro rápido'}</h2>
 							<div className="flex gap-2">
 								<button type="button" onClick={() => startNewClient()} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600">Novo</button>
-								{selectedClient ? <button type="button" disabled={!canWrite || selectedClient.is_anonymized} onClick={() => startEditClient(selectedClient)} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">Editar</button> : null}
+								{selectedClient ? <button type="button" disabled={!canClinicalProfessional || selectedClient.is_anonymized} onClick={() => startEditClient(selectedClient)} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">Editar</button> : null}
 							</div>
 						</div>
 						<form onSubmit={submitClient} className="mt-4 space-y-3">
@@ -1059,11 +1062,11 @@ export default function DashboardPage({ userName }) {
 								<input type="checkbox" checked={clientForm.consent_accepted} onChange={(event) => updateClient('consent_accepted', event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600" />
 								<span>Cliente autorizou o registro dos dados para acompanhamento corporal.</span>
 							</label>
-							<button type="submit" disabled={!canWrite || savingClient} className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
+							<button type="submit" disabled={(clientMode === 'edit' ? !canClinicalProfessional : !canCreateClinicalRecords) || savingClient} className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
 								{savingClient ? 'Salvando...' : clientMode === 'edit' ? 'Salvar alterações' : 'Salvar cliente'}
 							</button>
 							{clientMode === 'edit' && selectedClient?.is_active && !selectedClient?.is_anonymized ? (
-								<button type="button" disabled={!canWrite} onClick={() => inactivateClient(selectedClient)} className="w-full rounded-xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
+								<button type="button" disabled={!canClinicalProfessional} onClick={() => inactivateClient(selectedClient)} className="w-full rounded-xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
 									Inativar cliente
 								</button>
 							) : null}
@@ -1237,7 +1240,7 @@ export default function DashboardPage({ userName }) {
 									<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Histórico de avaliações</p>
 									<h2 className="mt-1 text-lg font-semibold text-slate-950">{selectedClient.assessments?.length ?? 0} registro(s)</h2>
 								</div>
-								<button type="button" disabled={!canWrite} onClick={startNewAssessment} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
+								<button type="button" disabled={!canCreateClinicalRecords} onClick={startNewAssessment} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
 									Nova avaliação
 								</button>
 							</div>
@@ -1260,13 +1263,13 @@ export default function DashboardPage({ userName }) {
 							</div>
 							{selectedAssessment ? (
 								<div className="mt-4 flex flex-wrap gap-2">
-									<button type="button" disabled={!canWrite} onClick={() => duplicateAssessment(selectedAssessment)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50">
+									<button type="button" disabled={!canCreateClinicalRecords} onClick={() => duplicateAssessment(selectedAssessment)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50">
 										Duplicar como base
 									</button>
-									<button type="button" disabled={!canWrite || selectedAssessment.is_canceled} onClick={() => startEditAssessment(selectedAssessment)} className="rounded-xl border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50">
+									<button type="button" disabled={!canClinicalProfessional || selectedAssessment.is_canceled} onClick={() => startEditAssessment(selectedAssessment)} className="rounded-xl border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50">
 										Corrigir avaliação
 									</button>
-									<button type="button" disabled={!canWrite || selectedAssessment.is_canceled} onClick={() => cancelAssessment(selectedAssessment)} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
+									<button type="button" disabled={!canClinicalProfessional || selectedAssessment.is_canceled} onClick={() => cancelAssessment(selectedAssessment)} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
 										Cancelar avaliação
 									</button>
 									{canAdmin ? (
@@ -1288,7 +1291,7 @@ export default function DashboardPage({ userName }) {
 											<p className="text-xs font-bold uppercase tracking-wide text-violet-700">Assistente da avaliação</p>
 											<p className="mt-1 text-sm text-slate-600">Sugestão para observações, sem alterar classificações oficiais.</p>
 										</div>
-										<button type="button" disabled={!canWrite || generatingObservation} onClick={generateObservationSuggestion} className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50">
+										<button type="button" disabled={!canClinicalProfessional || generatingObservation} onClick={generateObservationSuggestion} className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50">
 											{generatingObservation ? 'Gerando...' : 'Gerar sugestão'}
 										</button>
 									</div>
@@ -1309,7 +1312,7 @@ export default function DashboardPage({ userName }) {
 															</ul>
 														</div>
 														<div className="flex flex-wrap gap-2">
-															<button type="button" onClick={approveObservationSuggestion} disabled={!canWrite || observationDraft.trim().length < 20} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
+															<button type="button" onClick={approveObservationSuggestion} disabled={!canClinicalProfessional || observationDraft.trim().length < 20} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
 																Aprovar observação
 															</button>
 															<button type="button" onClick={discardObservationSuggestion} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">
@@ -1368,7 +1371,7 @@ export default function DashboardPage({ userName }) {
 														<p className="text-xs font-bold uppercase text-slate-500">{share.channel} • expira {formatDate(share.expires_at)}</p>
 														<p className="mt-1 text-xs text-slate-500">Visualizações: {share.view_count} • {share.is_active ? 'Ativo' : 'Revogado/expirado'}</p>
 													</div>
-													<button type="button" disabled={!share.is_active} onClick={() => revokeShare(share)} className="rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-50">
+													<button type="button" disabled={!canClinicalProfessional || !share.is_active} onClick={() => revokeShare(share)} className="rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-50">
 														Revogar
 													</button>
 												</div>
@@ -1444,7 +1447,7 @@ export default function DashboardPage({ userName }) {
 									Confira os campos obrigatórios e valores digitados.
 								</div>
 							) : null}
-						<button type="submit" disabled={!canWrite || !selectedClient || !selectedClient.is_active || savingAssessment} className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-4">
+						<button type="submit" disabled={(assessmentMode === 'edit' ? !canClinicalProfessional : !canCreateClinicalRecords) || !selectedClient || !selectedClient.is_active || savingAssessment} className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-4">
 							{savingAssessment ? 'Salvando...' : assessmentMode === 'edit' ? 'Salvar correção e gerar relatório' : 'Salvar avaliação e gerar relatório'}
 						</button>
 						</form>

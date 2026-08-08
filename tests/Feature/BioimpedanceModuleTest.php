@@ -348,6 +348,28 @@ class BioimpedanceModuleTest extends TestCase
         ])->assertJsonValidationErrors(['bioimpedance_client_id']);
     }
 
+    public function test_anonymizing_client_revokes_public_links_and_scrubs_share_messages(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $assessment = $this->createAssessmentForUser($admin);
+        $shareResponse = $this->actingAs($admin)->postJson(route('bioimpedance.assessments.shares.store', $assessment->id), [
+            'channel' => 'whatsapp',
+            'expires_in_days' => 7,
+        ]);
+
+        $shareId = $shareResponse->json('share.id');
+        $this->assertNotNull($shareResponse->json('share.url'));
+
+        $this->actingAs($admin)->patchJson(route('bioimpedance.clients.anonymize', $assessment->bioimpedance_client_id), [
+            'anonymization_reason' => 'Solicitação formal do cliente.',
+        ])->assertOk();
+
+        $share = BioimpedanceReportShare::query()->findOrFail($shareId);
+        $this->assertNotNull($share->revoked_at);
+        $this->assertSame('Compartilhamento revogado por anonimização LGPD.', $share->message);
+        $this->get($shareResponse->json('share.url'))->assertStatus(410);
+    }
+
     public function test_all_client_assessments_are_returned_for_history(): void
     {
         $user = User::factory()->create();
@@ -497,11 +519,29 @@ class BioimpedanceModuleTest extends TestCase
         $this->assertStringNotContainsString('80', $response->json('share.message'));
         $this->assertNotNull($response->json('share.url'));
 
+        $plainUrl = $response->json('share.url');
+        $plainToken = basename(parse_url($plainUrl, PHP_URL_PATH));
+        $shareId = $response->json('share.id');
+        $share = BioimpedanceReportShare::query()->findOrFail($shareId);
+
+        $this->assertStringContainsString($plainUrl, $response->json('share.message'));
+        $this->assertStringNotContainsString($plainToken, (string) $share->message);
+        $this->assertStringNotContainsString($plainUrl, (string) $share->message);
+        $createdAudit = AppAudit::query()
+            ->where('action', 'bioimpedance_report_share.created')
+            ->where('auditable_id', $shareId)
+            ->firstOrFail();
+        $this->assertStringNotContainsString($plainToken, json_encode($createdAudit->new_values));
+        $this->assertStringNotContainsString($plainUrl, json_encode($createdAudit->new_values));
+
         $publicResponse = $this->get($response->json('share.url'));
         $publicResponse->assertOk();
         $publicResponse->assertSee('Relatório de bioimpedância');
+        $this->assertStringContainsString('no-store', $publicResponse->headers->get('Cache-Control'));
+        $this->assertStringContainsString('no-cache', $publicResponse->headers->get('Cache-Control'));
+        $publicResponse->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        $publicResponse->assertHeader('Referrer-Policy', 'no-referrer');
 
-        $shareId = $response->json('share.id');
         $this->assertDatabaseHas('bioimpedance_report_shares', [
             'id' => $shareId,
             'view_count' => 1,
@@ -527,6 +567,54 @@ class BioimpedanceModuleTest extends TestCase
             ->assertJsonPath('share.is_active', false);
 
         $this->get($shareResponse->json('share.url'))->assertStatus(410);
+    }
+
+    public function test_reception_can_create_records_but_cannot_change_clinical_outputs(): void
+    {
+        $professional = User::factory()->create(['role' => User::ROLE_PROFESSIONAL]);
+        $reception = User::factory()->create(['role' => User::ROLE_RECEPTION]);
+        $assessment = $this->createAssessmentForUser($professional);
+
+        $clientResponse = $this->actingAs($reception)->postJson(route('bioimpedance.clients.store'), [
+            'full_name' => 'Cliente Recepcao',
+            'birth_date' => '1990-05-10',
+            'biological_sex' => 'female',
+            'height_cm' => 165,
+            'email' => 'cliente.recepcao@example.com',
+        ]);
+
+        $clientResponse->assertCreated();
+
+        $this->actingAs($reception)->postJson(route('bioimpedance.assessments.store'), [
+            'bioimpedance_client_id' => $clientResponse->json('client.id'),
+            'evaluated_at' => '2026-08-07 09:30:00',
+            'weight_kg' => 70,
+            'scale_bmi' => 25.7,
+            'body_fat_percentage' => 28,
+            'skeletal_muscle_percentage' => 28,
+            'resting_metabolism_kcal' => 1400,
+            'body_age' => 42,
+            'visceral_fat_level' => 8,
+        ])->assertCreated();
+
+        $this->actingAs($reception)->putJson(route('bioimpedance.assessments.update', $assessment->id), [
+            'evaluated_at' => '2026-08-07 09:30:00',
+            'weight_kg' => 81,
+            'scale_bmi' => 26.8,
+            'body_fat_percentage' => 21,
+            'skeletal_muscle_percentage' => 37,
+            'resting_metabolism_kcal' => 1800,
+            'body_age' => 41,
+            'visceral_fat_level' => 10,
+            'change_reason' => 'Correção pela recepção.',
+        ])->assertForbidden();
+
+        $this->actingAs($reception)->patchJson(route('bioimpedance.assessments.cancel', $assessment->id), [
+            'cancellation_reason' => 'Cancelamento pela recepção.',
+        ])->assertForbidden();
+
+        $this->actingAs($reception)->getJson(route('bioimpedance.assessments.observation-suggestion', $assessment->id))
+            ->assertForbidden();
     }
 
     public function test_legacy_pending_analysis_is_refreshed_before_pdf_download(): void
