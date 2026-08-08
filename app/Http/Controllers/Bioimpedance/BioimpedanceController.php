@@ -7,6 +7,7 @@ use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceAssessmentAudit;
 use App\Models\Bioimpedance\BioimpedanceClient;
 use App\Services\Bioimpedance\BioimpedanceAnalyzer;
+use App\Services\Bioimpedance\LegacyBioimpedanceAnalysisRefresher;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -164,9 +165,11 @@ class BioimpedanceController extends Controller
         ]);
     }
 
-    public function downloadAssessmentPdf(BioimpedanceAssessment $assessment): Response
+    public function downloadAssessmentPdf(BioimpedanceAssessment $assessment, LegacyBioimpedanceAnalysisRefresher $legacyAnalysisRefresher): Response
     {
         $assessment->load(['client', 'professional', 'correctedBy', 'canceledBy']);
+        $legacyAnalysisRefresher->refreshIfLegacy($assessment);
+        $assessment->refresh()->load(['client', 'professional', 'correctedBy', 'canceledBy']);
         $assessment->update([
             'report_issued_at' => now(),
             'report_issue_count' => $assessment->report_issue_count + 1,

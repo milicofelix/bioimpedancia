@@ -331,6 +331,33 @@ class BioimpedanceModuleTest extends TestCase
         $this->assertSame(1, $assessment->report_issue_count);
     }
 
+    public function test_legacy_pending_analysis_is_refreshed_before_pdf_download(): void
+    {
+        $user = User::factory()->create();
+        $assessment = $this->createAssessmentForUser($user);
+        $assessment->forceFill([
+            'analysis' => [
+                'source' => 'Omron HBF-514C',
+                'summary' => 'IMC calculado em 31.4 kg/m2, classificado como Obesidade grau I. Gordura corporal registrada em 20,5%.',
+                'indicators' => [
+                    'body_fat' => ['classification' => 'Aguardando manual Omron', 'tone' => 'pending', 'pending' => true],
+                    'skeletal_muscle' => ['classification' => 'Aguardando manual Omron', 'tone' => 'pending', 'pending' => true],
+                    'visceral_fat' => ['classification' => 'Aguardando manual Omron', 'tone' => 'pending', 'pending' => true],
+                ],
+            ],
+        ])->save();
+
+        $this->actingAs($user)->get(route('bioimpedance.assessments.pdf', $assessment->id))
+            ->assertOk();
+
+        $assessment->refresh();
+        $this->assertSame('Elevada', $assessment->analysis['indicators']['body_fat']['classification']);
+        $this->assertSame('Normal', $assessment->analysis['indicators']['skeletal_muscle']['classification']);
+        $this->assertSame('Normal', $assessment->analysis['indicators']['visceral_fat']['classification']);
+        $this->assertSame('1.0.0', $assessment->analysis['reference']['classification_version']);
+        $this->assertStringContainsString('kg/m²', $assessment->analysis['summary']);
+    }
+
     public function test_assessment_age_is_calculated_from_evaluation_date(): void
     {
         $user = User::factory()->create();
