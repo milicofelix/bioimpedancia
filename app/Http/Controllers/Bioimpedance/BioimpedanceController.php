@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Bioimpedance;
 
 use App\Http\Controllers\Controller;
 use App\Models\AppAudit;
+use App\Models\Bioimpedance\BioimpedanceAiAnalysisOutput;
 use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceAssessmentAudit;
 use App\Models\Bioimpedance\BioimpedanceClient;
@@ -423,13 +424,14 @@ class BioimpedanceController extends Controller
         ], 201);
     }
 
-    public function suggestAssessmentObservation(BioimpedanceAssessment $assessment, BioimpedanceObservationAssistant $assistant): JsonResponse
+    public function suggestAssessmentObservation(Request $request, BioimpedanceAssessment $assessment, BioimpedanceObservationAssistant $assistant): JsonResponse
     {
+        $this->authorizeWrite($request);
         $assessment->load(['client', 'professional']);
         abort_if($assessment->canceled_at, 422, 'Avaliação cancelada não pode receber sugestão de observação.');
 
         return response()->json([
-            'assistant' => $assistant->suggest($assessment),
+            'assistant' => $assistant->suggest($assessment, $request->user()),
         ]);
     }
 
@@ -445,6 +447,7 @@ class BioimpedanceController extends Controller
         $validated = $request->validate([
             'notes' => ['required', 'string', 'min:20', 'max:2000'],
             'review_action' => ['required', Rule::in(['approved', 'edited'])],
+            'assistant_output_id' => ['nullable', 'exists:bioimpedance_ai_analysis_outputs,id'],
         ]);
 
         $oldValues = $this->assessmentAuditValues($assessment);
@@ -462,6 +465,17 @@ class BioimpedanceController extends Controller
             $oldValues,
             $this->assessmentAuditValues($assessment)
         );
+
+        if ($validated['assistant_output_id'] ?? null) {
+            BioimpedanceAiAnalysisOutput::query()
+                ->where('id', $validated['assistant_output_id'])
+                ->whereHas('request', fn ($query) => $query->where('bioimpedance_assessment_id', $assessment->id))
+                ->update([
+                    'professional_observation' => $validated['notes'],
+                    'approved_by_user_id' => $request->user()->id,
+                    'approved_at' => now(),
+                ]);
+        }
 
         return response()->json([
             'client' => $this->clientPayload($this->loadClientAssessments($assessment->client->refresh())),

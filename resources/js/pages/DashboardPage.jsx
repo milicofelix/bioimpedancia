@@ -892,6 +892,7 @@ export default function DashboardPage({ userName }) {
 		const { data } = await window.axios.patch(`/bioimpedance/assessments/${selectedAssessment.id}/observation`, {
 			notes: observationDraft,
 			review_action: reviewAction,
+			assistant_output_id: observationAssistant?.output_id,
 		});
 		setClients((current) => current.map((client) => (client.id === data.client.id ? data.client : client)));
 		setSelectedAssessmentId(data.assessment.id);
@@ -1293,23 +1294,46 @@ export default function DashboardPage({ userName }) {
 									</div>
 									{observationAssistant ? (
 										<div className="mt-3 rounded-xl bg-white p-3">
-											<textarea value={observationDraft} onChange={(event) => setObservationDraft(event.target.value)} rows="6" className={inputClass()} />
-											<div className="mt-3 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
-												<div>
-													<p className="text-xs font-bold uppercase tracking-wide text-slate-500">Referências usadas</p>
-													<ul className="mt-2 space-y-1 text-xs leading-5 text-slate-500">
-														{observationAssistant.references?.map((reference) => <li key={reference}>{reference}</li>)}
-													</ul>
+											{observationAssistant.status === 'generated' ? (
+												<>
+													<textarea value={observationDraft} onChange={(event) => setObservationDraft(event.target.value)} rows="6" className={inputClass()} />
+													<div className="mt-3 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+														<div>
+															<p className="text-xs font-bold uppercase tracking-wide text-slate-500">Fontes recuperadas</p>
+															<ul className="mt-2 space-y-1 text-xs leading-5 text-slate-500">
+																{observationAssistant.sources?.map((source) => (
+																	<li key={source.id}>
+																		{source.document} • {source.section}{source.page ? ` • pág. ${source.page}` : ''}
+																	</li>
+																))}
+															</ul>
+														</div>
+														<div className="flex flex-wrap gap-2">
+															<button type="button" onClick={approveObservationSuggestion} disabled={!canWrite || observationDraft.trim().length < 20} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
+																Aprovar observação
+															</button>
+															<button type="button" onClick={discardObservationSuggestion} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">
+																Descartar
+															</button>
+														</div>
+													</div>
+												</>
+											) : (
+												<div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-800">
+													{observationAssistant.summary ?? 'Não há evidência aprovada suficiente para gerar sugestão.'}
 												</div>
-												<div className="flex flex-wrap gap-2">
-													<button type="button" onClick={approveObservationSuggestion} disabled={!canWrite || observationDraft.trim().length < 20} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
-														Aprovar observação
-													</button>
-													<button type="button" onClick={discardObservationSuggestion} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">
-														Descartar
-													</button>
-												</div>
+											)}
+											<div className="mt-3 flex flex-wrap gap-2 text-xs font-bold">
+												<span className={`rounded-full px-3 py-1 ${observationAssistant.validation_status === 'passed' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+													Validação: {observationAssistant.validation_status === 'passed' ? 'aprovada' : 'bloqueada'}
+												</span>
+												<span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">Request #{observationAssistant.request_id}</span>
 											</div>
+											{observationAssistant.validation_errors?.length ? (
+												<ul className="mt-2 space-y-1 text-xs leading-5 text-rose-700">
+													{observationAssistant.validation_errors.map((error) => <li key={error}>{error}</li>)}
+												</ul>
+											) : null}
 											<p className="mt-3 text-xs text-slate-500">{observationAssistant.notice}</p>
 										</div>
 									) : null}

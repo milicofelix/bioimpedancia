@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\AppAudit;
+use App\Models\Bioimpedance\BioimpedanceAiAnalysisOutput;
+use App\Models\Bioimpedance\BioimpedanceAiAnalysisRequest;
 use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceAssessmentAudit;
 use App\Models\Bioimpedance\BioimpedanceClient;
@@ -860,18 +862,31 @@ class BioimpedanceModuleTest extends TestCase
         $suggestionResponse = $this->actingAs($user)->getJson(route('bioimpedance.assessments.observation-suggestion', $assessmentId));
 
         $suggestionResponse->assertOk();
+        $suggestionResponse->assertJsonPath('assistant.status', 'generated');
+        $suggestionResponse->assertJsonPath('assistant.validation_status', 'passed');
         $suggestionResponse->assertJsonPath('assistant.context.age_at_assessment', 45);
         $suggestionResponse->assertJsonPath('assistant.context.device_model', 'HBF-514C');
-        $suggestionResponse->assertJsonPath('assistant.notice', 'Sugestão gerada para revisão do profissional. As classificações oficiais não foram alteradas.');
+        $suggestionResponse->assertJsonPath('assistant.notice', 'Sugestão RAG validada para revisão do profissional. As classificações oficiais não foram alteradas.');
         $this->assertStringContainsString('gordura corporal normal', $suggestionResponse->json('assistant.suggestion'));
         $this->assertStringContainsString('gordura visceral elevada', $suggestionResponse->json('assistant.suggestion'));
         $this->assertStringContainsString('19 anos acima', $suggestionResponse->json('assistant.suggestion'));
         $this->assertStringContainsString('redução de 2,0 kg em peso', $suggestionResponse->json('assistant.suggestion'));
+        $this->assertContains('omron-hbf514c-visceral-fat', collect($suggestionResponse->json('assistant.sources'))->pluck('id'));
+        $this->assertDatabaseHas('bioimpedance_ai_analysis_requests', [
+            'id' => $suggestionResponse->json('assistant.request_id'),
+            'bioimpedance_assessment_id' => $assessmentId,
+            'status' => 'generated',
+        ]);
+        $this->assertDatabaseHas('bioimpedance_ai_analysis_outputs', [
+            'id' => $suggestionResponse->json('assistant.output_id'),
+            'validation_status' => 'passed',
+        ]);
 
         $approvedNotes = $suggestionResponse->json('assistant.suggestion').' Orientação final revisada pelo profissional.';
         $approveResponse = $this->actingAs($user)->patchJson(route('bioimpedance.assessments.observation.approve', $assessmentId), [
             'notes' => $approvedNotes,
             'review_action' => 'edited',
+            'assistant_output_id' => $suggestionResponse->json('assistant.output_id'),
         ]);
 
         $approveResponse->assertOk();
@@ -880,6 +895,8 @@ class BioimpedanceModuleTest extends TestCase
             'bioimpedance_assessment_id' => $assessmentId,
             'action' => 'observation_edited',
         ]);
+        $this->assertNotNull(BioimpedanceAiAnalysisOutput::query()->find($suggestionResponse->json('assistant.output_id'))->approved_at);
+        $this->assertSame(1, BioimpedanceAiAnalysisRequest::query()->where('bioimpedance_assessment_id', $assessmentId)->count());
         $this->assertSame($originalAnalysis, BioimpedanceAssessment::query()->findOrFail($assessmentId)->analysis);
     }
 
