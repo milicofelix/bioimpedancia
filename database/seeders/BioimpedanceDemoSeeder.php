@@ -6,6 +6,7 @@ use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceClient;
 use App\Models\User;
 use App\Services\Bioimpedance\BioimpedanceAnalyzer;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 
@@ -28,9 +29,11 @@ class BioimpedanceDemoSeeder extends Seeder
             $client->assessments()->delete();
 
             foreach ($assessments as $assessmentData) {
+                $snapshot = $this->snapshot($clientData, $assessmentData['evaluated_at']);
                 $calculatedBmi = $this->bmi($assessmentData['weight_kg'], $clientData['height_cm']);
                 $payload = [
                     ...$assessmentData,
+                    ...$snapshot,
                     'bioimpedance_client_id' => $client->id,
                     'user_id' => $professional?->id,
                     'calculated_bmi' => $calculatedBmi,
@@ -50,6 +53,17 @@ class BioimpedanceDemoSeeder extends Seeder
         $heightM = $heightCm / 100;
 
         return round($weightKg / ($heightM * $heightM), 1);
+    }
+
+    private function snapshot(array $clientData, string $evaluatedAt): array
+    {
+        return [
+            'age_at_assessment' => (int) CarbonImmutable::parse($clientData['birth_date'])->diffInYears(CarbonImmutable::parse($evaluatedAt)),
+            'height_cm_at_assessment' => $clientData['height_cm'],
+            'biological_sex_at_assessment' => $clientData['biological_sex'],
+            'device_model' => BioimpedanceAnalyzer::DEVICE_MODEL,
+            'reference_version' => BioimpedanceAnalyzer::REFERENCE_VERSION,
+        ];
     }
 
     private function clients(): array

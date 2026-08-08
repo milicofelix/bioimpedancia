@@ -614,13 +614,21 @@ function ScaleCard({ title, value, unit, badge, tone, position = 50, labels = []
 						</div>
 						{pending ? null : <span className="absolute top-0 h-0 w-0 -translate-x-1/2 border-x-[7px] border-t-[10px] border-x-transparent border-t-slate-900" style={{ left: `${position}%` }}></span>}
 					</div>
-					<div className="mt-1 flex flex-wrap justify-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
-						{labels.map((label, index) => (
-							<span key={label} className="inline-flex items-center gap-1 whitespace-nowrap">
-								<span className={`h-1.5 w-1.5 rounded-full ${pending ? 'bg-slate-300' : scaleSegments[index]?.className ?? 'bg-slate-300'}`}></span>
-								{label}
-							</span>
-						))}
+					<div className="mt-1 flex text-xs text-slate-500">
+						{scaleSegments.map((segment, index) => {
+							const label = segment.label ?? labels[index];
+
+							if (!label) {
+								return null;
+							}
+
+							return (
+								<span key={`${label}-${index}`} className="inline-flex min-w-0 items-center justify-center gap-1 px-1 text-center leading-tight" style={{ width: `${segment.width}%` }}>
+									<span className={`h-1.5 w-1.5 rounded-full ${pending ? 'bg-slate-300' : scaleSegments[index]?.className ?? 'bg-slate-300'}`}></span>
+									{label}
+								</span>
+							);
+						})}
 					</div>
 				</div>
 			)}

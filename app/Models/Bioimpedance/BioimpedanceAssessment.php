@@ -14,6 +14,11 @@ class BioimpedanceAssessment extends Model
     protected $fillable = [
         'bioimpedance_client_id',
         'user_id',
+        'age_at_assessment',
+        'height_cm_at_assessment',
+        'biological_sex_at_assessment',
+        'device_model',
+        'reference_version',
         'evaluated_at',
         'weight_kg',
         'scale_bmi',
@@ -32,6 +37,7 @@ class BioimpedanceAssessment extends Model
     {
         return [
             'evaluated_at' => 'datetime',
+            'height_cm_at_assessment' => 'decimal:1',
             'weight_kg' => 'decimal:2',
             'scale_bmi' => 'decimal:1',
             'calculated_bmi' => 'decimal:1',

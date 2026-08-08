@@ -6,6 +6,10 @@ use Carbon\CarbonImmutable;
 
 class BioimpedanceAnalyzer
 {
+    public const DEVICE_MODEL = 'HBF-514C';
+
+    public const REFERENCE_VERSION = '1.0.0';
+
     private const BODY_FAT_RANGES = [
         'female' => [
             ['min_age' => 20, 'max_age' => 39, 'normal_min' => 21.0, 'normal_max' => 32.9, 'high_max' => 38.9],
@@ -34,17 +38,26 @@ class BioimpedanceAnalyzer
 
     public function analyze(array $client, array $assessment): array
     {
-        $heightM = ((float) $client['height_cm']) / 100;
+        $heightCm = (float) ($assessment['height_cm_at_assessment'] ?? $client['height_cm']);
+        $heightM = $heightCm / 100;
         $weightKg = (float) $assessment['weight_kg'];
         $calculatedBmi = round($weightKg / ($heightM * $heightM), 1);
         $scaleBmi = isset($assessment['scale_bmi']) ? (float) $assessment['scale_bmi'] : null;
         $bmiDifference = $scaleBmi === null ? null : round($scaleBmi - $calculatedBmi, 2);
-        $age = CarbonImmutable::parse($client['birth_date'])->age;
-        $sex = $client['biological_sex'];
+        $age = $this->ageAtAssessment($client, $assessment);
+        $sex = $assessment['biological_sex_at_assessment'] ?? $client['biological_sex'];
 
         return [
             'source' => 'Omron HBF-514C',
+            'reference' => $this->reference(),
             'age' => $age,
+            'snapshot' => [
+                'age_at_assessment' => $age,
+                'height_cm_at_assessment' => $heightCm,
+                'biological_sex_at_assessment' => $sex,
+                'device_model' => self::DEVICE_MODEL,
+                'reference_version' => self::REFERENCE_VERSION,
+            ],
             'calculated_bmi' => $calculatedBmi,
             'bmi_difference' => $bmiDifference,
             'summary' => $this->summary($calculatedBmi, $assessment, $age, $sex),
@@ -60,7 +73,7 @@ class BioimpedanceAnalyzer
             ? 'Gordura corporal registrada em '.number_format((float) $assessment['body_fat_percentage'], 1, ',', '.').'%, classificada como '.$this->bodyFatClassification((float) $assessment['body_fat_percentage'], $sex, $age)['classification'].'.'
             : 'Gordura corporal nao informada.';
 
-        return "IMC calculado em {$calculatedBmi} kg/m2, classificado como {$bmi['classification']}. {$fat}";
+        return "IMC calculado automaticamente com base em peso e altura: {$calculatedBmi} kg/m², classificado como {$bmi['classification']}. {$fat}";
     }
 
     private function indicators(float $calculatedBmi, array $assessment, int $age, string $sex): array
@@ -74,7 +87,7 @@ class BioimpedanceAnalyzer
             ],
             'bmi' => [
                 'label' => 'IMC',
-                'value' => number_format($calculatedBmi, 1, ',', '.').' kg/m2',
+                'value' => number_format($calculatedBmi, 1, ',', '.').' kg/m²',
                 ...$this->bmiClassification($calculatedBmi),
             ],
             'body_fat' => $this->bodyFatIndicator($assessment['body_fat_percentage'] ?? null, $sex, $age),
@@ -232,6 +245,7 @@ class BioimpedanceAnalyzer
             $segments[] = [
                 'className' => $colors[$index] ?? 'bg-slate-300',
                 'width' => (($points[$index + 1] - $points[$index]) / ($max - $min)) * 100,
+                'label' => $labels[$index] ?? null,
             ];
         }
 
@@ -260,19 +274,44 @@ class BioimpedanceAnalyzer
         ];
     }
 
+    private function ageAtAssessment(array $client, array $assessment): int
+    {
+        if (isset($assessment['age_at_assessment']) && $assessment['age_at_assessment'] !== null) {
+            return (int) $assessment['age_at_assessment'];
+        }
+
+        $birthDate = CarbonImmutable::parse($client['birth_date']);
+        $evaluatedAt = CarbonImmutable::parse($assessment['evaluated_at'] ?? now());
+
+        return (int) $birthDate->diffInYears($evaluatedAt);
+    }
+
+    private function reference(): array
+    {
+        return [
+            'manufacturer' => 'Omron',
+            'model' => self::DEVICE_MODEL,
+            'manual_code' => '5344832-6B',
+            'version' => 'LA IM SP r2',
+            'classification_version' => self::REFERENCE_VERSION,
+        ];
+    }
+
     private function warnings(array $client, array $assessment, float $calculatedBmi, ?float $bmiDifference): array
     {
         $warnings = [];
 
-        if ((float) $client['height_cm'] < 100 || (float) $client['height_cm'] > 230) {
-            $warnings[] = 'Altura fora da faixa esperada para adultos. Confira o cadastro do cliente.';
+        $heightCm = (float) ($assessment['height_cm_at_assessment'] ?? $client['height_cm']);
+
+        if ($heightCm < 100 || $heightCm > 199.5) {
+            $warnings[] = 'Altura fora da faixa aceita pela Omron HBF-514C. Confira o cadastro do cliente.';
         }
 
-        if ((float) $assessment['weight_kg'] < 25 || (float) $assessment['weight_kg'] > 250) {
-            $warnings[] = 'Peso fora da faixa esperada. Confira o valor digitado a partir da balanca.';
+        if ((float) $assessment['weight_kg'] < 2 || (float) $assessment['weight_kg'] > 150) {
+            $warnings[] = 'Peso fora da faixa aceita pela Omron HBF-514C. Confira o valor digitado a partir da balanca.';
         }
 
-        if ($calculatedBmi < 10 || $calculatedBmi > 80) {
+        if ($calculatedBmi < 7 || $calculatedBmi > 90) {
             $warnings[] = 'IMC calculado muito fora do esperado. Verifique peso e altura.';
         }
 
@@ -284,8 +323,8 @@ class BioimpedanceAnalyzer
             'body_fat_percentage' => 'gordura corporal',
             'skeletal_muscle_percentage' => 'musculo esqueletico',
         ] as $field => $label) {
-            if (isset($assessment[$field]) && ((float) $assessment[$field] < 1 || (float) $assessment[$field] > 80)) {
-                $warnings[] = "Percentual de {$label} parece incomum. Confira a digitacao.";
+            if (isset($assessment[$field]) && ((float) $assessment[$field] < 5 || (float) $assessment[$field] > ($field === 'body_fat_percentage' ? 60 : 50))) {
+                $warnings[] = "Percentual de {$label} fora da faixa aceita pela Omron HBF-514C. Confira a digitacao.";
             }
         }
 

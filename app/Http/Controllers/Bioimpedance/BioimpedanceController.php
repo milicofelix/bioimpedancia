@@ -8,6 +8,7 @@ use App\Models\Bioimpedance\BioimpedanceClient;
 use App\Services\Bioimpedance\BioimpedanceAnalyzer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 
 class BioimpedanceController extends Controller
@@ -18,7 +19,7 @@ class BioimpedanceController extends Controller
             ->with(['assessments' => fn ($query) => $query->latest('evaluated_at')->limit(5)])
             ->orderBy('full_name')
             ->get()
-            ->map(fn (BioimpedanceClient $client) => $this->clientPayload($client, $analyzer));
+            ->map(fn (BioimpedanceClient $client) => $this->clientPayload($client));
 
         return response()->json([
             'clients' => $clients,
@@ -42,7 +43,7 @@ class BioimpedanceController extends Controller
             'full_name' => ['required', 'string', 'max:160'],
             'birth_date' => ['required', 'date', 'before:today'],
             'biological_sex' => ['required', Rule::in(['female', 'male'])],
-            'height_cm' => ['required', 'numeric', 'between:80,250'],
+            'height_cm' => ['required', 'numeric', 'between:100,199.5'],
             'phone' => ['nullable', 'string', 'max:40'],
             'email' => ['nullable', 'email', 'max:160'],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -71,21 +72,23 @@ class BioimpedanceController extends Controller
         $validated = $request->validate([
             'bioimpedance_client_id' => ['required', 'exists:bioimpedance_clients,id'],
             'evaluated_at' => ['required', 'date'],
-            'weight_kg' => ['required', 'numeric', 'between:20,300'],
-            'scale_bmi' => ['nullable', 'numeric', 'between:5,90'],
-            'body_fat_percentage' => ['nullable', 'numeric', 'between:1,80'],
-            'skeletal_muscle_percentage' => ['nullable', 'numeric', 'between:1,80'],
-            'resting_metabolism_kcal' => ['nullable', 'integer', 'between:500,5000'],
-            'body_age' => ['nullable', 'integer', 'between:10,120'],
-            'visceral_fat_level' => ['nullable', 'numeric', 'between:0,40'],
+            'weight_kg' => ['required', 'numeric', 'between:2,150'],
+            'scale_bmi' => ['nullable', 'numeric', 'between:7,90'],
+            'body_fat_percentage' => ['nullable', 'numeric', 'between:5,60'],
+            'skeletal_muscle_percentage' => ['nullable', 'numeric', 'between:5,50'],
+            'resting_metabolism_kcal' => ['nullable', 'integer', 'between:385,3999'],
+            'body_age' => ['nullable', 'integer', 'between:18,80'],
+            'visceral_fat_level' => ['nullable', 'integer', 'between:1,30'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $client = BioimpedanceClient::query()->findOrFail($validated['bioimpedance_client_id']);
-        $analysis = $analyzer->analyze($client->toArray(), $validated);
+        $snapshot = $this->assessmentSnapshot($client, $validated['evaluated_at']);
+        $analysis = $analyzer->analyze($client->toArray(), [...$validated, ...$snapshot]);
 
         $assessment = BioimpedanceAssessment::query()->create([
             ...$validated,
+            ...$snapshot,
             'user_id' => $request->user()->id,
             'calculated_bmi' => $analysis['calculated_bmi'],
             'bmi_difference' => $analysis['bmi_difference'],
@@ -93,9 +96,20 @@ class BioimpedanceController extends Controller
         ]);
 
         return response()->json([
-            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')->limit(5)]), $analyzer),
+            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')->limit(5)])),
             'assessment' => $this->assessmentPayload($assessment),
         ], 201);
+    }
+
+    private function assessmentSnapshot(BioimpedanceClient $client, string $evaluatedAt): array
+    {
+        return [
+            'age_at_assessment' => (int) $client->birth_date->diffInYears(Carbon::parse($evaluatedAt)),
+            'height_cm_at_assessment' => (float) $client->height_cm,
+            'biological_sex_at_assessment' => $client->biological_sex,
+            'device_model' => BioimpedanceAnalyzer::DEVICE_MODEL,
+            'reference_version' => BioimpedanceAnalyzer::REFERENCE_VERSION,
+        ];
     }
 
     private function normalizeHeightToCentimeters(mixed $value): mixed
@@ -124,7 +138,7 @@ class BioimpedanceController extends Controller
         return $value;
     }
 
-    private function clientPayload(BioimpedanceClient $client, ?BioimpedanceAnalyzer $analyzer = null): array
+    private function clientPayload(BioimpedanceClient $client): array
     {
         return [
             'id' => $client->id,
@@ -139,24 +153,25 @@ class BioimpedanceController extends Controller
             'assessments' => $client->assessments
                 ->sortByDesc('evaluated_at')
                 ->values()
-                ->map(fn (BioimpedanceAssessment $assessment) => $this->assessmentPayload($assessment, $client, $analyzer))
+                ->map(fn (BioimpedanceAssessment $assessment) => $this->assessmentPayload($assessment))
                 ->all(),
         ];
     }
 
-    private function assessmentPayload(BioimpedanceAssessment $assessment, ?BioimpedanceClient $client = null, ?BioimpedanceAnalyzer $analyzer = null): array
+    private function assessmentPayload(BioimpedanceAssessment $assessment): array
     {
         $analysis = $assessment->analysis;
-
-        if ($client && $analyzer) {
-            $analysis = $analyzer->analyze($client->toArray(), $assessment->toArray());
-        }
 
         return [
             'id' => $assessment->id,
             'bioimpedance_client_id' => $assessment->bioimpedance_client_id,
             'professional_name' => $assessment->professional?->name,
             'evaluated_at' => $assessment->evaluated_at?->toIso8601String(),
+            'age_at_assessment' => $assessment->age_at_assessment,
+            'height_cm_at_assessment' => $assessment->height_cm_at_assessment === null ? null : (float) $assessment->height_cm_at_assessment,
+            'biological_sex_at_assessment' => $assessment->biological_sex_at_assessment,
+            'device_model' => $assessment->device_model,
+            'reference_version' => $assessment->reference_version,
             'weight_kg' => (float) $assessment->weight_kg,
             'scale_bmi' => $assessment->scale_bmi === null ? null : (float) $assessment->scale_bmi,
             'calculated_bmi' => (float) $assessment->calculated_bmi,
