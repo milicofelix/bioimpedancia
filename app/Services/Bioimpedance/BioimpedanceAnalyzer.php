@@ -6,6 +6,32 @@ use Carbon\CarbonImmutable;
 
 class BioimpedanceAnalyzer
 {
+    private const BODY_FAT_RANGES = [
+        'female' => [
+            ['min_age' => 20, 'max_age' => 39, 'normal_min' => 21.0, 'normal_max' => 32.9, 'high_max' => 38.9],
+            ['min_age' => 40, 'max_age' => 59, 'normal_min' => 23.0, 'normal_max' => 33.9, 'high_max' => 39.9],
+            ['min_age' => 60, 'max_age' => 79, 'normal_min' => 24.0, 'normal_max' => 35.9, 'high_max' => 41.9],
+        ],
+        'male' => [
+            ['min_age' => 20, 'max_age' => 39, 'normal_min' => 8.0, 'normal_max' => 19.9, 'high_max' => 24.9],
+            ['min_age' => 40, 'max_age' => 59, 'normal_min' => 11.0, 'normal_max' => 21.9, 'high_max' => 27.9],
+            ['min_age' => 60, 'max_age' => 79, 'normal_min' => 13.0, 'normal_max' => 24.9, 'high_max' => 29.9],
+        ],
+    ];
+
+    private const SKELETAL_MUSCLE_RANGES = [
+        'female' => [
+            ['min_age' => 18, 'max_age' => 39, 'normal_min' => 24.3, 'normal_max' => 30.3, 'high_max' => 35.3],
+            ['min_age' => 40, 'max_age' => 59, 'normal_min' => 24.1, 'normal_max' => 30.1, 'high_max' => 35.1],
+            ['min_age' => 60, 'max_age' => 80, 'normal_min' => 23.9, 'normal_max' => 29.9, 'high_max' => 34.9],
+        ],
+        'male' => [
+            ['min_age' => 18, 'max_age' => 39, 'normal_min' => 33.3, 'normal_max' => 39.3, 'high_max' => 44.0],
+            ['min_age' => 40, 'max_age' => 59, 'normal_min' => 33.1, 'normal_max' => 39.1, 'high_max' => 43.8],
+            ['min_age' => 60, 'max_age' => 80, 'normal_min' => 32.9, 'normal_max' => 38.9, 'high_max' => 43.6],
+        ],
+    ];
+
     public function analyze(array $client, array $assessment): array
     {
         $heightM = ((float) $client['height_cm']) / 100;
@@ -13,28 +39,31 @@ class BioimpedanceAnalyzer
         $calculatedBmi = round($weightKg / ($heightM * $heightM), 1);
         $scaleBmi = isset($assessment['scale_bmi']) ? (float) $assessment['scale_bmi'] : null;
         $bmiDifference = $scaleBmi === null ? null : round($scaleBmi - $calculatedBmi, 2);
+        $age = CarbonImmutable::parse($client['birth_date'])->age;
+        $sex = $client['biological_sex'];
 
         return [
-            'age' => CarbonImmutable::parse($client['birth_date'])->age,
+            'source' => 'Omron HBF-514C',
+            'age' => $age,
             'calculated_bmi' => $calculatedBmi,
             'bmi_difference' => $bmiDifference,
-            'summary' => $this->summary($calculatedBmi, $assessment),
-            'indicators' => $this->indicators($calculatedBmi, $assessment),
+            'summary' => $this->summary($calculatedBmi, $assessment, $age, $sex),
+            'indicators' => $this->indicators($calculatedBmi, $assessment, $age, $sex),
             'warnings' => $this->warnings($client, $assessment, $calculatedBmi, $bmiDifference),
         ];
     }
 
-    private function summary(float $calculatedBmi, array $assessment): string
+    private function summary(float $calculatedBmi, array $assessment, int $age, string $sex): string
     {
         $bmi = $this->bmiClassification($calculatedBmi);
         $fat = isset($assessment['body_fat_percentage'])
-            ? 'Gordura corporal registrada em '.number_format((float) $assessment['body_fat_percentage'], 1, ',', '.').'%.'
+            ? 'Gordura corporal registrada em '.number_format((float) $assessment['body_fat_percentage'], 1, ',', '.').'%, classificada como '.$this->bodyFatClassification((float) $assessment['body_fat_percentage'], $sex, $age)['classification'].'.'
             : 'Gordura corporal nao informada.';
 
         return "IMC calculado em {$calculatedBmi} kg/m2, classificado como {$bmi['classification']}. {$fat}";
     }
 
-    private function indicators(float $calculatedBmi, array $assessment): array
+    private function indicators(float $calculatedBmi, array $assessment, int $age, string $sex): array
     {
         return [
             'weight' => [
@@ -48,8 +77,8 @@ class BioimpedanceAnalyzer
                 'value' => number_format($calculatedBmi, 1, ',', '.').' kg/m2',
                 ...$this->bmiClassification($calculatedBmi),
             ],
-            'body_fat' => $this->pendingOmronIndicator('Gordura corporal', $assessment['body_fat_percentage'] ?? null, '%'),
-            'skeletal_muscle' => $this->pendingOmronIndicator('Musculo esqueletico', $assessment['skeletal_muscle_percentage'] ?? null, '%'),
+            'body_fat' => $this->bodyFatIndicator($assessment['body_fat_percentage'] ?? null, $sex, $age),
+            'skeletal_muscle' => $this->skeletalMuscleIndicator($assessment['skeletal_muscle_percentage'] ?? null, $sex, $age),
             'resting_metabolism' => [
                 'label' => 'Metabolismo basal',
                 'value' => isset($assessment['resting_metabolism_kcal'])
@@ -64,7 +93,7 @@ class BioimpedanceAnalyzer
                 'classification' => null,
                 'tone' => 'neutral',
             ],
-            'visceral_fat' => $this->pendingOmronIndicator('Gordura visceral', $assessment['visceral_fat_level'] ?? null, ''),
+            'visceral_fat' => $this->visceralFatIndicator($assessment['visceral_fat_level'] ?? null, $age),
         ];
     }
 
@@ -80,17 +109,154 @@ class BioimpedanceAnalyzer
         };
     }
 
-    private function pendingOmronIndicator(string $label, mixed $value, string $suffix): array
+    private function bodyFatIndicator(mixed $value, string $sex, int $age): array
     {
-        $formattedValue = $value === null
-            ? 'Nao informado'
-            : number_format((float) $value, 1, ',', '.').($suffix ? " {$suffix}" : '');
+        $range = $this->ageRange($sex, $age, self::BODY_FAT_RANGES);
 
         return [
-            'label' => $label,
-            'value' => $formattedValue,
-            'classification' => 'Aguardando manual Omron',
+            'label' => 'Gordura corporal',
+            'value' => $this->formattedDecimal($value, '%'),
+            ...$this->bodyFatClassification($value, $sex, $age),
+            'scale' => $this->ageRangeScale((float) $value, 5, 60, $range, ['Baixa', 'Normal', 'Elevada', 'Muito elevada']),
+        ];
+    }
+
+    private function skeletalMuscleIndicator(mixed $value, string $sex, int $age): array
+    {
+        $range = $this->ageRange($sex, $age, self::SKELETAL_MUSCLE_RANGES);
+
+        return [
+            'label' => 'Musculo esqueletico',
+            'value' => $this->formattedDecimal($value, '%'),
+            ...$this->skeletalMuscleClassification($value, $sex, $age),
+            'scale' => $this->ageRangeScale((float) $value, 5, 50, $range, ['Baixo', 'Normal', 'Alto', 'Muito alto']),
+        ];
+    }
+
+    private function visceralFatIndicator(mixed $value, int $age): array
+    {
+        return [
+            'label' => 'Gordura visceral',
+            'value' => $this->formattedDecimal($value, ''),
+            ...$this->visceralFatClassification($value, $age),
+            'scale' => $this->thresholdScale((float) $value, 1, 30, [10, 15], ['Normal', 'Elevada', 'Muito elevada'], ['bg-emerald-500', 'bg-amber-500', 'bg-rose-500']),
+        ];
+    }
+
+    private function bodyFatClassification(mixed $value, string $sex, int $age): array
+    {
+        return $this->ageBasedClassification($value, $sex, $age, self::BODY_FAT_RANGES, [
+            'low' => 'Baixa',
+            'normal' => 'Normal',
+            'high' => 'Elevada',
+            'very_high' => 'Muito elevada',
+        ]);
+    }
+
+    private function skeletalMuscleClassification(mixed $value, string $sex, int $age): array
+    {
+        return $this->ageBasedClassification($value, $sex, $age, self::SKELETAL_MUSCLE_RANGES, [
+            'low' => 'Baixo',
+            'normal' => 'Normal',
+            'high' => 'Alto',
+            'very_high' => 'Muito alto',
+        ]);
+    }
+
+    private function visceralFatClassification(mixed $value, int $age): array
+    {
+        if ($value === null || $value === '') {
+            return $this->pendingClassification('Nao informado');
+        }
+
+        if ($age < 18 || $age > 80) {
+            return $this->pendingClassification('Fora da faixa etaria Omron');
+        }
+
+        $value = (float) $value;
+
+        return match (true) {
+            $value < 10 => ['classification' => 'Normal', 'tone' => 'good', 'pending' => false],
+            $value < 15 => ['classification' => 'Elevada', 'tone' => 'warning', 'pending' => false],
+            default => ['classification' => 'Muito elevada', 'tone' => 'danger', 'pending' => false],
+        };
+    }
+
+    private function ageBasedClassification(mixed $value, string $sex, int $age, array $ranges, array $labels): array
+    {
+        if ($value === null || $value === '') {
+            return $this->pendingClassification('Nao informado');
+        }
+
+        $range = $this->ageRange($sex, $age, $ranges);
+
+        if (! $range) {
+            return $this->pendingClassification('Fora da faixa etaria Omron');
+        }
+
+        $value = (float) $value;
+
+        return match (true) {
+            $value < $range['normal_min'] => ['classification' => $labels['low'], 'tone' => 'attention', 'pending' => false],
+            $value <= $range['normal_max'] => ['classification' => $labels['normal'], 'tone' => 'good', 'pending' => false],
+            $value <= $range['high_max'] => ['classification' => $labels['high'], 'tone' => 'warning', 'pending' => false],
+            default => ['classification' => $labels['very_high'], 'tone' => 'danger', 'pending' => false],
+        };
+    }
+
+    private function ageRange(string $sex, int $age, array $ranges): ?array
+    {
+        return collect($ranges[$sex] ?? [])
+            ->first(fn (array $range) => $age >= $range['min_age'] && $age <= $range['max_age']);
+    }
+
+    private function ageRangeScale(float $value, float $min, float $max, ?array $range, array $labels): array
+    {
+        if (! $range) {
+            return $this->thresholdScale($value, $min, $max, [], $labels);
+        }
+
+        return $this->thresholdScale($value, $min, $max, [
+            $range['normal_min'],
+            $range['normal_max'] + 0.1,
+            $range['high_max'] + 0.1,
+        ], $labels);
+    }
+
+    private function thresholdScale(float $value, float $min, float $max, array $thresholds, array $labels, array $colors = ['bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500']): array
+    {
+        $points = [$min, ...$thresholds, $max];
+        $segments = [];
+
+        for ($index = 0; $index < count($points) - 1; $index++) {
+            $segments[] = [
+                'className' => $colors[$index] ?? 'bg-slate-300',
+                'width' => (($points[$index + 1] - $points[$index]) / ($max - $min)) * 100,
+            ];
+        }
+
+        return [
+            'position' => max(2, min(98, (($value - $min) / ($max - $min)) * 100)),
+            'labels' => $labels,
+            'segments' => $segments,
+        ];
+    }
+
+    private function formattedDecimal(mixed $value, string $suffix): string
+    {
+        if ($value === null || $value === '') {
+            return 'Nao informado';
+        }
+
+        return number_format((float) $value, 1, ',', '.').($suffix ? " {$suffix}" : '');
+    }
+
+    private function pendingClassification(string $classification): array
+    {
+        return [
+            'classification' => $classification,
             'tone' => 'pending',
+            'pending' => true,
         ];
     }
 

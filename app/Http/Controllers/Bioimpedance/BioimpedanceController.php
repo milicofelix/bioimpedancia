@@ -12,13 +12,13 @@ use Illuminate\Validation\Rule;
 
 class BioimpedanceController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(BioimpedanceAnalyzer $analyzer): JsonResponse
     {
         $clients = BioimpedanceClient::query()
             ->with(['assessments' => fn ($query) => $query->latest('evaluated_at')->limit(5)])
             ->orderBy('full_name')
             ->get()
-            ->map(fn (BioimpedanceClient $client) => $this->clientPayload($client));
+            ->map(fn (BioimpedanceClient $client) => $this->clientPayload($client, $analyzer));
 
         return response()->json([
             'clients' => $clients,
@@ -93,7 +93,7 @@ class BioimpedanceController extends Controller
         ]);
 
         return response()->json([
-            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')->limit(5)])),
+            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')->limit(5)]), $analyzer),
             'assessment' => $this->assessmentPayload($assessment),
         ], 201);
     }
@@ -124,7 +124,7 @@ class BioimpedanceController extends Controller
         return $value;
     }
 
-    private function clientPayload(BioimpedanceClient $client): array
+    private function clientPayload(BioimpedanceClient $client, ?BioimpedanceAnalyzer $analyzer = null): array
     {
         return [
             'id' => $client->id,
@@ -139,13 +139,19 @@ class BioimpedanceController extends Controller
             'assessments' => $client->assessments
                 ->sortByDesc('evaluated_at')
                 ->values()
-                ->map(fn (BioimpedanceAssessment $assessment) => $this->assessmentPayload($assessment))
+                ->map(fn (BioimpedanceAssessment $assessment) => $this->assessmentPayload($assessment, $client, $analyzer))
                 ->all(),
         ];
     }
 
-    private function assessmentPayload(BioimpedanceAssessment $assessment): array
+    private function assessmentPayload(BioimpedanceAssessment $assessment, ?BioimpedanceClient $client = null, ?BioimpedanceAnalyzer $analyzer = null): array
     {
+        $analysis = $assessment->analysis;
+
+        if ($client && $analyzer) {
+            $analysis = $analyzer->analyze($client->toArray(), $assessment->toArray());
+        }
+
         return [
             'id' => $assessment->id,
             'bioimpedance_client_id' => $assessment->bioimpedance_client_id,
@@ -160,7 +166,7 @@ class BioimpedanceController extends Controller
             'resting_metabolism_kcal' => $assessment->resting_metabolism_kcal,
             'body_age' => $assessment->body_age,
             'visceral_fat_level' => $assessment->visceral_fat_level === null ? null : (float) $assessment->visceral_fat_level,
-            'analysis' => $assessment->analysis,
+            'analysis' => $analysis,
             'notes' => $assessment->notes,
         ];
     }

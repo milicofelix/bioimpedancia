@@ -41,7 +41,40 @@ class BioimpedanceModuleTest extends TestCase
         $assessmentResponse->assertCreated();
         $assessmentResponse->assertJsonPath('assessment.calculated_bmi', 29.8);
         $assessmentResponse->assertJsonPath('assessment.analysis.indicators.bmi.classification', 'Sobrepeso');
-        $assessmentResponse->assertJsonPath('assessment.analysis.indicators.body_fat.classification', 'Aguardando manual Omron');
+        $assessmentResponse->assertJsonPath('assessment.analysis.indicators.body_fat.classification', 'Normal');
+        $assessmentResponse->assertJsonPath('assessment.analysis.indicators.skeletal_muscle.classification', 'Alto');
+        $assessmentResponse->assertJsonPath('assessment.analysis.indicators.visceral_fat.classification', 'Elevada');
+    }
+
+    public function test_hbf_514c_tables_classify_male_assessment_by_age(): void
+    {
+        $user = User::factory()->create();
+
+        $clientResponse = $this->actingAs($user)->postJson(route('bioimpedance.clients.store'), [
+            'full_name' => 'Adriano Freitas',
+            'birth_date' => '1981-07-03',
+            'biological_sex' => 'male',
+            'height_cm' => 174,
+            'email' => 'adriano@example.com',
+        ]);
+
+        $assessmentResponse = $this->actingAs($user)->postJson(route('bioimpedance.assessments.store'), [
+            'bioimpedance_client_id' => $clientResponse->json('client.id'),
+            'evaluated_at' => '2026-08-07 23:19:00',
+            'weight_kg' => 95.2,
+            'scale_bmi' => 31.4,
+            'body_fat_percentage' => 20.5,
+            'skeletal_muscle_percentage' => 37.6,
+            'resting_metabolism_kcal' => 1935,
+            'body_age' => 64,
+            'visceral_fat_level' => 14,
+        ]);
+
+        $assessmentResponse->assertCreated();
+        $assessmentResponse->assertJsonPath('assessment.analysis.indicators.body_fat.classification', 'Normal');
+        $assessmentResponse->assertJsonPath('assessment.analysis.indicators.skeletal_muscle.classification', 'Normal');
+        $assessmentResponse->assertJsonPath('assessment.analysis.indicators.visceral_fat.classification', 'Elevada');
+        $assessmentResponse->assertJsonPath('assessment.analysis.indicators.body_fat.pending', false);
     }
 
     public function test_client_height_can_be_sent_in_meters(): void

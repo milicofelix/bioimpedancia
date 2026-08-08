@@ -77,6 +77,16 @@ function bmiToneClass(classification) {
 	return 'bg-rose-100 text-rose-700';
 }
 
+function indicatorBadgeClass(tone) {
+	return {
+		good: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+		warning: 'border-amber-100 bg-amber-50 text-amber-700',
+		danger: 'border-rose-100 bg-rose-50 text-rose-700',
+		attention: 'border-sky-100 bg-sky-50 text-sky-700',
+		pending: 'border-slate-200 bg-slate-50 text-slate-500',
+	}[tone] ?? 'border-slate-200 bg-slate-50 text-slate-500';
+}
+
 function normalizeDecimal(value) {
 	if (value === null || value === undefined || value === '') return '';
 	return String(value).replace(',', '.').replace(/[^\d.]/g, '');
@@ -403,7 +413,11 @@ function Report({ clinic, client, assessment, professional }) {
 	}
 
 	const warnings = assessment?.analysis?.warnings ?? [];
-	const bmiClassification = assessment?.analysis?.indicators?.bmi?.classification ?? 'Classificação pendente';
+	const analysisIndicators = assessment?.analysis?.indicators ?? {};
+	const bmiClassification = analysisIndicators?.bmi?.classification ?? 'Classificação pendente';
+	const bodyFat = analysisIndicators?.body_fat ?? {};
+	const skeletalMuscle = analysisIndicators?.skeletal_muscle ?? {};
+	const visceralFat = analysisIndicators?.visceral_fat ?? {};
 	const bodyAgeDelta = assessment?.body_age && client.age ? assessment.body_age - client.age : null;
 	const validationTitle = warnings.length ? 'Dados com alertas' : 'Dados validados';
 	const validationText = warnings.length ? warnings[0] : 'Nenhum alerta automático identificado.';
@@ -475,25 +489,34 @@ function Report({ clinic, client, assessment, professional }) {
 									title="Gordura corporal"
 									value={numberBr(assessment.body_fat_percentage, 1)}
 									unit="%"
-									badge="Classificação pendente"
-									labels={['Baixa', 'Normal', 'Elevada', 'Muito elevada']}
-									pending
+									badge={bodyFat.classification ?? 'Classificação pendente'}
+									tone={bodyFat.tone}
+									position={bodyFat.scale?.position}
+									labels={bodyFat.scale?.labels ?? ['Baixa', 'Normal', 'Elevada', 'Muito elevada']}
+									segments={bodyFat.scale?.segments}
+									pending={bodyFat.pending}
 								/>
 								<ScaleCard
 									title="Músculo esquelético"
 									value={numberBr(assessment.skeletal_muscle_percentage, 1)}
 									unit="%"
-									badge="Classificação pendente"
-									labels={['Baixo', 'Normal', 'Alto', 'Muito alto']}
-									pending
+									badge={skeletalMuscle.classification ?? 'Classificação pendente'}
+									tone={skeletalMuscle.tone}
+									position={skeletalMuscle.scale?.position}
+									labels={skeletalMuscle.scale?.labels ?? ['Baixo', 'Normal', 'Alto', 'Muito alto']}
+									segments={skeletalMuscle.scale?.segments}
+									pending={skeletalMuscle.pending}
 								/>
 								<ScaleCard
 									title="Gordura visceral"
 									value={numberBr(assessment.visceral_fat_level, 1)}
 									unit="nível"
-									badge="Classificação pendente"
-									labels={['Baixa', 'Normal', 'Elevada', 'Muito elevada']}
-									pending
+									badge={visceralFat.classification ?? 'Classificação pendente'}
+									tone={visceralFat.tone}
+									position={visceralFat.scale?.position}
+									labels={visceralFat.scale?.labels ?? ['Normal', 'Alta', 'Muito alta']}
+									segments={visceralFat.scale?.segments}
+									pending={visceralFat.pending}
 								/>
 								<ScaleCard
 									title="Metabolismo basal"
@@ -509,8 +532,8 @@ function Report({ clinic, client, assessment, professional }) {
 							<h3 className="text-base font-bold uppercase tracking-wide text-[#b96f7d]">Síntese da avaliação</h3>
 							<div className="mt-4 space-y-2 text-sm leading-6 text-slate-700">
 								<p>O IMC foi calculado automaticamente com base em peso e altura: {numberBr(assessment.calculated_bmi, 1)} kg/m², classificado como {bmiClassification}.</p>
-								<p>A gordura corporal registrada foi de {numberBr(assessment.body_fat_percentage, 1)}% e a idade corporal estimada foi de {assessment.body_age ?? '-'} anos.</p>
-								<p>As demais classificações serão exibidas após a parametrização das referências do modelo Omron.</p>
+								<p>A gordura corporal foi classificada como {bodyFat.classification ?? '-'} e o músculo esquelético como {skeletalMuscle.classification ?? '-'}, conforme sexo e idade.</p>
+								<p>A idade corporal estimada foi de {assessment.body_age ?? '-'} anos e a gordura visceral foi classificada como {visceralFat.classification ?? '-'}.</p>
 							</div>
 							{assessment.notes ? <p className="mt-3 text-sm text-slate-600"><strong>Observações:</strong> {assessment.notes}</p> : null}
 						</section>
@@ -560,12 +583,19 @@ function HeroMetric({ eyebrow, value, unit, compactEyebrow = false }) {
 	);
 }
 
-function ScaleCard({ title, value, unit, badge, position = 50, labels = [], withoutScale = false, pending = false }) {
+function ScaleCard({ title, value, unit, badge, tone, position = 50, labels = [], segments, withoutScale = false, pending = false }) {
+	const scaleSegments = segments ?? [
+		{ className: 'bg-blue-500', width: 25 },
+		{ className: 'bg-emerald-500', width: 25 },
+		{ className: 'bg-amber-500', width: 25 },
+		{ className: 'bg-rose-500', width: 25 },
+	];
+
 	return (
 		<div className="rounded-2xl border border-rose-100 bg-white p-5 shadow-sm">
 			<div className="flex items-start justify-between gap-4">
 				<p className="text-sm font-bold uppercase tracking-wide text-slate-500">{title}</p>
-				<span className="rounded-full border border-rose-100 bg-rose-50 px-4 py-2 text-xs font-bold text-[#8f5f67]">{badge}</span>
+				<span className={`rounded-full border px-4 py-2 text-xs font-bold ${indicatorBadgeClass(tone)}`}>{badge}</span>
 			</div>
 			<p className="mt-4 text-4xl font-bold leading-none text-slate-900">
 				{value} <span className="text-lg text-slate-500">{unit}</span>
@@ -573,16 +603,24 @@ function ScaleCard({ title, value, unit, badge, position = 50, labels = [], with
 			{withoutScale ? null : (
 				<div className="mt-5">
 					<div className="relative h-5">
-						<div className={`absolute top-2 grid h-2 w-full grid-cols-4 overflow-hidden rounded-sm ${pending ? 'opacity-70 grayscale' : ''}`}>
-							<span className={pending ? 'bg-slate-300' : 'bg-blue-500'}></span>
-							<span className={pending ? 'bg-slate-300' : 'bg-emerald-500'}></span>
-							<span className={pending ? 'bg-slate-300' : 'bg-amber-500'}></span>
-							<span className={pending ? 'bg-slate-300' : 'bg-rose-500'}></span>
+						<div className={`absolute top-2 flex h-2 w-full overflow-hidden rounded-sm ${pending ? 'opacity-70 grayscale' : ''}`}>
+							{scaleSegments.map((segment, index) => (
+								<span
+									key={`${segment.className}-${index}`}
+									className={pending ? 'bg-slate-300' : segment.className}
+									style={{ width: `${segment.width}%` }}
+								></span>
+							))}
 						</div>
 						{pending ? null : <span className="absolute top-0 h-0 w-0 -translate-x-1/2 border-x-[7px] border-t-[10px] border-x-transparent border-t-slate-900" style={{ left: `${position}%` }}></span>}
 					</div>
-					<div className="grid grid-cols-4 text-center text-xs text-slate-500">
-						{labels.map((label) => <span key={label}>{label}</span>)}
+					<div className="mt-1 flex flex-wrap justify-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+						{labels.map((label, index) => (
+							<span key={label} className="inline-flex items-center gap-1 whitespace-nowrap">
+								<span className={`h-1.5 w-1.5 rounded-full ${pending ? 'bg-slate-300' : scaleSegments[index]?.className ?? 'bg-slate-300'}`}></span>
+								{label}
+							</span>
+						))}
 					</div>
 				</div>
 			)}
