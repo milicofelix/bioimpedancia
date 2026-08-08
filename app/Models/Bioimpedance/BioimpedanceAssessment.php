@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class BioimpedanceAssessment extends Model
 {
@@ -14,6 +15,8 @@ class BioimpedanceAssessment extends Model
     protected $fillable = [
         'bioimpedance_client_id',
         'user_id',
+        'corrected_by_user_id',
+        'correction_count',
         'age_at_assessment',
         'height_cm_at_assessment',
         'biological_sex_at_assessment',
@@ -31,12 +34,16 @@ class BioimpedanceAssessment extends Model
         'visceral_fat_level',
         'analysis',
         'notes',
+        'canceled_at',
+        'canceled_by_user_id',
+        'cancellation_reason',
     ];
 
     protected function casts(): array
     {
         return [
             'evaluated_at' => 'datetime',
+            'canceled_at' => 'datetime',
             'height_cm_at_assessment' => 'decimal:1',
             'weight_kg' => 'decimal:2',
             'scale_bmi' => 'decimal:1',
@@ -57,5 +64,20 @@ class BioimpedanceAssessment extends Model
     public function professional(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function correctedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'corrected_by_user_id');
+    }
+
+    public function canceledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'canceled_by_user_id');
+    }
+
+    public function audits(): HasMany
+    {
+        return $this->hasMany(BioimpedanceAssessmentAudit::class);
     }
 }

@@ -59,6 +59,15 @@ function formatIssueDate(value) {
 	return new Intl.DateTimeFormat('pt-BR').format(new Date(value));
 }
 
+function toDatetimeLocal(value) {
+	if (!value) return new Date().toISOString().slice(0, 16);
+
+	const date = new Date(value);
+	const timezoneOffset = date.getTimezoneOffset() * 60000;
+
+	return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
+}
+
 function numberBr(value, decimals = 1) {
 	if (value === null || value === undefined || value === '') return '-';
 
@@ -170,6 +179,22 @@ function clientFormFromClient(client) {
 	};
 }
 
+function assessmentFormFromAssessment(assessment) {
+	if (!assessment) return emptyAssessment;
+
+	return {
+		evaluated_at: toDatetimeLocal(assessment.evaluated_at),
+		weight_kg: numberBr(assessment.weight_kg, 1),
+		scale_bmi: assessment.scale_bmi == null ? '' : numberBr(assessment.scale_bmi, 1),
+		body_fat_percentage: assessment.body_fat_percentage == null ? '' : numberBr(assessment.body_fat_percentage, 1),
+		skeletal_muscle_percentage: assessment.skeletal_muscle_percentage == null ? '' : numberBr(assessment.skeletal_muscle_percentage, 1),
+		resting_metabolism_kcal: assessment.resting_metabolism_kcal ?? '',
+		body_age: assessment.body_age ?? '',
+		visceral_fat_level: assessment.visceral_fat_level == null ? '' : String(Math.trunc(assessment.visceral_fat_level)),
+		notes: assessment.notes ?? '',
+	};
+}
+
 export default function DashboardPage({ userName }) {
 	const [clients, setClients] = useState([]);
 	const [clinic, setClinic] = useState({
@@ -179,8 +204,12 @@ export default function DashboardPage({ userName }) {
 		logo_url: '/images/brand/ricosty-logo.png',
 	});
 	const [selectedClientId, setSelectedClientId] = useState(null);
+	const [selectedAssessmentId, setSelectedAssessmentId] = useState(null);
 	const [clientForm, setClientForm] = useState(emptyClient);
 	const [assessmentForm, setAssessmentForm] = useState(emptyAssessment);
+	const [assessmentMode, setAssessmentMode] = useState('create');
+	const [editingAssessmentId, setEditingAssessmentId] = useState(null);
+	const [assessmentChangeReason, setAssessmentChangeReason] = useState('');
 	const [query, setQuery] = useState('');
 	const [showInactive, setShowInactive] = useState(false);
 	const [clientMode, setClientMode] = useState('create');
@@ -195,11 +224,14 @@ export default function DashboardPage({ userName }) {
 			setClients(data.clients);
 			setClinic(data.clinic);
 			setSelectedClientId(data.clients[0]?.id ?? null);
+			setSelectedAssessmentId(data.clients[0]?.assessments?.[0]?.id ?? null);
 		}).finally(() => setLoading(false));
 	}, []);
 
 	const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null;
-	const latestAssessment = selectedClient?.assessments?.[0] ?? null;
+	const selectedAssessment = selectedClient?.assessments?.find((assessment) => assessment.id === selectedAssessmentId)
+		?? selectedClient?.assessments?.[0]
+		?? null;
 
 	const filteredClients = useMemo(() => {
 		const term = query.trim().toLowerCase();
@@ -253,6 +285,47 @@ export default function DashboardPage({ userName }) {
 		setClientMode('edit');
 		setEditingClientId(client.id);
 		setClientForm(clientFormFromClient(client));
+		setErrors({});
+	}
+
+	function selectClient(client) {
+		setSelectedClientId(client.id);
+		setSelectedAssessmentId(client.assessments?.[0]?.id ?? null);
+		setAssessmentMode('create');
+		setEditingAssessmentId(null);
+		setAssessmentForm({ ...emptyAssessment, evaluated_at: new Date().toISOString().slice(0, 16) });
+		setAssessmentChangeReason('');
+	}
+
+	function startNewAssessment() {
+		setAssessmentMode('create');
+		setEditingAssessmentId(null);
+		setAssessmentForm({ ...emptyAssessment, evaluated_at: new Date().toISOString().slice(0, 16) });
+		setAssessmentChangeReason('');
+		setErrors({});
+	}
+
+	function startEditAssessment(assessment) {
+		if (!assessment || assessment.is_canceled) return;
+
+		setAssessmentMode('edit');
+		setEditingAssessmentId(assessment.id);
+		setAssessmentForm(assessmentFormFromAssessment(assessment));
+		setAssessmentChangeReason('');
+		setErrors({});
+	}
+
+	function duplicateAssessment(assessment) {
+		if (!assessment) return;
+
+		setAssessmentMode('create');
+		setEditingAssessmentId(null);
+		setAssessmentForm({
+			...assessmentFormFromAssessment(assessment),
+			evaluated_at: new Date().toISOString().slice(0, 16),
+			notes: '',
+		});
+		setAssessmentChangeReason('');
 		setErrors({});
 	}
 
@@ -321,15 +394,35 @@ export default function DashboardPage({ userName }) {
 			visceral_fat_level: normalizeDecimal(assessmentForm.visceral_fat_level),
 		};
 
+		if (assessmentMode === 'edit') {
+			payload.change_reason = assessmentChangeReason;
+		}
+
 		try {
-			const { data } = await window.axios.post('/bioimpedance/assessments', payload);
+			const { data } = assessmentMode === 'edit' && editingAssessmentId
+				? await window.axios.put(`/bioimpedance/assessments/${editingAssessmentId}`, payload)
+				: await window.axios.post('/bioimpedance/assessments', payload);
 			setClients((current) => current.map((client) => (client.id === data.client.id ? data.client : client)));
-			setAssessmentForm({ ...emptyAssessment, evaluated_at: new Date().toISOString().slice(0, 16) });
+			setSelectedAssessmentId(data.assessment.id);
+			startNewAssessment();
 		} catch (error) {
 			setErrors(error.response?.data?.errors ?? {});
 		} finally {
 			setSavingAssessment(false);
 		}
+	}
+
+	async function cancelAssessment(assessment) {
+		if (!assessment || assessment.is_canceled) return;
+
+		const reason = window.prompt('Informe o motivo do cancelamento da avaliação:');
+		if (!reason) return;
+
+		const { data } = await window.axios.patch(`/bioimpedance/assessments/${assessment.id}/cancel`, {
+			cancellation_reason: reason,
+		});
+		setClients((current) => current.map((client) => (client.id === data.client.id ? data.client : client)));
+		setSelectedAssessmentId(data.assessment.id);
 	}
 
 	return (
@@ -375,7 +468,7 @@ export default function DashboardPage({ userName }) {
 								<button
 									type="button"
 									key={client.id}
-									onClick={() => setSelectedClientId(client.id)}
+									onClick={() => selectClient(client)}
 									className={`w-full rounded-xl border px-3 py-3 text-left transition ${selectedClientId === client.id ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
 								>
 									<span className="flex items-center justify-between gap-2 text-sm font-semibold text-slate-900">
@@ -468,12 +561,56 @@ export default function DashboardPage({ userName }) {
 				</aside>
 
 				<section className="space-y-5">
+					{selectedClient ? (
+						<div className="no-print rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+								<div>
+									<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Histórico de avaliações</p>
+									<h2 className="mt-1 text-lg font-semibold text-slate-950">{selectedClient.assessments?.length ?? 0} registro(s)</h2>
+								</div>
+								<button type="button" onClick={startNewAssessment} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700">
+									Nova avaliação
+								</button>
+							</div>
+							<div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+								{selectedClient.assessments?.map((assessment) => (
+									<button
+										type="button"
+										key={assessment.id}
+										onClick={() => setSelectedAssessmentId(assessment.id)}
+										className={`rounded-xl border p-3 text-left transition ${selectedAssessment?.id === assessment.id ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 hover:bg-slate-50'} ${assessment.is_canceled ? 'opacity-70' : ''}`}
+									>
+										<span className="flex items-center justify-between gap-2 text-sm font-bold text-slate-900">
+											{formatDate(assessment.evaluated_at)}
+											{assessment.is_canceled ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] uppercase text-rose-700">Cancelada</span> : null}
+										</span>
+										<span className="mt-2 block text-xs text-slate-500">Peso {numberBr(assessment.weight_kg, 1)} kg • IMC {numberBr(assessment.calculated_bmi, 1)}</span>
+										<span className="mt-1 block text-xs text-slate-400">{assessment.correction_count ? `${assessment.correction_count} correção(ões)` : 'Sem correções'}</span>
+									</button>
+								))}
+							</div>
+							{selectedAssessment ? (
+								<div className="mt-4 flex flex-wrap gap-2">
+									<button type="button" onClick={() => duplicateAssessment(selectedAssessment)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
+										Duplicar como base
+									</button>
+									<button type="button" disabled={selectedAssessment.is_canceled} onClick={() => startEditAssessment(selectedAssessment)} className="rounded-xl border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50">
+										Corrigir avaliação
+									</button>
+									<button type="button" disabled={selectedAssessment.is_canceled} onClick={() => cancelAssessment(selectedAssessment)} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
+										Cancelar avaliação
+									</button>
+								</div>
+							) : null}
+						</div>
+					) : null}
+
 					<div className="no-print rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
 						<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 							<div>
-								<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Registrar nova avaliação</p>
+								<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">{assessmentMode === 'edit' ? 'Corrigir avaliação' : 'Registrar nova avaliação'}</p>
 								<h1 className="mt-1 text-2xl font-semibold text-slate-950">{selectedClient?.full_name ?? 'Selecione um cliente'}</h1>
-								<p className="mt-1 text-sm text-slate-500">Digite os valores exibidos na balança Omron antiga após a pesagem.</p>
+								<p className="mt-1 text-sm text-slate-500">{assessmentMode === 'edit' ? 'A correção exige justificativa e gera auditoria.' : 'Digite os valores exibidos na balança Omron antiga após a pesagem.'}</p>
 							</div>
 							<div className="rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-600">
 								IMC calculado: <strong className="text-slate-950">{calculatedBmi ?? '-'}</strong>
@@ -510,18 +647,25 @@ export default function DashboardPage({ userName }) {
 									<textarea value={assessmentForm.notes} onChange={(event) => updateAssessment('notes', event.target.value)} rows="3" className={inputClass()} />
 								</Field>
 							</div>
+							{assessmentMode === 'edit' ? (
+								<div className="md:col-span-4">
+									<Field label="Justificativa da correção">
+										<textarea value={assessmentChangeReason} onChange={(event) => setAssessmentChangeReason(event.target.value)} rows="2" className={inputClass()} />
+									</Field>
+								</div>
+							) : null}
 							{Object.keys(errors).length ? (
 								<div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 md:col-span-4">
 									Confira os campos obrigatórios e valores digitados.
 								</div>
 							) : null}
 							<button type="submit" disabled={!selectedClient || !selectedClient.is_active || savingAssessment} className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-4">
-								{savingAssessment ? 'Gerando relatório...' : 'Salvar avaliação e gerar relatório'}
+								{savingAssessment ? 'Salvando...' : assessmentMode === 'edit' ? 'Salvar correção e gerar relatório' : 'Salvar avaliação e gerar relatório'}
 							</button>
 						</form>
 					</div>
 
-					<Report clinic={clinic} client={selectedClient} assessment={latestAssessment} professional={userName} />
+					<Report clinic={clinic} client={selectedClient} assessment={selectedAssessment} professional={userName} />
 				</section>
 			</div>
 		</main>
@@ -575,6 +719,11 @@ function Report({ clinic, client, assessment, professional }) {
 			</header>
 
 			<div className="report-body bg-[#fbf8f8] px-8 py-7">
+				{assessment?.is_canceled ? (
+					<div className="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+						<strong>Avaliação cancelada.</strong> {assessment.cancellation_reason ?? 'Registro preservado apenas para histórico.'}
+					</div>
+				) : null}
 				<section className="report-client-grid grid gap-4 rounded-2xl border border-rose-100 bg-white p-5 shadow-sm sm:grid-cols-[2fr_1fr_1fr_1fr]">
 					<div>
 						<p className="text-xs font-bold uppercase tracking-wide text-[#b96f7d]">Cliente</p>

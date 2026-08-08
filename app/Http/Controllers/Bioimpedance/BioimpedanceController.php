@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Bioimpedance;
 
 use App\Http\Controllers\Controller;
 use App\Models\Bioimpedance\BioimpedanceAssessment;
+use App\Models\Bioimpedance\BioimpedanceAssessmentAudit;
 use App\Models\Bioimpedance\BioimpedanceClient;
 use App\Services\Bioimpedance\BioimpedanceAnalyzer;
 use Illuminate\Http\JsonResponse;
@@ -17,7 +18,7 @@ class BioimpedanceController extends Controller
     public function index(): JsonResponse
     {
         $clients = BioimpedanceClient::query()
-            ->with(['assessments' => fn ($query) => $query->latest('evaluated_at')->limit(5)])
+            ->with(['assessments' => fn ($query) => $query->latest('evaluated_at')])
             ->orderBy('full_name')
             ->get()
             ->map(fn (BioimpedanceClient $client) => $this->clientPayload($client));
@@ -52,7 +53,7 @@ class BioimpedanceController extends Controller
         $client->update($validated);
 
         return response()->json([
-            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')->limit(5)])),
+            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
         ]);
     }
 
@@ -63,32 +64,13 @@ class BioimpedanceController extends Controller
         ]);
 
         return response()->json([
-            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')->limit(5)])),
+            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
         ]);
     }
 
     public function storeAssessment(Request $request, BioimpedanceAnalyzer $analyzer): JsonResponse
     {
-        $request->merge([
-            'weight_kg' => $this->normalizeDecimal($request->input('weight_kg')),
-            'scale_bmi' => $this->normalizeDecimal($request->input('scale_bmi')),
-            'body_fat_percentage' => $this->normalizeDecimal($request->input('body_fat_percentage')),
-            'skeletal_muscle_percentage' => $this->normalizeDecimal($request->input('skeletal_muscle_percentage')),
-            'visceral_fat_level' => $this->normalizeDecimal($request->input('visceral_fat_level')),
-        ]);
-
-        $validated = $request->validate([
-            'bioimpedance_client_id' => ['required', 'exists:bioimpedance_clients,id'],
-            'evaluated_at' => ['required', 'date', 'before_or_equal:now'],
-            'weight_kg' => ['required', 'numeric', 'between:2,150'],
-            'scale_bmi' => ['nullable', 'numeric', 'between:7,90'],
-            'body_fat_percentage' => ['nullable', 'numeric', 'between:5,60'],
-            'skeletal_muscle_percentage' => ['nullable', 'numeric', 'between:5,50'],
-            'resting_metabolism_kcal' => ['nullable', 'integer', 'between:385,3999'],
-            'body_age' => ['nullable', 'integer', 'between:18,80'],
-            'visceral_fat_level' => ['nullable', 'integer', 'between:1,30'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-        ]);
+        $validated = $this->validateAssessment($request);
 
         $client = BioimpedanceClient::query()->findOrFail($validated['bioimpedance_client_id']);
         if ($client->inactivated_at) {
@@ -112,9 +94,101 @@ class BioimpedanceController extends Controller
         ]);
 
         return response()->json([
-            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')->limit(5)])),
+            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
             'assessment' => $this->assessmentPayload($assessment),
         ], 201);
+    }
+
+    public function updateAssessment(Request $request, BioimpedanceAssessment $assessment, BioimpedanceAnalyzer $analyzer): JsonResponse
+    {
+        if ($assessment->canceled_at) {
+            throw ValidationException::withMessages([
+                'bioimpedance_assessment_id' => 'Avaliação cancelada não pode ser alterada.',
+            ]);
+        }
+
+        $validated = $this->validateAssessment($request, requireClient: false);
+        unset($validated['bioimpedance_client_id']);
+
+        $changeReason = $request->validate([
+            'change_reason' => ['required', 'string', 'min:5', 'max:1000'],
+        ])['change_reason'];
+
+        $client = $assessment->client;
+        $this->validateEvaluationDateAgainstBirthDate($client, $validated['evaluated_at']);
+
+        $snapshot = $this->assessmentSnapshotForCorrection($assessment, $client, $validated['evaluated_at']);
+        $analysis = $analyzer->analyze($client->toArray(), [...$validated, ...$snapshot]);
+        $oldValues = $this->assessmentAuditValues($assessment);
+
+        $assessment->update([
+            ...$validated,
+            ...$snapshot,
+            'corrected_by_user_id' => $request->user()->id,
+            'correction_count' => $assessment->correction_count + 1,
+            'calculated_bmi' => $analysis['calculated_bmi'],
+            'bmi_difference' => $analysis['bmi_difference'],
+            'analysis' => $analysis,
+        ]);
+
+        $this->auditAssessment($assessment->refresh(), $request, 'corrected', $changeReason, $oldValues, $this->assessmentAuditValues($assessment));
+
+        return response()->json([
+            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
+            'assessment' => $this->assessmentPayload($assessment),
+        ]);
+    }
+
+    public function cancelAssessment(Request $request, BioimpedanceAssessment $assessment): JsonResponse
+    {
+        if ($assessment->canceled_at) {
+            return response()->json([
+                'client' => $this->clientPayload($assessment->client->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
+                'assessment' => $this->assessmentPayload($assessment),
+            ]);
+        }
+
+        $validated = $request->validate([
+            'cancellation_reason' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+        $oldValues = $this->assessmentAuditValues($assessment);
+
+        $assessment->update([
+            'canceled_at' => now(),
+            'canceled_by_user_id' => $request->user()->id,
+            'cancellation_reason' => $validated['cancellation_reason'],
+        ]);
+
+        $this->auditAssessment($assessment->refresh(), $request, 'canceled', $validated['cancellation_reason'], $oldValues, $this->assessmentAuditValues($assessment));
+
+        return response()->json([
+            'client' => $this->clientPayload($assessment->client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
+            'assessment' => $this->assessmentPayload($assessment),
+        ]);
+    }
+
+    private function validateAssessment(Request $request, bool $requireClient = true): array
+    {
+        $request->merge([
+            'weight_kg' => $this->normalizeDecimal($request->input('weight_kg')),
+            'scale_bmi' => $this->normalizeDecimal($request->input('scale_bmi')),
+            'body_fat_percentage' => $this->normalizeDecimal($request->input('body_fat_percentage')),
+            'skeletal_muscle_percentage' => $this->normalizeDecimal($request->input('skeletal_muscle_percentage')),
+            'visceral_fat_level' => $this->normalizeDecimal($request->input('visceral_fat_level')),
+        ]);
+
+        return $request->validate([
+            'bioimpedance_client_id' => [$requireClient ? 'required' : 'sometimes', 'exists:bioimpedance_clients,id'],
+            'evaluated_at' => ['required', 'date', 'before_or_equal:now'],
+            'weight_kg' => ['required', 'numeric', 'between:2,150'],
+            'scale_bmi' => ['nullable', 'numeric', 'between:7,90'],
+            'body_fat_percentage' => ['nullable', 'numeric', 'between:5,60'],
+            'skeletal_muscle_percentage' => ['nullable', 'numeric', 'between:5,50'],
+            'resting_metabolism_kcal' => ['nullable', 'integer', 'between:385,3999'],
+            'body_age' => ['nullable', 'integer', 'between:18,80'],
+            'visceral_fat_level' => ['nullable', 'integer', 'between:1,30'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
     }
 
     private function validateClient(Request $request, ?BioimpedanceClient $client = null): array
@@ -172,6 +246,51 @@ class BioimpedanceController extends Controller
             'device_model' => BioimpedanceAnalyzer::DEVICE_MODEL,
             'reference_version' => BioimpedanceAnalyzer::REFERENCE_VERSION,
         ];
+    }
+
+    private function assessmentSnapshotForCorrection(BioimpedanceAssessment $assessment, BioimpedanceClient $client, string $evaluatedAt): array
+    {
+        return [
+            'age_at_assessment' => (int) $client->birth_date->diffInYears(Carbon::parse($evaluatedAt)),
+            'height_cm_at_assessment' => (float) ($assessment->height_cm_at_assessment ?? $client->height_cm),
+            'biological_sex_at_assessment' => $assessment->biological_sex_at_assessment ?? $client->biological_sex,
+            'device_model' => $assessment->device_model ?? BioimpedanceAnalyzer::DEVICE_MODEL,
+            'reference_version' => $assessment->reference_version ?? BioimpedanceAnalyzer::REFERENCE_VERSION,
+        ];
+    }
+
+    private function assessmentAuditValues(BioimpedanceAssessment $assessment): array
+    {
+        return collect($assessment->only([
+            'evaluated_at',
+            'weight_kg',
+            'scale_bmi',
+            'calculated_bmi',
+            'bmi_difference',
+            'body_fat_percentage',
+            'skeletal_muscle_percentage',
+            'resting_metabolism_kcal',
+            'body_age',
+            'visceral_fat_level',
+            'analysis',
+            'notes',
+            'correction_count',
+            'canceled_at',
+            'cancellation_reason',
+        ]))->map(fn ($value) => $value instanceof Carbon ? $value->toIso8601String() : $value)->all();
+    }
+
+    private function auditAssessment(BioimpedanceAssessment $assessment, Request $request, string $action, string $reason, array $oldValues, array $newValues): void
+    {
+        BioimpedanceAssessmentAudit::query()->create([
+            'bioimpedance_assessment_id' => $assessment->id,
+            'user_id' => $request->user()->id,
+            'action' => $action,
+            'reason' => $reason,
+            'old_values' => $oldValues,
+            'new_values' => $newValues,
+            'ip_address' => $request->ip(),
+        ]);
     }
 
     private function normalizeHeightToCentimeters(mixed $value): mixed
@@ -248,6 +367,8 @@ class BioimpedanceController extends Controller
             'id' => $assessment->id,
             'bioimpedance_client_id' => $assessment->bioimpedance_client_id,
             'professional_name' => $assessment->professional?->name,
+            'corrected_by_name' => $assessment->correctedBy?->name,
+            'canceled_by_name' => $assessment->canceledBy?->name,
             'evaluated_at' => $assessment->evaluated_at?->toIso8601String(),
             'age_at_assessment' => $assessment->age_at_assessment,
             'height_cm_at_assessment' => $assessment->height_cm_at_assessment === null ? null : (float) $assessment->height_cm_at_assessment,
@@ -265,6 +386,10 @@ class BioimpedanceController extends Controller
             'visceral_fat_level' => $assessment->visceral_fat_level === null ? null : (float) $assessment->visceral_fat_level,
             'analysis' => $analysis,
             'notes' => $assessment->notes,
+            'correction_count' => $assessment->correction_count,
+            'canceled_at' => $assessment->canceled_at?->toIso8601String(),
+            'cancellation_reason' => $assessment->cancellation_reason,
+            'is_canceled' => $assessment->canceled_at !== null,
         ];
     }
 }

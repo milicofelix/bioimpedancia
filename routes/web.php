@@ -20,5 +20,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/bioimpedance/clients/{client}', [BioimpedanceController::class, 'updateClient'])->name('bioimpedance.clients.update');
     Route::patch('/bioimpedance/clients/{client}/inactivate', [BioimpedanceController::class, 'inactivateClient'])->name('bioimpedance.clients.inactivate');
     Route::post('/bioimpedance/assessments', [BioimpedanceController::class, 'storeAssessment'])->name('bioimpedance.assessments.store');
+    Route::put('/bioimpedance/assessments/{assessment}', [BioimpedanceController::class, 'updateAssessment'])->name('bioimpedance.assessments.update');
+    Route::patch('/bioimpedance/assessments/{assessment}/cancel', [BioimpedanceController::class, 'cancelAssessment'])->name('bioimpedance.assessments.cancel');
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 });

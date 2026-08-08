@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Bioimpedance\BioimpedanceAssessment;
+use App\Models\Bioimpedance\BioimpedanceAssessmentAudit;
 use App\Models\Bioimpedance\BioimpedanceClient;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -201,6 +203,116 @@ class BioimpedanceModuleTest extends TestCase
             ...$assessmentPayload,
             'evaluated_at' => '2026-08-08 09:30:00',
         ])->assertJsonValidationErrors(['bioimpedance_client_id']);
+    }
+
+    public function test_all_client_assessments_are_returned_for_history(): void
+    {
+        $user = User::factory()->create();
+
+        $clientResponse = $this->actingAs($user)->postJson(route('bioimpedance.clients.store'), [
+            'full_name' => 'Historico Completo',
+            'birth_date' => '1990-01-01',
+            'biological_sex' => 'female',
+            'height_cm' => 165,
+            'email' => 'historico.completo@example.com',
+        ]);
+
+        for ($month = 1; $month <= 6; $month++) {
+            $this->actingAs($user)->postJson(route('bioimpedance.assessments.store'), [
+                'bioimpedance_client_id' => $clientResponse->json('client.id'),
+                'evaluated_at' => "2026-0{$month}-07 09:30:00",
+                'weight_kg' => 70 + $month,
+                'scale_bmi' => 25.7,
+                'body_fat_percentage' => 30,
+                'skeletal_muscle_percentage' => 28,
+                'resting_metabolism_kcal' => 1450,
+                'body_age' => 40,
+                'visceral_fat_level' => 9,
+            ])->assertCreated();
+        }
+
+        $this->actingAs($user)->getJson(route('bioimpedance.index'))
+            ->assertOk()
+            ->assertJsonCount(6, 'clients.0.assessments')
+            ->assertJsonPath('clients.0.assessments.0.weight_kg', 76);
+    }
+
+    public function test_assessment_can_be_corrected_with_audit_trail(): void
+    {
+        $user = User::factory()->create();
+        $assessment = $this->createAssessmentForUser($user);
+
+        $response = $this->actingAs($user)->putJson(route('bioimpedance.assessments.update', $assessment->id), [
+            'evaluated_at' => '2026-08-07 09:30:00',
+            'weight_kg' => 82.5,
+            'scale_bmi' => 27.2,
+            'body_fat_percentage' => 21.5,
+            'skeletal_muscle_percentage' => 37.5,
+            'resting_metabolism_kcal' => 1810,
+            'body_age' => 41,
+            'visceral_fat_level' => 10,
+            'notes' => 'Peso corrigido por erro de digitação.',
+            'change_reason' => 'Corrigir peso digitado incorretamente.',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('assessment.weight_kg', 82.5);
+        $response->assertJsonPath('assessment.correction_count', 1);
+        $response->assertJsonPath('assessment.corrected_by_name', $user->name);
+        $this->assertSame(1, BioimpedanceAssessmentAudit::query()->where('action', 'corrected')->count());
+        $this->assertDatabaseHas('bioimpedance_assessment_audits', [
+            'bioimpedance_assessment_id' => $assessment->id,
+            'user_id' => $user->id,
+            'action' => 'corrected',
+            'reason' => 'Corrigir peso digitado incorretamente.',
+        ]);
+    }
+
+    public function test_assessment_correction_requires_reason(): void
+    {
+        $user = User::factory()->create();
+        $assessment = $this->createAssessmentForUser($user);
+
+        $this->actingAs($user)->putJson(route('bioimpedance.assessments.update', $assessment->id), [
+            'evaluated_at' => '2026-08-07 09:30:00',
+            'weight_kg' => 82.5,
+            'scale_bmi' => 27.2,
+            'body_fat_percentage' => 21.5,
+            'skeletal_muscle_percentage' => 37.5,
+            'resting_metabolism_kcal' => 1810,
+            'body_age' => 41,
+            'visceral_fat_level' => 10,
+        ])->assertJsonValidationErrors(['change_reason']);
+    }
+
+    public function test_assessment_can_be_canceled_without_being_deleted(): void
+    {
+        $user = User::factory()->create();
+        $assessment = $this->createAssessmentForUser($user);
+
+        $this->actingAs($user)->patchJson(route('bioimpedance.assessments.cancel', $assessment->id), [
+            'cancellation_reason' => 'Avaliação registrada no cliente errado.',
+        ])->assertOk()
+            ->assertJsonPath('assessment.is_canceled', true)
+            ->assertJsonPath('assessment.cancellation_reason', 'Avaliação registrada no cliente errado.');
+
+        $this->assertDatabaseHas('bioimpedance_assessments', [
+            'id' => $assessment->id,
+            'cancellation_reason' => 'Avaliação registrada no cliente errado.',
+        ]);
+        $this->assertSame(1, BioimpedanceAssessmentAudit::query()->where('action', 'canceled')->count());
+
+        $this->actingAs($user)->putJson(route('bioimpedance.assessments.update', $assessment->id), [
+            'evaluated_at' => '2026-08-07 09:30:00',
+            'weight_kg' => 82.5,
+            'scale_bmi' => 27.2,
+            'body_fat_percentage' => 21.5,
+            'skeletal_muscle_percentage' => 37.5,
+            'resting_metabolism_kcal' => 1810,
+            'body_age' => 41,
+            'visceral_fat_level' => 10,
+            'change_reason' => 'Tentativa de corrigir cancelada.',
+        ])->assertJsonValidationErrors(['bioimpedance_assessment_id']);
     }
 
     public function test_assessment_age_is_calculated_from_evaluation_date(): void
@@ -514,5 +626,30 @@ class BioimpedanceModuleTest extends TestCase
             'visceral_fat_level' => $value,
         ])->assertCreated()
             ->assertJsonPath('assessment.analysis.indicators.visceral_fat.classification', $classification);
+    }
+
+    private function createAssessmentForUser(User $user): BioimpedanceAssessment
+    {
+        $clientResponse = $this->actingAs($user)->postJson(route('bioimpedance.clients.store'), [
+            'full_name' => 'Cliente Avaliacao',
+            'birth_date' => '1988-01-01',
+            'biological_sex' => 'male',
+            'height_cm' => 174,
+            'email' => 'cliente.avaliacao.'.uniqid().'@example.com',
+        ]);
+
+        $assessmentResponse = $this->actingAs($user)->postJson(route('bioimpedance.assessments.store'), [
+            'bioimpedance_client_id' => $clientResponse->json('client.id'),
+            'evaluated_at' => '2026-08-07 09:30:00',
+            'weight_kg' => 80,
+            'scale_bmi' => 26.4,
+            'body_fat_percentage' => 20,
+            'skeletal_muscle_percentage' => 37,
+            'resting_metabolism_kcal' => 1800,
+            'body_age' => 40,
+            'visceral_fat_level' => 9,
+        ]);
+
+        return BioimpedanceAssessment::query()->findOrFail($assessmentResponse->json('assessment.id'));
     }
 }
