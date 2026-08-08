@@ -33,6 +33,22 @@ const sexLabels = {
 	male: 'Masculino',
 };
 
+const evolutionMetrics = [
+	{ key: 'weight_kg', label: 'Peso', unit: 'kg', decimals: 1, lowerIsBetter: true },
+	{ key: 'calculated_bmi', label: 'IMC', unit: 'kg/m²', decimals: 1, lowerIsBetter: true },
+	{ key: 'body_fat_percentage', label: 'Gordura', unit: 'p.p.', valueUnit: '%', decimals: 1, lowerIsBetter: true },
+	{ key: 'skeletal_muscle_percentage', label: 'Músculo', unit: 'p.p.', valueUnit: '%', decimals: 1, lowerIsBetter: false },
+	{ key: 'visceral_fat_level', label: 'Visceral', unit: 'níveis', valueUnit: 'nível', decimals: 0, lowerIsBetter: true },
+	{ key: 'body_age', label: 'Idade corporal', unit: 'anos', decimals: 0, lowerIsBetter: true },
+];
+
+const evolutionPeriods = [
+	{ key: '30', label: '30 dias', days: 30 },
+	{ key: '90', label: '90 dias', days: 90 },
+	{ key: '180', label: '180 dias', days: 180 },
+	{ key: 'all', label: 'Tudo', days: null },
+];
+
 function Field({ label, children }) {
 	return (
 		<label className="block">
@@ -100,6 +116,102 @@ function indicatorBadgeClass(tone) {
 		attention: 'border-sky-100 bg-sky-50 text-sky-700',
 		pending: 'border-slate-200 bg-slate-50 text-slate-500',
 	}[tone] ?? 'border-slate-200 bg-slate-50 text-slate-500';
+}
+
+function sortAssessmentsAscending(assessments = []) {
+	return [...assessments]
+		.filter((assessment) => !assessment.is_canceled)
+		.sort((a, b) => new Date(a.evaluated_at) - new Date(b.evaluated_at));
+}
+
+function metricValue(assessment, key) {
+	const value = Number(assessment?.[key]);
+	return Number.isFinite(value) ? value : null;
+}
+
+function signedNumber(value, decimals = 1) {
+	if (value === null || value === undefined || Number.isNaN(value)) return '-';
+	const signal = value > 0 ? '+' : '';
+
+	return `${signal}${numberBr(value, decimals)}`;
+}
+
+function deltaTone(metric, delta) {
+	if (delta === null || delta === 0) return 'neutral';
+	const improved = metric.lowerIsBetter ? delta < 0 : delta > 0;
+
+	return improved ? 'good' : 'attention';
+}
+
+function deltaClass(tone) {
+	return {
+		good: 'bg-emerald-50 text-emerald-700',
+		attention: 'bg-rose-50 text-rose-700',
+		neutral: 'bg-slate-100 text-slate-600',
+	}[tone] ?? 'bg-slate-100 text-slate-600';
+}
+
+function formatMetricCurrent(assessment, metric) {
+	const value = metricValue(assessment, metric.key);
+	if (value === null) return '-';
+
+	return `${numberBr(value, metric.decimals)} ${metric.valueUnit ?? metric.unit}`;
+}
+
+function formatMetricDelta(delta, metric) {
+	if (delta === null) return '-';
+
+	return `${signedNumber(delta, metric.decimals)} ${metric.unit}`;
+}
+
+function comparisonSummary(previous, current) {
+	if (!previous || !current) {
+		return 'Cadastre pelo menos duas avaliações para gerar a síntese comparativa.';
+	}
+
+	const metricDelta = (key) => {
+		const previousValue = metricValue(previous, key);
+		const currentValue = metricValue(current, key);
+
+		return previousValue !== null && currentValue !== null ? currentValue - previousValue : null;
+	};
+	const weightDelta = metricDelta('weight_kg');
+	const fatDelta = metricDelta('body_fat_percentage');
+	const muscleDelta = metricDelta('skeletal_muscle_percentage');
+	const parts = [];
+
+	if (Number.isFinite(weightDelta)) {
+		parts.push(`${weightDelta < 0 ? 'redução' : weightDelta > 0 ? 'aumento' : 'manutenção'} de ${numberBr(Math.abs(weightDelta), 1)} kg no peso`);
+	}
+
+	if (Number.isFinite(fatDelta)) {
+		parts.push(`${fatDelta < 0 ? 'redução' : fatDelta > 0 ? 'aumento' : 'manutenção'} de ${numberBr(Math.abs(fatDelta), 1)} ponto percentual na gordura corporal`);
+	}
+
+	if (Number.isFinite(muscleDelta)) {
+		parts.push(`${muscleDelta > 0 ? 'aumento' : muscleDelta < 0 ? 'redução' : 'manutenção'} de ${numberBr(Math.abs(muscleDelta), 1)} ponto percentual no músculo esquelético`);
+	}
+
+	return parts.length
+		? `Desde a avaliação anterior, houve ${parts.join(', ')}.`
+		: 'Não há indicadores suficientes para gerar a síntese comparativa.';
+}
+
+function sparklinePoints(values, width = 150, height = 42) {
+	const validValues = values.filter((value) => Number.isFinite(value));
+	if (!validValues.length) return '';
+	if (validValues.length === 1) return `0,${height / 2} ${width},${height / 2}`;
+
+	const min = Math.min(...validValues);
+	const max = Math.max(...validValues);
+	const range = max - min || 1;
+
+	return validValues.map((value, index) => {
+		const x = (index / (validValues.length - 1)) * width;
+		const y = height - ((value - min) / range) * height;
+
+		return `${x.toFixed(1)},${y.toFixed(1)}`;
+	}).join(' ');
 }
 
 function normalizeDecimal(value) {
@@ -605,6 +717,8 @@ export default function DashboardPage({ userName }) {
 						</div>
 					) : null}
 
+					<EvolutionPanel client={selectedClient} selectedAssessment={selectedAssessment} />
+
 					<div className="no-print rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
 						<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 							<div>
@@ -923,6 +1037,146 @@ function MiniMetric({ label, value }) {
 		<div>
 			<p className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p>
 			<p className="mt-2 text-lg font-bold text-slate-950">{value}</p>
+		</div>
+	);
+}
+
+function EvolutionPanel({ client, selectedAssessment }) {
+	const [period, setPeriod] = useState('all');
+
+	if (!client) return null;
+
+	const timeline = sortAssessmentsAscending(client.assessments);
+	const current = selectedAssessment && !selectedAssessment.is_canceled
+		? selectedAssessment
+		: timeline[timeline.length - 1] ?? null;
+	const currentIndex = timeline.findIndex((assessment) => assessment.id === current?.id);
+	const previous = currentIndex > 0 ? timeline[currentIndex - 1] : null;
+	const selectedPeriod = evolutionPeriods.find((item) => item.key === period) ?? evolutionPeriods[evolutionPeriods.length - 1];
+	const periodStart = current && selectedPeriod.days
+		? new Date(new Date(current.evaluated_at).getTime() - selectedPeriod.days * 24 * 60 * 60 * 1000)
+		: null;
+	const visibleTimeline = periodStart
+		? timeline.filter((assessment) => new Date(assessment.evaluated_at) >= periodStart && new Date(assessment.evaluated_at) <= new Date(current.evaluated_at))
+		: timeline;
+	const first = visibleTimeline[0] ?? null;
+
+	return (
+		<section className="no-print rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+			<div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+				<div>
+					<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Evolução corporal</p>
+					<h2 className="mt-1 text-xl font-semibold text-slate-950">{timeline.length} avaliação(ões) válidas</h2>
+				</div>
+				<div className="flex flex-col gap-2 sm:items-end">
+					<div className="rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-600">
+						Selecionada: <strong className="text-slate-950">{current ? formatDate(current.evaluated_at) : '-'}</strong>
+					</div>
+					<div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+						{evolutionPeriods.map((item) => (
+							<button
+								type="button"
+								key={item.key}
+								onClick={() => setPeriod(item.key)}
+								className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${period === item.key ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+							>
+								{item.label}
+							</button>
+						))}
+					</div>
+				</div>
+			</div>
+
+			{timeline.length ? (
+				<>
+					<div className="mt-5 grid gap-3 md:grid-cols-3">
+						{evolutionMetrics.slice(0, 3).map((metric) => (
+							<TrendCard key={metric.key} metric={metric} assessments={visibleTimeline} current={current} first={first} />
+						))}
+					</div>
+					<div className="mt-3 grid gap-3 md:grid-cols-3">
+						{evolutionMetrics.slice(3).map((metric) => (
+							<TrendCard key={metric.key} metric={metric} assessments={visibleTimeline} current={current} first={first} />
+						))}
+					</div>
+
+					<div className="mt-5 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+						<div className="overflow-hidden rounded-2xl border border-slate-200">
+							<table className="w-full text-left text-sm">
+								<thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+									<tr>
+										<th className="px-4 py-3 font-bold">Indicador</th>
+										<th className="px-4 py-3 font-bold">Anterior</th>
+										<th className="px-4 py-3 font-bold">Atual</th>
+										<th className="px-4 py-3 font-bold">Variação</th>
+									</tr>
+								</thead>
+								<tbody className="divide-y divide-slate-100">
+									{evolutionMetrics.map((metric) => {
+										const previousValue = metricValue(previous, metric.key);
+										const currentValue = metricValue(current, metric.key);
+										const delta = previousValue !== null && currentValue !== null ? currentValue - previousValue : null;
+										const tone = deltaTone(metric, delta);
+
+										return (
+											<tr key={metric.key}>
+												<td className="px-4 py-3 font-semibold text-slate-800">{metric.label}</td>
+												<td className="px-4 py-3 text-slate-600">{formatMetricCurrent(previous, metric)}</td>
+												<td className="px-4 py-3 text-slate-900">{formatMetricCurrent(current, metric)}</td>
+												<td className="px-4 py-3">
+													<span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${deltaClass(tone)}`}>
+														{formatMetricDelta(delta, metric)}
+													</span>
+												</td>
+											</tr>
+										);
+									})}
+								</tbody>
+							</table>
+						</div>
+
+						<div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
+							<h3 className="text-sm font-bold uppercase tracking-wide text-emerald-800">Síntese comparativa</h3>
+							<p className="mt-4 text-sm leading-6 text-slate-700">{comparisonSummary(previous, current)}</p>
+							<p className="mt-4 text-xs leading-5 text-slate-500">A leitura de evolução considera composição corporal, não apenas redução de peso.</p>
+						</div>
+					</div>
+				</>
+			) : (
+				<div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+					Cadastre avaliações para visualizar histórico, comparações e tendência corporal.
+				</div>
+			)}
+		</section>
+	);
+}
+
+function TrendCard({ metric, assessments, current, first }) {
+	const values = assessments.map((assessment) => metricValue(assessment, metric.key));
+	const firstValue = metricValue(first, metric.key);
+	const currentValue = metricValue(current, metric.key);
+	const totalDelta = firstValue !== null && currentValue !== null ? currentValue - firstValue : null;
+	const tone = deltaTone(metric, totalDelta);
+	const points = sparklinePoints(values);
+
+	return (
+		<div className="rounded-2xl border border-slate-200 bg-white p-4">
+			<div className="flex items-start justify-between gap-3">
+				<div>
+					<p className="text-xs font-bold uppercase tracking-wide text-slate-500">{metric.label}</p>
+					<p className="mt-2 text-2xl font-bold text-slate-950">{formatMetricCurrent(current, metric)}</p>
+				</div>
+				<span className={`rounded-full px-3 py-1 text-xs font-bold ${deltaClass(tone)}`}>
+					{formatMetricDelta(totalDelta, metric)}
+				</span>
+			</div>
+			<svg className="mt-4 h-12 w-full" viewBox="0 0 150 42" preserveAspectRatio="none" aria-hidden="true">
+				<polyline points={points} fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+			</svg>
+			<div className="mt-2 flex justify-between text-[11px] font-semibold uppercase text-slate-400">
+				<span>{first ? formatIssueDate(first.evaluated_at) : '-'}</span>
+				<span>{current ? formatIssueDate(current.evaluated_at) : '-'}</span>
+			</div>
 		</div>
 	);
 }
