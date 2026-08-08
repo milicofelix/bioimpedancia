@@ -25,6 +25,10 @@ class BioimpedanceClient extends Model
         'consent_accepted_at',
         'next_assessment_at',
         'inactivated_at',
+        'privacy_exported_at',
+        'privacy_export_count',
+        'anonymized_at',
+        'anonymized_by_user_id',
         'notes',
     ];
 
@@ -36,6 +40,8 @@ class BioimpedanceClient extends Model
             'consent_accepted_at' => 'datetime',
             'next_assessment_at' => 'date',
             'inactivated_at' => 'datetime',
+            'privacy_exported_at' => 'datetime',
+            'anonymized_at' => 'datetime',
         ];
     }
 

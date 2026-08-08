@@ -56,6 +56,7 @@ class BioimpedanceController extends Controller
     public function updateClient(Request $request, BioimpedanceClient $client): JsonResponse
     {
         $this->authorizeWrite($request);
+        $this->ensureClientIsNotAnonymized($client);
         $validated = $this->validateClient($request, $client);
         $oldValues = $this->clientAuditPayload($client);
 
@@ -78,6 +79,78 @@ class BioimpedanceController extends Controller
 
         return response()->json([
             'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
+        ]);
+    }
+
+    public function exportClientPrivacyData(Request $request, BioimpedanceClient $client): Response
+    {
+        $this->authorizeAdmin($request);
+        $client->load(['assessments' => fn ($query) => $query->latest('evaluated_at')]);
+        $exportCount = $client->privacy_export_count + 1;
+        $client->update([
+            'privacy_exported_at' => now(),
+            'privacy_export_count' => $exportCount,
+        ]);
+        $this->audit($request, 'bioimpedance_client.privacy_exported', $client, 'Dados do cliente exportados para atendimento LGPD', null, [
+            'client_id' => $client->id,
+            'privacy_export_count' => $exportCount,
+        ]);
+
+        $payload = [
+            'exported_at' => now()->toIso8601String(),
+            'exported_by' => $this->userPayload($request->user()),
+            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
+            'clinic' => $this->clinicPayload(),
+            'purpose' => 'Exportação de dados pessoais e avaliações para atendimento de solicitação LGPD.',
+        ];
+
+        return response(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), 200, [
+            'Content-Type' => 'application/json; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$this->privacyExportFileName($client).'"',
+        ]);
+    }
+
+    public function anonymizeClient(Request $request, BioimpedanceClient $client): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+        if ($client->anonymized_at) {
+            return response()->json([
+                'client' => $this->clientPayload($client->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
+                'audit_events' => $this->auditEventsPayload(),
+            ]);
+        }
+
+        $validated = $request->validate([
+            'anonymization_reason' => ['required', 'string', 'min:10', 'max:1000'],
+        ]);
+        $oldValues = $this->clientAuditPayload($client);
+        $anonymizedName = 'Cliente anonimizado #'.str_pad((string) $client->id, 4, '0', STR_PAD_LEFT);
+
+        $client->update([
+            'full_name' => $anonymizedName,
+            'birth_date' => '1900-01-01',
+            'biological_sex' => 'female',
+            'height_cm' => 100,
+            'phone' => null,
+            'phone_digits' => null,
+            'email' => null,
+            'cpf' => null,
+            'address' => null,
+            'emergency_contact_name' => null,
+            'emergency_contact_phone' => null,
+            'consent_accepted_at' => null,
+            'next_assessment_at' => null,
+            'inactivated_at' => now(),
+            'anonymized_at' => now(),
+            'anonymized_by_user_id' => $request->user()->id,
+            'notes' => 'Registro anonimizado por solicitação LGPD.',
+        ]);
+
+        $this->audit($request, 'bioimpedance_client.anonymized', $client, 'Cliente anonimizado: '.$validated['anonymization_reason'], $oldValues, $this->clientAuditPayload($client->refresh()));
+
+        return response()->json([
+            'client' => $this->clientPayload($client->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
+            'audit_events' => $this->auditEventsPayload(),
         ]);
     }
 
@@ -178,6 +251,7 @@ class BioimpedanceController extends Controller
                 'bioimpedance_client_id' => 'Cliente inativo não pode receber novas avaliações.',
             ]);
         }
+        $this->ensureClientIsNotAnonymized($client);
 
         $this->validateEvaluationDateAgainstBirthDate($client, $validated['evaluated_at']);
 
@@ -280,6 +354,11 @@ class BioimpedanceController extends Controller
         ]);
         $assessment->refresh()->load(['client', 'professional', 'correctedBy', 'canceledBy']);
         config(['dompdf.public_path' => public_path()]);
+        $this->audit(request(), 'bioimpedance_assessment.report_downloaded', $assessment, 'Relatório PDF acessado', null, [
+            'assessment_id' => $assessment->id,
+            'client_id' => $assessment->bioimpedance_client_id,
+            'report_issue_count' => $assessment->report_issue_count,
+        ]);
 
         $pdf = Pdf::loadView('bioimpedance.report-pdf', [
             'clinic' => [
@@ -368,6 +447,15 @@ class BioimpedanceController extends Controller
         if (Carbon::parse($evaluatedAt)->lt($client->birth_date)) {
             throw ValidationException::withMessages([
                 'evaluated_at' => 'A avaliação não pode ser anterior ao nascimento do cliente.',
+            ]);
+        }
+    }
+
+    private function ensureClientIsNotAnonymized(BioimpedanceClient $client): void
+    {
+        if ($client->anonymized_at) {
+            throw ValidationException::withMessages([
+                'bioimpedance_client_id' => 'Cliente anonimizado não pode ser alterado.',
             ]);
         }
     }
@@ -533,6 +621,10 @@ class BioimpedanceController extends Controller
             'consent_accepted_at',
             'next_assessment_at',
             'inactivated_at',
+            'privacy_exported_at',
+            'privacy_export_count',
+            'anonymized_at',
+            'anonymized_by_user_id',
             'notes',
         ]))->map(fn ($value) => $value instanceof Carbon ? $value->toIso8601String() : $value)->all();
     }
@@ -588,6 +680,10 @@ class BioimpedanceController extends Controller
             'consent_accepted_at' => $client->consent_accepted_at?->toIso8601String(),
             'next_assessment_at' => $client->next_assessment_at?->toDateString(),
             'inactivated_at' => $client->inactivated_at?->toIso8601String(),
+            'privacy_exported_at' => $client->privacy_exported_at?->toIso8601String(),
+            'privacy_export_count' => $client->privacy_export_count,
+            'anonymized_at' => $client->anonymized_at?->toIso8601String(),
+            'is_anonymized' => $client->anonymized_at !== null,
             'is_active' => $client->inactivated_at === null,
             'last_assessment_at' => $client->assessments->max('evaluated_at')?->toIso8601String(),
             'notes' => $client->notes,
@@ -650,5 +746,10 @@ class BioimpedanceController extends Controller
     private function pdfFileName(BioimpedanceAssessment $assessment): string
     {
         return Str::slug('bioimpedancia-'.$assessment->client->full_name.'-'.$assessment->evaluated_at->format('Y-m-d')).'.pdf';
+    }
+
+    private function privacyExportFileName(BioimpedanceClient $client): string
+    {
+        return Str::slug('dados-lgpd-'.$client->full_name.'-'.now()->format('Y-m-d')).'.json';
     }
 }

@@ -284,6 +284,65 @@ class BioimpedanceModuleTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_admin_can_export_client_privacy_data_and_action_is_audited(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $assessment = $this->createAssessmentForUser($admin);
+        $client = $assessment->client;
+
+        $response = $this->actingAs($admin)->get(route('bioimpedance.clients.privacy-export', $client->id));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/json; charset=UTF-8');
+        $response->assertHeader('content-disposition', 'attachment; filename="dados-lgpd-cliente-avaliacao-'.now()->format('Y-m-d').'.json"');
+        $this->assertSame('Cliente Avaliacao', $response->json('client.full_name'));
+        $this->assertCount(1, $response->json('client.assessments'));
+
+        $client->refresh();
+        $this->assertNotNull($client->privacy_exported_at);
+        $this->assertSame(1, $client->privacy_export_count);
+        $this->assertDatabaseHas('app_audits', [
+            'user_id' => $admin->id,
+            'action' => 'bioimpedance_client.privacy_exported',
+            'auditable_type' => $client::class,
+            'auditable_id' => $client->id,
+        ]);
+    }
+
+    public function test_only_admin_can_anonymize_client_and_identifier_data_is_removed(): void
+    {
+        $professional = User::factory()->create(['role' => User::ROLE_PROFESSIONAL]);
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $assessment = $this->createAssessmentForUser($admin);
+        $client = $assessment->client;
+
+        $this->actingAs($professional)->patchJson(route('bioimpedance.clients.anonymize', $client->id), [
+            'anonymization_reason' => 'Solicitação formal do cliente.',
+        ])->assertForbidden();
+
+        $response = $this->actingAs($admin)->patchJson(route('bioimpedance.clients.anonymize', $client->id), [
+            'anonymization_reason' => 'Solicitação formal do cliente.',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('client.is_anonymized', true)
+            ->assertJsonPath('client.email', null)
+            ->assertJsonPath('client.phone', null)
+            ->assertJsonPath('client.full_name', 'Cliente anonimizado #'.str_pad((string) $client->id, 4, '0', STR_PAD_LEFT))
+            ->assertJsonCount(1, 'client.assessments');
+
+        $client->refresh();
+        $this->assertNotNull($client->anonymized_at);
+        $this->assertSame($admin->id, $client->anonymized_by_user_id);
+
+        $this->actingAs($admin)->putJson(route('bioimpedance.clients.update', $client->id), [
+            'full_name' => 'Tentativa',
+            'birth_date' => '1990-01-01',
+            'biological_sex' => 'female',
+            'height_cm' => 165,
+        ])->assertJsonValidationErrors(['bioimpedance_client_id']);
+    }
+
     public function test_all_client_assessments_are_returned_for_history(): void
     {
         $user = User::factory()->create();
@@ -408,6 +467,12 @@ class BioimpedanceModuleTest extends TestCase
         $assessment->refresh();
         $this->assertNotNull($assessment->report_issued_at);
         $this->assertSame(1, $assessment->report_issue_count);
+        $this->assertDatabaseHas('app_audits', [
+            'user_id' => $user->id,
+            'action' => 'bioimpedance_assessment.report_downloaded',
+            'auditable_type' => $assessment::class,
+            'auditable_id' => $assessment->id,
+        ]);
     }
 
     public function test_legacy_pending_analysis_is_refreshed_before_pdf_download(): void

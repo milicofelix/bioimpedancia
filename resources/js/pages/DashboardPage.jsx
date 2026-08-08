@@ -414,6 +414,7 @@ export default function DashboardPage({ userName }) {
 		return (weight / (height * height)).toFixed(1);
 	}, [assessmentForm.weight_kg, clientForm.height_cm, selectedClient]);
 	const canWrite = currentUser?.role !== 'viewer';
+	const canAdmin = Boolean(currentUser?.is_admin);
 
 	async function handleLogout() {
 		await window.axios.post('/logout', {}, { headers: { Accept: 'application/json' } });
@@ -546,6 +547,24 @@ export default function DashboardPage({ userName }) {
 
 		const { data } = await window.axios.patch(`/bioimpedance/clients/${client.id}/inactivate`);
 		setClients((current) => current.map((item) => (item.id === data.client.id ? data.client : item)));
+		setSelectedClientId(data.client.id);
+	}
+
+	function exportClientPrivacyData(client) {
+		if (!canAdmin || !client) return;
+		window.open(`/bioimpedance/clients/${client.id}/privacy-export`, '_blank', 'noopener,noreferrer');
+	}
+
+	async function anonymizeClient(client) {
+		if (!canAdmin || !client) return;
+		const reason = window.prompt(`Informe o motivo da anonimização de ${client.full_name}:`);
+		if (!reason) return;
+
+		const { data } = await window.axios.patch(`/bioimpedance/clients/${client.id}/anonymize`, {
+			anonymization_reason: reason,
+		});
+		setClients((current) => current.map((item) => (item.id === data.client.id ? data.client : item)));
+		setAuditEvents(data.audit_events ?? auditEvents);
 		setSelectedClientId(data.client.id);
 	}
 
@@ -732,7 +751,7 @@ export default function DashboardPage({ userName }) {
 							<h2 className="text-base font-semibold text-slate-950">{clientMode === 'edit' ? 'Editar cliente' : 'Cadastro rápido'}</h2>
 							<div className="flex gap-2">
 								<button type="button" onClick={() => startNewClient()} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600">Novo</button>
-								{selectedClient ? <button type="button" disabled={!canWrite} onClick={() => startEditClient(selectedClient)} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">Editar</button> : null}
+								{selectedClient ? <button type="button" disabled={!canWrite || selectedClient.is_anonymized} onClick={() => startEditClient(selectedClient)} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">Editar</button> : null}
 							</div>
 						</div>
 						<form onSubmit={submitClient} className="mt-4 space-y-3">
@@ -788,7 +807,7 @@ export default function DashboardPage({ userName }) {
 							<button type="submit" disabled={!canWrite || savingClient} className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
 								{savingClient ? 'Salvando...' : clientMode === 'edit' ? 'Salvar alterações' : 'Salvar cliente'}
 							</button>
-							{clientMode === 'edit' && selectedClient?.is_active ? (
+							{clientMode === 'edit' && selectedClient?.is_active && !selectedClient?.is_anonymized ? (
 								<button type="button" disabled={!canWrite} onClick={() => inactivateClient(selectedClient)} className="w-full rounded-xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
 									Inativar cliente
 								</button>
@@ -986,6 +1005,16 @@ export default function DashboardPage({ userName }) {
 									<button type="button" disabled={!canWrite || selectedAssessment.is_canceled} onClick={() => cancelAssessment(selectedAssessment)} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
 										Cancelar avaliação
 									</button>
+									{canAdmin ? (
+										<>
+											<button type="button" onClick={() => exportClientPrivacyData(selectedClient)} className="rounded-xl border border-sky-200 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50">
+												Exportar dados LGPD
+											</button>
+											<button type="button" disabled={selectedClient.is_anonymized} onClick={() => anonymizeClient(selectedClient)} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50">
+												Anonimizar cliente
+											</button>
+										</>
+									) : null}
 								</div>
 							) : null}
 						</div>
