@@ -32,13 +32,15 @@ class BioimpedanceDemoSeeder extends Seeder
             foreach ($assessments as $assessmentData) {
                 $snapshot = $this->snapshot($clientData, $assessmentData['evaluated_at']);
                 $calculatedBmi = $this->bmi($assessmentData['weight_kg'], $clientData['height_cm']);
+                $scaleBmi = $this->realisticScaleBmi($calculatedBmi, $assessmentData['evaluated_at'], $client->id);
                 $payload = [
                     ...$assessmentData,
                     ...$snapshot,
                     'bioimpedance_client_id' => $client->id,
                     'user_id' => $professional?->id,
+                    'scale_bmi' => $scaleBmi,
                     'calculated_bmi' => $calculatedBmi,
-                    'bmi_difference' => round(($assessmentData['scale_bmi'] ?? $calculatedBmi) - $calculatedBmi, 2),
+                    'bmi_difference' => round($scaleBmi - $calculatedBmi, 2),
                 ];
 
                 BioimpedanceAssessment::query()->create([
@@ -54,6 +56,14 @@ class BioimpedanceDemoSeeder extends Seeder
         $heightM = $heightCm / 100;
 
         return round($weightKg / ($heightM * $heightM), 1);
+    }
+
+    private function realisticScaleBmi(float $calculatedBmi, string $evaluatedAt, int $clientId): float
+    {
+        $seed = ((int) CarbonImmutable::parse($evaluatedAt)->format('d') + $clientId) % 3;
+        $variation = [-0.1, 0.0, 0.1][$seed];
+
+        return round($calculatedBmi + $variation, 1);
     }
 
     private function digits(?string $value): ?string
@@ -119,7 +129,7 @@ class BioimpedanceDemoSeeder extends Seeder
                 'phone' => '(11) 98001-1003',
                 'email' => 'demo.camila.alves@ricosty.local',
                 'notes' => 'Demo - evolução leve com platô.',
-                'assessments' => $this->series('2026-02-03', 67.8, 27.2, 33.2, 27.0, 1390, 39, 8, [
+                'assessments' => $this->series('2026-01-25', 67.8, 27.2, 33.2, 27.0, 1390, 39, 8, [
                     [-0.7, -0.3, -0.8, 0.2, -6, 0, 0],
                     [-0.2, -0.1, -0.1, 0.1, -2, 0, 0],
                     [-0.1, 0.0, 0.2, 0.0, 0, 0, 0],
@@ -134,7 +144,7 @@ class BioimpedanceDemoSeeder extends Seeder
                 'phone' => '(11) 98001-1004',
                 'email' => 'demo.daniel.pereira@ricosty.local',
                 'notes' => 'Demo - estabilidade geral.',
-                'assessments' => $this->series('2026-02-19', 88.7, 30.0, 22.4, 36.4, 1880, 53, 11, [
+                'assessments' => $this->series('2026-02-03', 88.7, 30.0, 22.4, 36.4, 1880, 53, 11, [
                     [0.1, 0.1, -0.1, 0.0, 3, 0, 0],
                     [-0.2, -0.1, 0.0, 0.1, -2, 0, 0],
                     [0.2, 0.1, 0.2, -0.1, 2, 0, 0],
@@ -149,7 +159,7 @@ class BioimpedanceDemoSeeder extends Seeder
                 'phone' => '(11) 98001-1005',
                 'email' => 'demo.elisa.costa@ricosty.local',
                 'notes' => 'Demo - melhora importante de gordura visceral.',
-                'assessments' => $this->series('2026-03-04', 78.2, 30.5, 41.2, 24.5, 1490, 64, 16, [
+                'assessments' => $this->series('2026-02-12', 78.2, 30.5, 41.2, 24.5, 1490, 64, 16, [
                     [-1.0, -0.4, -1.4, 0.3, -10, -1, -1],
                     [-0.9, -0.3, -1.2, 0.3, -8, -1, -1],
                     [-0.8, -0.3, -1.0, 0.4, -8, -1, -1],
@@ -164,7 +174,7 @@ class BioimpedanceDemoSeeder extends Seeder
                 'phone' => '(11) 98001-1006',
                 'email' => 'demo.felipe.nogueira@ricosty.local',
                 'notes' => 'Demo - ganho muscular com redução de gordura.',
-                'assessments' => $this->series('2026-03-21', 84.5, 25.8, 21.5, 37.0, 1990, 38, 9, [
+                'assessments' => $this->series('2026-02-21', 84.5, 25.8, 21.5, 37.0, 1990, 38, 9, [
                     [-0.4, -0.1, -1.0, 0.8, 12, -1, 0],
                     [-0.5, -0.2, -0.9, 0.7, 14, -1, 0],
                     [0.1, 0.0, -0.7, 0.8, 16, -1, -1],
@@ -179,7 +189,7 @@ class BioimpedanceDemoSeeder extends Seeder
                 'phone' => '(11) 98001-1007',
                 'email' => 'demo.gabriela.souza@ricosty.local',
                 'notes' => 'Demo - regressão por aumento de peso e gordura.',
-                'assessments' => $this->series('2026-04-02', 72.1, 25.2, 32.8, 28.6, 1505, 43, 9, [
+                'assessments' => $this->series('2026-03-03', 72.1, 25.2, 32.8, 28.6, 1505, 43, 9, [
                     [0.9, 0.3, 1.2, -0.3, 14, 1, 1],
                     [1.1, 0.4, 1.5, -0.4, 18, 1, 1],
                     [0.6, 0.2, 0.8, -0.2, 6, 0, 0],
@@ -194,7 +204,7 @@ class BioimpedanceDemoSeeder extends Seeder
                 'phone' => '(11) 98001-1008',
                 'email' => 'demo.henrique.barros@ricosty.local',
                 'notes' => 'Demo - oscilação com melhora final.',
-                'assessments' => $this->series('2026-04-18', 101.3, 32.7, 29.0, 34.2, 2105, 58, 17, [
+                'assessments' => $this->series('2026-03-14', 101.3, 32.7, 29.0, 34.2, 2105, 58, 17, [
                     [-1.2, -0.4, -0.9, 0.2, -10, 0, 0],
                     [0.5, 0.2, 0.7, -0.2, 8, 1, 1],
                     [-1.8, -0.6, -1.7, 0.6, -20, -2, -2],
@@ -209,7 +219,7 @@ class BioimpedanceDemoSeeder extends Seeder
                 'phone' => '(11) 98001-1009',
                 'email' => 'demo.isabela.ferreira@ricosty.local',
                 'notes' => 'Demo - cliente jovem com manutenção.',
-                'assessments' => $this->series('2026-05-07', 61.2, 23.3, 27.6, 29.1, 1360, 27, 6, [
+                'assessments' => $this->series('2026-03-24', 61.2, 23.3, 27.6, 29.1, 1360, 27, 6, [
                     [-0.2, -0.1, -0.2, 0.1, -2, 0, 0],
                     [0.0, 0.0, 0.1, 0.0, 1, 0, 0],
                     [-0.3, -0.1, -0.3, 0.2, -3, 0, 0],
@@ -224,7 +234,7 @@ class BioimpedanceDemoSeeder extends Seeder
                 'phone' => '(11) 98001-1010',
                 'email' => 'demo.joao.ribeiro@ricosty.local',
                 'notes' => 'Demo - aumento de gordura visceral apesar de peso quase estável.',
-                'assessments' => $this->series('2026-05-24', 79.0, 27.3, 20.2, 38.0, 1850, 41, 8, [
+                'assessments' => $this->series('2026-04-02', 79.0, 27.3, 20.2, 38.0, 1850, 41, 8, [
                     [0.2, 0.1, 0.8, -0.2, 5, 0, 1],
                     [0.3, 0.1, 0.9, -0.3, 5, 1, 1],
                     [-0.1, 0.0, 0.5, -0.1, 1, 0, 1],
@@ -239,7 +249,7 @@ class BioimpedanceDemoSeeder extends Seeder
                 'phone' => '(11) 98001-1011',
                 'email' => 'demo.karen.lopes@ricosty.local',
                 'notes' => 'Demo - grande evolução com perda de peso.',
-                'assessments' => $this->series('2026-06-05', 86.0, 35.8, 42.0, 23.8, 1515, 58, 15, [
+                'assessments' => $this->series('2026-04-10', 86.0, 35.8, 42.0, 23.8, 1515, 58, 15, [
                     [-2.0, -0.8, -2.2, 0.5, -18, -1, -1],
                     [-1.8, -0.8, -2.0, 0.6, -16, -1, -1],
                     [-1.5, -0.6, -1.8, 0.5, -12, -1, -1],
@@ -254,7 +264,7 @@ class BioimpedanceDemoSeeder extends Seeder
                 'phone' => '(11) 98001-1012',
                 'email' => 'demo.lucas.almeida@ricosty.local',
                 'notes' => 'Demo - recomposição: peso sobe, gordura cai e músculo aumenta.',
-                'assessments' => $this->series('2026-06-22', 76.5, 22.8, 17.8, 39.0, 1920, 28, 6, [
+                'assessments' => $this->series('2026-04-15', 76.5, 22.8, 17.8, 39.0, 1920, 28, 6, [
                     [0.8, 0.2, -0.6, 0.9, 22, 0, 0],
                     [0.7, 0.2, -0.5, 0.8, 20, 0, 0],
                     [0.4, 0.1, -0.4, 0.7, 16, 0, 0],
@@ -269,7 +279,7 @@ class BioimpedanceDemoSeeder extends Seeder
                 'phone' => '(11) 98001-1013',
                 'email' => 'demo.mariana.gomes@ricosty.local',
                 'notes' => 'Demo - sem evolução relevante.',
-                'assessments' => $this->series('2026-07-03', 69.4, 24.9, 31.0, 28.8, 1455, 36, 8, [
+                'assessments' => $this->series('2026-04-18', 69.4, 24.9, 31.0, 28.8, 1455, 36, 8, [
                     [0.0, 0.0, 0.1, -0.1, 2, 0, 0],
                     [0.2, 0.1, 0.0, 0.0, 0, 0, 0],
                     [-0.1, 0.0, -0.1, 0.1, -1, 0, 0],
@@ -284,7 +294,7 @@ class BioimpedanceDemoSeeder extends Seeder
                 'phone' => '(11) 98001-1014',
                 'email' => 'demo.nelson.moreira@ricosty.local',
                 'notes' => 'Demo - melhora lenta em cliente acima de 60 anos.',
-                'assessments' => $this->series('2026-07-19', 91.2, 32.3, 28.4, 32.9, 1760, 67, 16, [
+                'assessments' => $this->series('2026-04-12', 91.2, 32.3, 28.4, 32.9, 1760, 67, 16, [
                     [-0.8, -0.3, -0.6, 0.2, -6, 0, 0],
                     [-0.7, -0.2, -0.5, 0.2, -5, 0, -1],
                     [-0.5, -0.2, -0.4, 0.1, -4, 0, 0],
@@ -299,7 +309,7 @@ class BioimpedanceDemoSeeder extends Seeder
                 'phone' => '(11) 98001-1015',
                 'email' => 'demo.patricia.ramos@ricosty.local',
                 'notes' => 'Demo - regressão após início promissor.',
-                'assessments' => $this->series('2026-08-02', 74.6, 25.5, 34.1, 27.5, 1510, 42, 9, [
+                'assessments' => $this->series('2026-04-18', 74.6, 25.5, 34.1, 27.5, 1510, 42, 9, [
                     [-0.6, -0.2, -0.5, 0.2, -5, 0, 0],
                     [0.9, 0.3, 1.2, -0.3, 13, 1, 1],
                     [1.1, 0.4, 1.4, -0.4, 16, 1, 1],

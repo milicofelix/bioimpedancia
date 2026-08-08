@@ -25,11 +25,21 @@ class DatabaseSeeder extends Seeder
         ]);
 
         User::query()->updateOrCreate([
-            'email' => 'test@example.com',
+            'email' => 'profissional@ricosty.local',
         ], [
-            'name' => 'Test User',
+            'name' => 'Profissional Ricosty',
             'role' => User::ROLE_PROFESSIONAL,
             'password' => Hash::make('password'),
         ]);
+
+        User::query()->updateOrCreate([
+            'email' => 'recepcao@ricosty.local',
+        ], [
+            'name' => 'Recepção Ricosty',
+            'role' => User::ROLE_RECEPTION,
+            'password' => Hash::make('password'),
+        ]);
+
+        $this->call(BioimpedanceDemoSeeder::class);
     }
 }

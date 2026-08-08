@@ -34,6 +34,20 @@ class BioimpedanceDemoSeederTest extends TestCase
         $stable = $this->firstAndLast('demo.daniel.pereira@ricosty.local');
         $this->assertLessThanOrEqual(0.3, abs($stable['last']->weight_kg - $stable['first']->weight_kg));
         $this->assertArrayHasKey('indicators', $stable['last']->analysis);
+
+        $this->assertNull(BioimpedanceAssessment::query()
+            ->whereHas('client', fn ($query) => $query->where('email', 'like', 'demo.%@ricosty.local'))
+            ->where('evaluated_at', '>', '2026-08-08 23:59:59')
+            ->first());
+
+        BioimpedanceAssessment::query()
+            ->whereHas('client', fn ($query) => $query->where('email', 'like', 'demo.%@ricosty.local'))
+            ->get()
+            ->each(fn (BioimpedanceAssessment $assessment) => $this->assertLessThan(
+                0.5,
+                abs((float) $assessment->bmi_difference),
+                'Seeder gerou diferença de IMC alta na avaliação '.$assessment->id
+            ));
     }
 
     private function firstAndLast(string $email): array
