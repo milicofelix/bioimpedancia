@@ -406,6 +406,9 @@ export default function DashboardPage({ userName }) {
 	const [savingUser, setSavingUser] = useState(false);
 	const [sharingAssessment, setSharingAssessment] = useState(false);
 	const [shareResult, setShareResult] = useState(null);
+	const [generatingObservation, setGeneratingObservation] = useState(false);
+	const [observationAssistant, setObservationAssistant] = useState(null);
+	const [observationDraft, setObservationDraft] = useState('');
 	const [refreshingDashboard, setRefreshingDashboard] = useState(false);
 	const [isOnline, setIsOnline] = useState(() => navigator.onLine);
 	const [assessmentDraftSavedAt, setAssessmentDraftSavedAt] = useState(null);
@@ -573,6 +576,8 @@ export default function DashboardPage({ userName }) {
 		setSelectedClientId(client.id);
 		setSelectedAssessmentId(client.assessments?.[0]?.id ?? null);
 		setShareResult(null);
+		setObservationAssistant(null);
+		setObservationDraft('');
 		setAssessmentMode('create');
 		setEditingAssessmentId(null);
 		setAssessmentForm({ ...emptyAssessment, evaluated_at: new Date().toISOString().slice(0, 16) });
@@ -587,10 +592,19 @@ export default function DashboardPage({ userName }) {
 		}
 	}
 
+	function selectAssessment(assessmentId) {
+		setSelectedAssessmentId(assessmentId);
+		setShareResult(null);
+		setObservationAssistant(null);
+		setObservationDraft('');
+	}
+
 	function startNewAssessment() {
 		setAssessmentMode('create');
 		setEditingAssessmentId(null);
 		setShareResult(null);
+		setObservationAssistant(null);
+		setObservationDraft('');
 		setAssessmentForm({ ...emptyAssessment, evaluated_at: new Date().toISOString().slice(0, 16) });
 		setAssessmentChangeReason('');
 		setAssessmentDraftSavedAt(null);
@@ -611,6 +625,8 @@ export default function DashboardPage({ userName }) {
 
 		setAssessmentMode('edit');
 		setEditingAssessmentId(assessment.id);
+		setObservationAssistant(null);
+		setObservationDraft('');
 		setAssessmentForm(assessmentFormFromAssessment(assessment));
 		setAssessmentChangeReason('');
 		setErrors({});
@@ -854,6 +870,42 @@ export default function DashboardPage({ userName }) {
 		} finally {
 			setSharingAssessment(false);
 		}
+	}
+
+	async function generateObservationSuggestion() {
+		if (!selectedAssessment || generatingObservation) return;
+
+		setGeneratingObservation(true);
+		try {
+			const { data } = await window.axios.get(`/bioimpedance/assessments/${selectedAssessment.id}/observation-suggestion`);
+			setObservationAssistant(data.assistant);
+			setObservationDraft(data.assistant?.suggestion ?? '');
+		} finally {
+			setGeneratingObservation(false);
+		}
+	}
+
+	async function approveObservationSuggestion() {
+		if (!selectedAssessment || !observationDraft.trim()) return;
+
+		const reviewAction = observationAssistant?.suggestion === observationDraft ? 'approved' : 'edited';
+		const { data } = await window.axios.patch(`/bioimpedance/assessments/${selectedAssessment.id}/observation`, {
+			notes: observationDraft,
+			review_action: reviewAction,
+		});
+		setClients((current) => current.map((client) => (client.id === data.client.id ? data.client : client)));
+		setSelectedAssessmentId(data.assessment.id);
+		setAuditEvents(data.audit_events ?? auditEvents);
+		setObservationAssistant(null);
+		setObservationDraft('');
+		if (editingAssessmentId === data.assessment.id) {
+			setAssessmentForm((current) => ({ ...current, notes: data.assessment.notes ?? '' }));
+		}
+	}
+
+	function discardObservationSuggestion() {
+		setObservationAssistant(null);
+		setObservationDraft('');
 	}
 
 	async function copyShareMessage() {
@@ -1193,7 +1245,7 @@ export default function DashboardPage({ userName }) {
 									<button
 										type="button"
 										key={assessment.id}
-										onClick={() => setSelectedAssessmentId(assessment.id)}
+										onClick={() => selectAssessment(assessment.id)}
 										className={`rounded-xl border p-3 text-left transition ${selectedAssessment?.id === assessment.id ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 hover:bg-slate-50'} ${assessment.is_canceled ? 'opacity-70' : ''}`}
 									>
 										<span className="flex items-center justify-between gap-2 text-sm font-bold text-slate-900">
@@ -1225,6 +1277,41 @@ export default function DashboardPage({ userName }) {
 												Anonimizar cliente
 											</button>
 										</>
+									) : null}
+								</div>
+							) : null}
+							{selectedAssessment && !selectedAssessment.is_canceled ? (
+								<div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 p-4">
+									<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+										<div>
+											<p className="text-xs font-bold uppercase tracking-wide text-violet-700">Assistente da avaliação</p>
+											<p className="mt-1 text-sm text-slate-600">Sugestão para observações, sem alterar classificações oficiais.</p>
+										</div>
+										<button type="button" disabled={!canWrite || generatingObservation} onClick={generateObservationSuggestion} className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50">
+											{generatingObservation ? 'Gerando...' : 'Gerar sugestão'}
+										</button>
+									</div>
+									{observationAssistant ? (
+										<div className="mt-3 rounded-xl bg-white p-3">
+											<textarea value={observationDraft} onChange={(event) => setObservationDraft(event.target.value)} rows="6" className={inputClass()} />
+											<div className="mt-3 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+												<div>
+													<p className="text-xs font-bold uppercase tracking-wide text-slate-500">Referências usadas</p>
+													<ul className="mt-2 space-y-1 text-xs leading-5 text-slate-500">
+														{observationAssistant.references?.map((reference) => <li key={reference}>{reference}</li>)}
+													</ul>
+												</div>
+												<div className="flex flex-wrap gap-2">
+													<button type="button" onClick={approveObservationSuggestion} disabled={!canWrite || observationDraft.trim().length < 20} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
+														Aprovar observação
+													</button>
+													<button type="button" onClick={discardObservationSuggestion} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">
+														Descartar
+													</button>
+												</div>
+											</div>
+											<p className="mt-3 text-xs text-slate-500">{observationAssistant.notice}</p>
+										</div>
 									) : null}
 								</div>
 							) : null}

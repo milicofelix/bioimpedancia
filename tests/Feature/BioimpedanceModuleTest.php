@@ -814,6 +814,75 @@ class BioimpedanceModuleTest extends TestCase
         $this->assertBodyFatClassification($user, $clientId, 12.0, 'Baixa', '2026-08-08 09:30:00');
     }
 
+    public function test_observation_assistant_suggests_and_professional_approves_notes_without_changing_classification(): void
+    {
+        $user = User::factory()->create([
+            'role' => User::ROLE_PROFESSIONAL,
+        ]);
+
+        $clientResponse = $this->actingAs($user)->postJson(route('bioimpedance.clients.store'), [
+            'full_name' => 'Adriano Freitas',
+            'birth_date' => '1981-07-03',
+            'biological_sex' => 'male',
+            'height_cm' => 174,
+            'email' => 'assistente@example.com',
+        ]);
+
+        $clientId = $clientResponse->json('client.id');
+
+        $this->actingAs($user)->postJson(route('bioimpedance.assessments.store'), [
+            'bioimpedance_client_id' => $clientId,
+            'evaluated_at' => '2026-07-15 09:30:00',
+            'weight_kg' => 97.2,
+            'scale_bmi' => 32.1,
+            'body_fat_percentage' => 22.5,
+            'skeletal_muscle_percentage' => 37.0,
+            'resting_metabolism_kcal' => 1940,
+            'body_age' => 65,
+            'visceral_fat_level' => 15,
+        ])->assertCreated();
+
+        $currentResponse = $this->actingAs($user)->postJson(route('bioimpedance.assessments.store'), [
+            'bioimpedance_client_id' => $clientId,
+            'evaluated_at' => '2026-08-07 09:30:00',
+            'weight_kg' => 95.2,
+            'scale_bmi' => 31.4,
+            'body_fat_percentage' => 20.5,
+            'skeletal_muscle_percentage' => 37.6,
+            'resting_metabolism_kcal' => 1935,
+            'body_age' => 64,
+            'visceral_fat_level' => 14,
+        ])->assertCreated();
+
+        $assessmentId = $currentResponse->json('assessment.id');
+        $originalAnalysis = BioimpedanceAssessment::query()->findOrFail($assessmentId)->analysis;
+
+        $suggestionResponse = $this->actingAs($user)->getJson(route('bioimpedance.assessments.observation-suggestion', $assessmentId));
+
+        $suggestionResponse->assertOk();
+        $suggestionResponse->assertJsonPath('assistant.context.age_at_assessment', 45);
+        $suggestionResponse->assertJsonPath('assistant.context.device_model', 'HBF-514C');
+        $suggestionResponse->assertJsonPath('assistant.notice', 'Sugestão gerada para revisão do profissional. As classificações oficiais não foram alteradas.');
+        $this->assertStringContainsString('gordura corporal normal', $suggestionResponse->json('assistant.suggestion'));
+        $this->assertStringContainsString('gordura visceral elevada', $suggestionResponse->json('assistant.suggestion'));
+        $this->assertStringContainsString('19 anos acima', $suggestionResponse->json('assistant.suggestion'));
+        $this->assertStringContainsString('redução de 2,0 kg em peso', $suggestionResponse->json('assistant.suggestion'));
+
+        $approvedNotes = $suggestionResponse->json('assistant.suggestion').' Orientação final revisada pelo profissional.';
+        $approveResponse = $this->actingAs($user)->patchJson(route('bioimpedance.assessments.observation.approve', $assessmentId), [
+            'notes' => $approvedNotes,
+            'review_action' => 'edited',
+        ]);
+
+        $approveResponse->assertOk();
+        $approveResponse->assertJsonPath('assessment.notes', $approvedNotes);
+        $this->assertDatabaseHas('bioimpedance_assessment_audits', [
+            'bioimpedance_assessment_id' => $assessmentId,
+            'action' => 'observation_edited',
+        ]);
+        $this->assertSame($originalAnalysis, BioimpedanceAssessment::query()->findOrFail($assessmentId)->analysis);
+    }
+
     public function test_admin_index_includes_operational_dashboard_metrics(): void
     {
         Carbon::setTestNow('2026-08-08 10:00:00');

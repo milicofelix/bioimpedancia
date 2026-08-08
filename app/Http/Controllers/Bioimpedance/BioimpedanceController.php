@@ -11,6 +11,7 @@ use App\Models\Bioimpedance\BioimpedanceClinicSetting;
 use App\Models\Bioimpedance\BioimpedanceReportShare;
 use App\Models\User;
 use App\Services\Bioimpedance\BioimpedanceAnalyzer;
+use App\Services\Bioimpedance\BioimpedanceObservationAssistant;
 use App\Services\Bioimpedance\LegacyBioimpedanceAnalysisRefresher;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Model;
@@ -420,6 +421,53 @@ class BioimpedanceController extends Controller
             'assessment' => $this->assessmentPayload($assessment->refresh()->load('shares')),
             'audit_events' => $request->user()->isAdmin() ? $this->auditEventsPayload() : [],
         ], 201);
+    }
+
+    public function suggestAssessmentObservation(BioimpedanceAssessment $assessment, BioimpedanceObservationAssistant $assistant): JsonResponse
+    {
+        $assessment->load(['client', 'professional']);
+        abort_if($assessment->canceled_at, 422, 'Avaliação cancelada não pode receber sugestão de observação.');
+
+        return response()->json([
+            'assistant' => $assistant->suggest($assessment),
+        ]);
+    }
+
+    public function approveAssessmentObservation(Request $request, BioimpedanceAssessment $assessment): JsonResponse
+    {
+        $this->authorizeWrite($request);
+        if ($assessment->canceled_at) {
+            throw ValidationException::withMessages([
+                'bioimpedance_assessment_id' => 'Avaliação cancelada não pode receber observação oficial.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'notes' => ['required', 'string', 'min:20', 'max:2000'],
+            'review_action' => ['required', Rule::in(['approved', 'edited'])],
+        ]);
+
+        $oldValues = $this->assessmentAuditValues($assessment);
+        $assessment->update([
+            'notes' => $validated['notes'],
+        ]);
+
+        $this->auditAssessment(
+            $assessment->refresh(),
+            $request,
+            'observation_'.$validated['review_action'],
+            $validated['review_action'] === 'edited'
+                ? 'Sugestão do assistente editada e aprovada pelo profissional.'
+                : 'Sugestão do assistente aprovada pelo profissional.',
+            $oldValues,
+            $this->assessmentAuditValues($assessment)
+        );
+
+        return response()->json([
+            'client' => $this->clientPayload($this->loadClientAssessments($assessment->client->refresh())),
+            'assessment' => $this->assessmentPayload($assessment),
+            'audit_events' => $request->user()->isAdmin() ? $this->auditEventsPayload() : [],
+        ]);
     }
 
     public function revokeAssessmentShare(Request $request, BioimpedanceReportShare $share): JsonResponse
