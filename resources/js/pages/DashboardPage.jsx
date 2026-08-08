@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 const emptyClient = {
 	full_name: '',
@@ -91,7 +91,7 @@ function Field({ label, children }) {
 }
 
 function inputClass() {
-	return 'mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100';
+	return 'mt-2 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:text-sm';
 }
 
 function formatDate(value) {
@@ -339,6 +339,38 @@ function assessmentFormFromAssessment(assessment) {
 	};
 }
 
+function assessmentDraftKey(clientId) {
+	return clientId ? `ricosty:assessment-draft:${clientId}` : null;
+}
+
+function hasAssessmentDraftData(form) {
+	return [
+		'weight_kg',
+		'scale_bmi',
+		'body_fat_percentage',
+		'skeletal_muscle_percentage',
+		'resting_metabolism_kcal',
+		'body_age',
+		'visceral_fat_level',
+		'notes',
+	].some((field) => String(form[field] ?? '').trim() !== '');
+}
+
+function focusNextFormField(event) {
+	if (event.key !== 'Enter' || event.target.tagName === 'TEXTAREA') return;
+
+	const form = event.currentTarget;
+	const fields = Array.from(form.querySelectorAll('input, select, textarea, button'))
+		.filter((field) => !field.disabled && field.type !== 'hidden');
+	const currentIndex = fields.indexOf(event.target);
+	const nextField = fields[currentIndex + 1];
+
+	if (nextField) {
+		event.preventDefault();
+		nextField.focus();
+	}
+}
+
 function clinicFormFromClinic(clinic) {
 	return {
 		...defaultClinic,
@@ -347,6 +379,7 @@ function clinicFormFromClinic(clinic) {
 }
 
 export default function DashboardPage({ userName }) {
+	const assessmentSectionRef = useRef(null);
 	const [clients, setClients] = useState([]);
 	const [clinic, setClinic] = useState(defaultClinic);
 	const [clinicForm, setClinicForm] = useState(defaultClinic);
@@ -370,6 +403,8 @@ export default function DashboardPage({ userName }) {
 	const [savingAssessment, setSavingAssessment] = useState(false);
 	const [savingClinic, setSavingClinic] = useState(false);
 	const [savingUser, setSavingUser] = useState(false);
+	const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+	const [assessmentDraftSavedAt, setAssessmentDraftSavedAt] = useState(null);
 	const [errors, setErrors] = useState({});
 	const [clinicErrors, setClinicErrors] = useState({});
 	const [userErrors, setUserErrors] = useState({});
@@ -386,6 +421,74 @@ export default function DashboardPage({ userName }) {
 			setSelectedAssessmentId(data.clients[0]?.assessments?.[0]?.id ?? null);
 		}).finally(() => setLoading(false));
 	}, []);
+
+	useEffect(() => {
+		const updateConnectionStatus = () => setIsOnline(navigator.onLine);
+
+		window.addEventListener('online', updateConnectionStatus);
+		window.addEventListener('offline', updateConnectionStatus);
+
+		return () => {
+			window.removeEventListener('online', updateConnectionStatus);
+			window.removeEventListener('offline', updateConnectionStatus);
+		};
+	}, []);
+
+	useEffect(() => {
+		if (!selectedClientId || assessmentMode !== 'create') return;
+
+		const key = assessmentDraftKey(selectedClientId);
+		const storedDraft = key ? window.localStorage.getItem(key) : null;
+		if (!storedDraft) {
+			setAssessmentDraftSavedAt(null);
+			return;
+		}
+
+		try {
+			const parsedDraft = JSON.parse(storedDraft);
+			if (parsedDraft?.form && hasAssessmentDraftData(parsedDraft.form)) {
+				setAssessmentForm(parsedDraft.form);
+				setAssessmentDraftSavedAt(parsedDraft.saved_at ?? null);
+			}
+		} catch {
+			window.localStorage.removeItem(key);
+			setAssessmentDraftSavedAt(null);
+		}
+	}, [assessmentMode, selectedClientId]);
+
+	useEffect(() => {
+		if (!selectedClientId || assessmentMode !== 'create') return;
+
+		const key = assessmentDraftKey(selectedClientId);
+		if (!key) return;
+
+		if (!hasAssessmentDraftData(assessmentForm)) {
+			window.localStorage.removeItem(key);
+			setAssessmentDraftSavedAt(null);
+			return;
+		}
+
+		const timeout = window.setTimeout(() => {
+			const savedAt = new Date().toISOString();
+			window.localStorage.setItem(key, JSON.stringify({ form: assessmentForm, saved_at: savedAt }));
+			setAssessmentDraftSavedAt(savedAt);
+		}, 500);
+
+		return () => window.clearTimeout(timeout);
+	}, [assessmentForm, assessmentMode, selectedClientId]);
+
+	useEffect(() => {
+		const warnBeforeExit = (event) => {
+			if (assessmentMode !== 'create' || !hasAssessmentDraftData(assessmentForm)) return;
+
+			event.preventDefault();
+			event.returnValue = '';
+		};
+
+		window.addEventListener('beforeunload', warnBeforeExit);
+
+		return () => window.removeEventListener('beforeunload', warnBeforeExit);
+	}, [assessmentForm, assessmentMode]);
 
 	const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null;
 	const selectedAssessment = selectedClient?.assessments?.find((assessment) => assessment.id === selectedAssessmentId)
@@ -456,6 +559,7 @@ export default function DashboardPage({ userName }) {
 		setEditingAssessmentId(null);
 		setAssessmentForm({ ...emptyAssessment, evaluated_at: new Date().toISOString().slice(0, 16) });
 		setAssessmentChangeReason('');
+		window.setTimeout(() => assessmentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
 	}
 
 	function startNewAssessment() {
@@ -463,7 +567,17 @@ export default function DashboardPage({ userName }) {
 		setEditingAssessmentId(null);
 		setAssessmentForm({ ...emptyAssessment, evaluated_at: new Date().toISOString().slice(0, 16) });
 		setAssessmentChangeReason('');
+		setAssessmentDraftSavedAt(null);
 		setErrors({});
+	}
+
+	function clearAssessmentDraft() {
+		const key = assessmentDraftKey(selectedClientId);
+		if (key) {
+			window.localStorage.removeItem(key);
+		}
+		setAssessmentForm({ ...emptyAssessment, evaluated_at: new Date().toISOString().slice(0, 16) });
+		setAssessmentDraftSavedAt(null);
 	}
 
 	function startEditAssessment(assessment) {
@@ -659,7 +773,13 @@ export default function DashboardPage({ userName }) {
 				: await window.axios.post('/bioimpedance/assessments', payload);
 			setClients((current) => current.map((client) => (client.id === data.client.id ? data.client : client)));
 			setSelectedAssessmentId(data.assessment.id);
+			const key = assessmentDraftKey(selectedClient.id);
+			if (key) {
+				window.localStorage.removeItem(key);
+			}
+			setAssessmentDraftSavedAt(null);
 			startNewAssessment();
+			window.setTimeout(() => document.getElementById('relatorio')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
 		} catch (error) {
 			setErrors(error.response?.data?.errors ?? {});
 		} finally {
@@ -693,6 +813,9 @@ export default function DashboardPage({ userName }) {
 						</div>
 					</div>
 					<div className="flex items-center gap-3">
+						<span className={`rounded-full px-3 py-1 text-xs font-bold ${isOnline ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+							{isOnline ? 'Online' : 'Offline'}
+						</span>
 						<span className="text-sm text-slate-500">Profissional: <strong className="text-slate-800">{userName}</strong></span>
 						<button type="button" onClick={handleLogout} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
 							Sair
@@ -701,9 +824,17 @@ export default function DashboardPage({ userName }) {
 				</div>
 			</header>
 
+			<nav className="no-print sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur lg:hidden">
+				<div className="grid grid-cols-3 gap-2">
+					<a href="#clientes" className="rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-bold text-slate-700">Clientes</a>
+					<a href="#avaliacao" className="rounded-xl border border-emerald-200 px-3 py-2 text-center text-xs font-bold text-emerald-700">Avaliação</a>
+					<a href="#relatorio" className="rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-bold text-slate-700">Relatório</a>
+				</div>
+			</nav>
+
 			<div className="mx-auto grid max-w-7xl gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[360px_1fr] lg:px-8">
 				<aside className="no-print space-y-5">
-					<section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+					<section id="clientes" className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
 						<div className="flex items-center justify-between">
 							<h2 className="text-base font-semibold text-slate-950">Clientes</h2>
 							<span className="text-xs text-slate-500">{filteredClients.length} cadastro(s)</span>
@@ -1022,19 +1153,27 @@ export default function DashboardPage({ userName }) {
 
 					<EvolutionPanel client={selectedClient} selectedAssessment={selectedAssessment} />
 
-					<div className="no-print rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-						<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-							<div>
-								<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">{assessmentMode === 'edit' ? 'Corrigir avaliação' : 'Registrar nova avaliação'}</p>
-								<h1 className="mt-1 text-2xl font-semibold text-slate-950">{selectedClient?.full_name ?? 'Selecione um cliente'}</h1>
-								<p className="mt-1 text-sm text-slate-500">{assessmentMode === 'edit' ? 'A correção exige justificativa e gera auditoria.' : 'Digite os valores exibidos na balança Omron antiga após a pesagem.'}</p>
+						<div id="avaliacao" ref={assessmentSectionRef} className="no-print scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+							<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+								<div>
+									<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">{assessmentMode === 'edit' ? 'Corrigir avaliação' : 'Registrar nova avaliação'}</p>
+									<h1 className="mt-1 text-2xl font-semibold text-slate-950">{selectedClient?.full_name ?? 'Selecione um cliente'}</h1>
+									<p className="mt-1 text-sm text-slate-500">{assessmentMode === 'edit' ? 'A correção exige justificativa e gera auditoria.' : 'Digite os valores exibidos na balança Omron antiga após a pesagem.'}</p>
+								</div>
+								<div className="flex flex-col gap-2 sm:items-end">
+									<div className="rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-600">
+										IMC calculado: <strong className="text-slate-950">{calculatedBmi ?? '-'}</strong>
+									</div>
+									{assessmentDraftSavedAt ? (
+										<div className="flex items-center gap-2 text-xs text-slate-500">
+											<span>Rascunho salvo {formatDate(assessmentDraftSavedAt)}</span>
+											<button type="button" onClick={clearAssessmentDraft} className="font-bold text-rose-600">Descartar</button>
+										</div>
+									) : null}
+								</div>
 							</div>
-							<div className="rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-600">
-								IMC calculado: <strong className="text-slate-950">{calculatedBmi ?? '-'}</strong>
-							</div>
-						</div>
 
-						<form onSubmit={submitAssessment} className="mt-5 grid gap-3 md:grid-cols-4">
+						<form onSubmit={submitAssessment} onKeyDownCapture={focusNextFormField} className="mt-5 grid gap-3 md:grid-cols-4">
 							<Field label="Data da avaliação">
 								<input type="datetime-local" value={assessmentForm.evaluated_at} onChange={(event) => updateAssessment('evaluated_at', event.target.value)} className={inputClass()} />
 							</Field>
@@ -1082,7 +1221,9 @@ export default function DashboardPage({ userName }) {
 						</form>
 					</div>
 
-					<Report clinic={clinic} client={selectedClient} assessment={selectedAssessment} professional={userName} />
+					<div id="relatorio" className="scroll-mt-20">
+						<Report clinic={clinic} client={selectedClient} assessment={selectedAssessment} professional={userName} />
+					</div>
 				</section>
 			</div>
 		</main>
