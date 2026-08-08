@@ -60,11 +60,11 @@ body {
     }
 
     .report-header {
-        padding: 7mm 13mm !important;
+        padding: 6mm 13mm !important;
     }
 
     .report-body {
-        padding: 4.5mm 13mm 5mm !important;
+        padding: 4mm 13mm 4.5mm !important;
     }
 
     .report-footer {
@@ -118,7 +118,7 @@ body {
     }
 
     .report .p-5 {
-        padding: 3.4mm !important;
+        padding: 3.1mm !important;
     }
 
     .report .px-8 {
@@ -132,11 +132,11 @@ body {
     }
 
     .report .mt-7 {
-        margin-top: 3.5mm !important;
+        margin-top: 3mm !important;
     }
 
     .report .mt-6 {
-        margin-top: 3.5mm !important;
+        margin-top: 3mm !important;
     }
 
     .report .mt-5 {
@@ -195,7 +195,7 @@ body {
 
     .report-logo {
         height: 24mm !important;
-        width: 50mm !important;
+        width: 74mm !important;
         object-fit: contain !important;
     }
 

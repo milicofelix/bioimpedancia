@@ -48,6 +48,11 @@ function formatDate(value) {
 	}).format(new Date(value));
 }
 
+function formatIssueDate(value) {
+	if (!value) return '-';
+	return new Intl.DateTimeFormat('pt-BR').format(new Date(value));
+}
+
 function numberBr(value, decimals = 1) {
 	if (value === null || value === undefined || value === '') return '-';
 
@@ -61,18 +66,15 @@ function assessmentNumber(id) {
 	return String(id ?? 1).padStart(4, '0');
 }
 
+function professionalName(name) {
+	return name === 'Milico Felix' ? 'Milico Félix' : name;
+}
+
 function bmiToneClass(classification) {
 	if (!classification) return 'bg-slate-100 text-slate-600';
 	if (classification === 'Eutrofia') return 'bg-emerald-100 text-emerald-700';
 	if (classification === 'Sobrepeso') return 'bg-amber-100 text-amber-700';
 	return 'bg-rose-100 text-rose-700';
-}
-
-function markerPosition(value, min, max) {
-	const numericValue = Number(value);
-
-	if (!Number.isFinite(numericValue)) return 50;
-	return Math.max(2, Math.min(98, ((numericValue - min) / (max - min)) * 100));
 }
 
 function normalizeDecimal(value) {
@@ -405,6 +407,7 @@ function Report({ clinic, client, assessment, professional }) {
 	const bodyAgeDelta = assessment?.body_age && client.age ? assessment.body_age - client.age : null;
 	const validationTitle = warnings.length ? 'Dados com alertas' : 'Dados validados';
 	const validationText = warnings.length ? warnings[0] : 'Nenhum alerta automático identificado.';
+	const formattedProfessional = professionalName(professional);
 
 	return (
 		<article className="report overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm print:border-0 print:shadow-none">
@@ -420,12 +423,12 @@ function Report({ clinic, client, assessment, professional }) {
 			<header className="report-header relative flex flex-col gap-5 overflow-hidden border-b border-rose-200 bg-gradient-to-br from-rose-50 via-white to-stone-100 px-8 py-8 text-slate-900 sm:flex-row sm:items-center sm:justify-between">
 				<div className="pointer-events-none absolute inset-x-0 top-0 h-2 bg-gradient-to-r from-[#d88b9a] via-[#f2c7cf] to-[#4a4a4a]"></div>
 				<div className="flex items-center gap-5">
-					<img src={clinic.logo_url} alt={clinic.display_name} className="report-logo h-28 w-64 object-contain" />
+					<img src={clinic.logo_url} alt={clinic.display_name} className="report-logo h-36 w-96 object-contain" />
 				</div>
 				<div className="text-left sm:text-right">
 					<p className="text-xl font-bold uppercase tracking-wide text-[#4a4a4a]">Relatório de bioimpedância</p>
 					<p className="mt-5 text-sm text-slate-600">Avaliação Nº {assessmentNumber(assessment?.id)} | {assessment ? formatDate(assessment.evaluated_at) : 'Aguardando avaliação'}</p>
-					<p className="mt-4 text-sm text-slate-600">Responsável: {professional}</p>
+					<p className="mt-4 text-sm text-slate-600">Responsável: {formattedProfessional}</p>
 				</div>
 			</header>
 
@@ -452,13 +455,13 @@ function Report({ clinic, client, assessment, professional }) {
 							</div>
 							<div className="report-body-age border-slate-300 md:border-l md:pl-8">
 								<div className="grid grid-cols-[1fr_auto] gap-4">
-									<HeroMetric eyebrow="Idade corporal" value={assessment.body_age ?? '-'} unit="anos" />
+									<HeroMetric eyebrow="Idade corporal" value={assessment.body_age ?? '-'} unit="anos" compactEyebrow />
 									{bodyAgeDelta !== null ? (
-										<div className="pt-8 text-right">
-											<p className={`text-lg font-bold ${bodyAgeDelta > 0 ? 'text-[#b96f7d]' : 'text-emerald-700'}`}>
-												{bodyAgeDelta > 0 ? '+' : ''}{bodyAgeDelta} anos
+										<div className="pt-7 text-right">
+											<p className={`text-sm font-bold leading-5 ${bodyAgeDelta > 0 ? 'text-[#b96f7d]' : 'text-emerald-700'}`}>
+												{Math.abs(bodyAgeDelta)} anos {bodyAgeDelta > 0 ? 'acima' : 'abaixo'}
 											</p>
-											<p className="mt-2 text-xs leading-5 text-slate-500">{bodyAgeDelta > 0 ? 'acima da idade cronológica' : 'em relação à idade cronológica'}</p>
+											<p className="mt-1 text-xs leading-5 text-slate-500">da idade cronológica</p>
 										</div>
 									) : null}
 								</div>
@@ -473,24 +476,24 @@ function Report({ clinic, client, assessment, professional }) {
 									value={numberBr(assessment.body_fat_percentage, 1)}
 									unit="%"
 									badge="Classificação pendente"
-									position={markerPosition(assessment.body_fat_percentage, 5, 45)}
 									labels={['Baixa', 'Normal', 'Elevada', 'Muito elevada']}
+									pending
 								/>
 								<ScaleCard
 									title="Músculo esquelético"
 									value={numberBr(assessment.skeletal_muscle_percentage, 1)}
 									unit="%"
 									badge="Classificação pendente"
-									position={markerPosition(assessment.skeletal_muscle_percentage, 15, 50)}
 									labels={['Baixo', 'Normal', 'Alto', 'Muito alto']}
+									pending
 								/>
 								<ScaleCard
 									title="Gordura visceral"
 									value={numberBr(assessment.visceral_fat_level, 1)}
 									unit="nível"
 									badge="Classificação pendente"
-									position={markerPosition(assessment.visceral_fat_level, 1, 25)}
 									labels={['Baixa', 'Normal', 'Elevada', 'Muito elevada']}
+									pending
 								/>
 								<ScaleCard
 									title="Metabolismo basal"
@@ -505,7 +508,7 @@ function Report({ clinic, client, assessment, professional }) {
 						<section className="mt-6 rounded-2xl border border-rose-100 bg-white p-5">
 							<h3 className="text-base font-bold uppercase tracking-wide text-[#b96f7d]">Síntese da avaliação</h3>
 							<div className="mt-4 space-y-2 text-sm leading-6 text-slate-700">
-								<p>O IMC calculado foi de {numberBr(assessment.calculated_bmi, 1)} kg/m2, classificado como {bmiClassification}.</p>
+								<p>O IMC foi calculado automaticamente com base em peso e altura: {numberBr(assessment.calculated_bmi, 1)} kg/m², classificado como {bmiClassification}.</p>
 								<p>A gordura corporal registrada foi de {numberBr(assessment.body_fat_percentage, 1)}% e a idade corporal estimada foi de {assessment.body_age ?? '-'} anos.</p>
 								<p>As demais classificações serão exibidas após a parametrização das referências do modelo Omron.</p>
 							</div>
@@ -537,7 +540,7 @@ function Report({ clinic, client, assessment, professional }) {
 							<p className="font-bold text-slate-900">Ricosty Emagrecimento e Estética</p>
 							<p className="mt-1">Avaliação corporal e acompanhamento estético</p>
 						</div>
-						<p>Documento demonstrativo • Página 1 de 1</p>
+						<p>Relatório nº {assessmentNumber(assessment?.id)} • Emitido em {assessment ? formatIssueDate(assessment.evaluated_at) : '-'}</p>
 					</div>
 				</footer>
 			</div>
@@ -545,10 +548,10 @@ function Report({ clinic, client, assessment, professional }) {
 	);
 }
 
-function HeroMetric({ eyebrow, value, unit }) {
+function HeroMetric({ eyebrow, value, unit, compactEyebrow = false }) {
 	return (
 		<div>
-			<p className="text-xs font-bold uppercase tracking-wide text-[#9f5f6b]">{eyebrow}</p>
+			<p className={`${compactEyebrow ? 'max-w-none' : ''} text-xs font-bold uppercase tracking-wide text-[#9f5f6b]`}>{eyebrow}</p>
 			<p className="mt-3 text-5xl font-bold leading-none text-slate-900">
 				{value}
 				{unit ? <span className="ml-1 text-lg text-slate-500">{unit}</span> : null}
@@ -557,7 +560,7 @@ function HeroMetric({ eyebrow, value, unit }) {
 	);
 }
 
-function ScaleCard({ title, value, unit, badge, position = 50, labels = [], withoutScale = false }) {
+function ScaleCard({ title, value, unit, badge, position = 50, labels = [], withoutScale = false, pending = false }) {
 	return (
 		<div className="rounded-2xl border border-rose-100 bg-white p-5 shadow-sm">
 			<div className="flex items-start justify-between gap-4">
@@ -570,13 +573,13 @@ function ScaleCard({ title, value, unit, badge, position = 50, labels = [], with
 			{withoutScale ? null : (
 				<div className="mt-5">
 					<div className="relative h-5">
-						<div className="absolute top-2 grid h-2 w-full grid-cols-4 overflow-hidden rounded-sm">
-							<span className="bg-blue-500"></span>
-							<span className="bg-emerald-500"></span>
-							<span className="bg-amber-500"></span>
-							<span className="bg-rose-500"></span>
+						<div className={`absolute top-2 grid h-2 w-full grid-cols-4 overflow-hidden rounded-sm ${pending ? 'opacity-70 grayscale' : ''}`}>
+							<span className={pending ? 'bg-slate-300' : 'bg-blue-500'}></span>
+							<span className={pending ? 'bg-slate-300' : 'bg-emerald-500'}></span>
+							<span className={pending ? 'bg-slate-300' : 'bg-amber-500'}></span>
+							<span className={pending ? 'bg-slate-300' : 'bg-rose-500'}></span>
 						</div>
-						<span className="absolute top-0 h-0 w-0 -translate-x-1/2 border-x-[7px] border-t-[10px] border-x-transparent border-t-slate-900" style={{ left: `${position}%` }}></span>
+						{pending ? null : <span className="absolute top-0 h-0 w-0 -translate-x-1/2 border-x-[7px] border-t-[10px] border-x-transparent border-t-slate-900" style={{ left: `${position}%` }}></span>}
 					</div>
 					<div className="grid grid-cols-4 text-center text-xs text-slate-500">
 						{labels.map((label) => <span key={label}>{label}</span>)}
