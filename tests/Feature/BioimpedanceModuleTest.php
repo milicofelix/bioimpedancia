@@ -315,6 +315,22 @@ class BioimpedanceModuleTest extends TestCase
         ])->assertJsonValidationErrors(['bioimpedance_assessment_id']);
     }
 
+    public function test_assessment_pdf_can_be_downloaded_and_marks_report_issue(): void
+    {
+        $user = User::factory()->create();
+        $assessment = $this->createAssessmentForUser($user);
+
+        $response = $this->actingAs($user)->get(route('bioimpedance.assessments.pdf', $assessment->id));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
+        $this->assertStringContainsString('bioimpedancia-cliente-avaliacao-2026-08-07.pdf', $response->headers->get('content-disposition'));
+
+        $assessment->refresh();
+        $this->assertNotNull($assessment->report_issued_at);
+        $this->assertSame(1, $assessment->report_issue_count);
+    }
+
     public function test_assessment_age_is_calculated_from_evaluation_date(): void
     {
         $user = User::factory()->create();

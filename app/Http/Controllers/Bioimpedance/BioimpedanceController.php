@@ -7,9 +7,12 @@ use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceAssessmentAudit;
 use App\Models\Bioimpedance\BioimpedanceClient;
 use App\Services\Bioimpedance\BioimpedanceAnalyzer;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -25,13 +28,7 @@ class BioimpedanceController extends Controller
 
         return response()->json([
             'clients' => $clients,
-            'clinic' => [
-                'name' => config('app.name', 'Clínica'),
-                'display_name' => 'Ricosty Emagrecimento e Estética',
-                'contact' => 'Avaliação corporal e acompanhamento estético',
-                'logo_initials' => 'RS',
-                'logo_url' => '/images/brand/ricosty-logo.png',
-            ],
+            'clinic' => $this->clinicPayload(),
         ]);
     }
 
@@ -167,6 +164,29 @@ class BioimpedanceController extends Controller
         ]);
     }
 
+    public function downloadAssessmentPdf(BioimpedanceAssessment $assessment): Response
+    {
+        $assessment->load(['client', 'professional', 'correctedBy', 'canceledBy']);
+        $assessment->update([
+            'report_issued_at' => now(),
+            'report_issue_count' => $assessment->report_issue_count + 1,
+        ]);
+        $assessment->refresh()->load(['client', 'professional', 'correctedBy', 'canceledBy']);
+        config(['dompdf.public_path' => public_path()]);
+
+        $pdf = Pdf::loadView('bioimpedance.report-pdf', [
+            'clinic' => [
+                ...$this->clinicPayload(),
+                'logo_data_uri' => $this->logoDataUri(),
+            ],
+            'client' => $this->clientPayload($assessment->client->setRelation('assessments', collect([$assessment]))),
+            'assessment' => $this->assessmentPayload($assessment),
+            'issuedAt' => $assessment->report_issued_at,
+        ])->setPaper('a4');
+
+        return $pdf->download($this->pdfFileName($assessment));
+    }
+
     private function validateAssessment(Request $request, bool $requireClient = true): array
     {
         $request->merge([
@@ -189,6 +209,17 @@ class BioimpedanceController extends Controller
             'visceral_fat_level' => ['nullable', 'integer', 'between:1,30'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
+    }
+
+    private function clinicPayload(): array
+    {
+        return [
+            'name' => config('app.name', 'Clínica'),
+            'display_name' => 'Ricosty Emagrecimento e Estética',
+            'contact' => 'Avaliação corporal e acompanhamento estético',
+            'logo_initials' => 'RS',
+            'logo_url' => '/images/brand/ricosty-logo.png',
+        ];
     }
 
     private function validateClient(Request $request, ?BioimpedanceClient $client = null): array
@@ -390,6 +421,24 @@ class BioimpedanceController extends Controller
             'canceled_at' => $assessment->canceled_at?->toIso8601String(),
             'cancellation_reason' => $assessment->cancellation_reason,
             'is_canceled' => $assessment->canceled_at !== null,
+            'report_issued_at' => $assessment->report_issued_at?->toIso8601String(),
+            'report_issue_count' => $assessment->report_issue_count,
         ];
+    }
+
+    private function logoDataUri(): ?string
+    {
+        $path = public_path('images/brand/ricosty-logo.png');
+
+        if (! is_file($path)) {
+            return null;
+        }
+
+        return 'data:image/png;base64,'.base64_encode(file_get_contents($path));
+    }
+
+    private function pdfFileName(BioimpedanceAssessment $assessment): string
+    {
+        return Str::slug('bioimpedancia-'.$assessment->client->full_name.'-'.$assessment->evaluated_at->format('Y-m-d')).'.pdf';
     }
 }

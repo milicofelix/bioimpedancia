@@ -698,6 +698,11 @@ function Report({ clinic, client, assessment, professional }) {
 	return (
 		<article className="report overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm print:border-0 print:shadow-none">
 			<div className="no-print mb-4 flex flex-wrap gap-2">
+				{assessment ? (
+					<a href={`/bioimpedance/assessments/${assessment.id}/pdf`} target="_blank" rel="noreferrer" className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">
+						Baixar PDF oficial
+					</a>
+				) : null}
 				<button type="button" onClick={() => window.print()} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700">
 					Imprimir / baixar PDF
 				</button>

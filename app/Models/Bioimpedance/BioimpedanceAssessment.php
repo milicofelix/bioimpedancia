@@ -37,6 +37,8 @@ class BioimpedanceAssessment extends Model
         'canceled_at',
         'canceled_by_user_id',
         'cancellation_reason',
+        'report_issued_at',
+        'report_issue_count',
     ];
 
     protected function casts(): array
@@ -44,6 +46,7 @@ class BioimpedanceAssessment extends Model
         return [
             'evaluated_at' => 'datetime',
             'canceled_at' => 'datetime',
+            'report_issued_at' => 'datetime',
             'height_cm_at_assessment' => 'decimal:1',
             'weight_kg' => 'decimal:2',
             'scale_bmi' => 'decimal:1',
