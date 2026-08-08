@@ -418,7 +418,10 @@ function Report({ clinic, client, assessment, professional }) {
 	const bodyFat = analysisIndicators?.body_fat ?? {};
 	const skeletalMuscle = analysisIndicators?.skeletal_muscle ?? {};
 	const visceralFat = analysisIndicators?.visceral_fat ?? {};
-	const bodyAgeDelta = assessment?.body_age && client.age ? assessment.body_age - client.age : null;
+	const assessmentAge = assessment?.age_at_assessment ?? client.age;
+	const assessmentHeight = assessment?.height_cm_at_assessment ?? client.height_cm;
+	const assessmentSex = assessment?.biological_sex_at_assessment ?? client.biological_sex;
+	const bodyAgeDelta = assessment?.body_age != null && assessmentAge != null ? assessment.body_age - assessmentAge : null;
 	const validationTitle = warnings.length ? 'Dados com alertas' : 'Dados validados';
 	const validationText = warnings.length ? warnings[0] : 'Nenhum alerta automático identificado.';
 	const formattedProfessional = professionalName(professional);
@@ -452,9 +455,9 @@ function Report({ clinic, client, assessment, professional }) {
 						<p className="text-xs font-bold uppercase tracking-wide text-[#b96f7d]">Cliente</p>
 						<h2 className="mt-2 text-2xl font-bold text-slate-950">{client.full_name}</h2>
 					</div>
-					<MiniMetric label="Idade" value={`${client.age} anos`} />
-					<MiniMetric label="Sexo" value={sexLabels[client.biological_sex]} />
-					<MiniMetric label="Altura" value={`${numberBr(client.height_cm, 0)} cm`} />
+					<MiniMetric label="Idade" value={`${assessmentAge ?? '-'} anos`} />
+					<MiniMetric label="Sexo" value={sexLabels[assessmentSex] ?? '-'} />
+					<MiniMetric label="Altura" value={`${numberBr(assessmentHeight, 0)} cm`} />
 				</section>
 
 				{assessment ? (

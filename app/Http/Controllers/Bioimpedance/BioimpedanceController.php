@@ -10,10 +10,11 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class BioimpedanceController extends Controller
 {
-    public function index(BioimpedanceAnalyzer $analyzer): JsonResponse
+    public function index(): JsonResponse
     {
         $clients = BioimpedanceClient::query()
             ->with(['assessments' => fn ($query) => $query->latest('evaluated_at')->limit(5)])
@@ -71,7 +72,7 @@ class BioimpedanceController extends Controller
 
         $validated = $request->validate([
             'bioimpedance_client_id' => ['required', 'exists:bioimpedance_clients,id'],
-            'evaluated_at' => ['required', 'date'],
+            'evaluated_at' => ['required', 'date', 'before_or_equal:now'],
             'weight_kg' => ['required', 'numeric', 'between:2,150'],
             'scale_bmi' => ['nullable', 'numeric', 'between:7,90'],
             'body_fat_percentage' => ['nullable', 'numeric', 'between:5,60'],
@@ -83,6 +84,8 @@ class BioimpedanceController extends Controller
         ]);
 
         $client = BioimpedanceClient::query()->findOrFail($validated['bioimpedance_client_id']);
+        $this->validateEvaluationDateAgainstBirthDate($client, $validated['evaluated_at']);
+
         $snapshot = $this->assessmentSnapshot($client, $validated['evaluated_at']);
         $analysis = $analyzer->analyze($client->toArray(), [...$validated, ...$snapshot]);
 
@@ -99,6 +102,15 @@ class BioimpedanceController extends Controller
             'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')->limit(5)])),
             'assessment' => $this->assessmentPayload($assessment),
         ], 201);
+    }
+
+    private function validateEvaluationDateAgainstBirthDate(BioimpedanceClient $client, string $evaluatedAt): void
+    {
+        if (Carbon::parse($evaluatedAt)->lt($client->birth_date)) {
+            throw ValidationException::withMessages([
+                'evaluated_at' => 'A avaliação não pode ser anterior ao nascimento do cliente.',
+            ]);
+        }
     }
 
     private function assessmentSnapshot(BioimpedanceClient $client, string $evaluatedAt): array
