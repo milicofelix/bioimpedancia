@@ -52,23 +52,23 @@ body {
     .report {
         border-radius: 0;
         box-shadow: none !important;
-        height: 297mm;
+        min-height: 297mm;
         width: 210mm;
-        overflow: hidden;
+        overflow: visible;
         page-break-after: avoid;
         page-break-before: avoid;
     }
 
     .report-header {
-        padding: 12mm 13mm !important;
+        padding: 7mm 13mm !important;
     }
 
     .report-body {
-        padding: 7mm 13mm 9mm !important;
+        padding: 4.5mm 13mm 5mm !important;
     }
 
     .report-footer {
-        margin-top: 7mm !important;
+        margin-top: 5mm !important;
     }
 
     .report * {
@@ -86,5 +86,132 @@ body {
         min-height: 0 !important;
         padding: 0 !important;
         width: auto !important;
+    }
+
+    .report-client-grid {
+        display: grid !important;
+        grid-template-columns: 2fr 1fr 1fr 1fr !important;
+    }
+
+    .report-hero-grid {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr 1.2fr !important;
+    }
+
+    .report-composition-grid,
+    .report-protocol-grid {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+    }
+
+    .report-body-age {
+        border-left: 1px solid rgb(203 213 225) !important;
+        padding-left: 7mm !important;
+    }
+
+    .report .rounded-3xl {
+        border-radius: 8mm !important;
+    }
+
+    .report .rounded-2xl {
+        border-radius: 4mm !important;
+    }
+
+    .report .p-5 {
+        padding: 3.4mm !important;
+    }
+
+    .report .px-8 {
+        padding-left: 13mm !important;
+        padding-right: 13mm !important;
+    }
+
+    .report .py-8 {
+        padding-top: 7mm !important;
+        padding-bottom: 7mm !important;
+    }
+
+    .report .mt-7 {
+        margin-top: 3.5mm !important;
+    }
+
+    .report .mt-6 {
+        margin-top: 3.5mm !important;
+    }
+
+    .report .mt-5 {
+        margin-top: 3mm !important;
+    }
+
+    .report .mt-4 {
+        margin-top: 2mm !important;
+    }
+
+    .report .mt-3 {
+        margin-top: 1.5mm !important;
+    }
+
+    .report .text-5xl {
+        font-size: 27pt !important;
+    }
+
+    .report .text-4xl {
+        font-size: 21pt !important;
+    }
+
+    .report .text-3xl {
+        font-size: 18pt !important;
+    }
+
+    .report .text-2xl {
+        font-size: 15pt !important;
+    }
+
+    .report .text-xl {
+        font-size: 13pt !important;
+    }
+
+    .report .text-lg {
+        font-size: 10pt !important;
+    }
+
+    .report .text-base {
+        font-size: 10pt !important;
+    }
+
+    .report .text-sm {
+        font-size: 8.3pt !important;
+    }
+
+    .report .text-xs {
+        font-size: 7pt !important;
+    }
+
+    .report footer .text-xs,
+    .report-footer {
+        font-size: 6.8pt !important;
+        line-height: 1.35 !important;
+    }
+
+    .report-logo {
+        height: 24mm !important;
+        width: 50mm !important;
+        object-fit: contain !important;
+    }
+
+    .report .h-5 {
+        height: 4mm !important;
+    }
+
+    .report .top-2 {
+        top: 1.7mm !important;
+    }
+
+    .report .h-2 {
+        height: 1.6mm !important;
+    }
+
+    .report .space-y-2 > :not([hidden]) ~ :not([hidden]) {
+        margin-top: 1.2mm !important;
     }
 }

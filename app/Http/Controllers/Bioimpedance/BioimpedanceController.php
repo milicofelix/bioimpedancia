@@ -24,9 +24,10 @@ class BioimpedanceController extends Controller
             'clients' => $clients,
             'clinic' => [
                 'name' => config('app.name', 'Clínica'),
-                'display_name' => 'Rico Style Emagrecimento',
+                'display_name' => 'Ricosty Emagrecimento e Estética',
                 'contact' => 'Avaliação corporal e acompanhamento estético',
                 'logo_initials' => 'RS',
+                'logo_url' => '/images/brand/ricosty-logo.png',
             ],
         ]);
     }

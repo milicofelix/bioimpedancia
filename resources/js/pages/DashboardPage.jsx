@@ -125,9 +125,10 @@ function phoneMask(value) {
 export default function DashboardPage({ userName }) {
 	const [clients, setClients] = useState([]);
 	const [clinic, setClinic] = useState({
-		display_name: 'Rico Style Emagrecimento',
+		display_name: 'Ricosty Emagrecimento e Estética',
 		contact: 'Avaliação corporal e acompanhamento estético',
 		logo_initials: 'RS',
+		logo_url: '/images/brand/ricosty-logo.png',
 	});
 	const [selectedClientId, setSelectedClientId] = useState(null);
 	const [clientForm, setClientForm] = useState(emptyClient);
@@ -247,9 +248,7 @@ export default function DashboardPage({ userName }) {
 			<header className="no-print border-b border-slate-200 bg-white">
 				<div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
 					<div className="flex items-center gap-3">
-						<div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-sm font-bold text-white">
-							{clinic.logo_initials}
-						</div>
+						<img src={clinic.logo_url} alt={clinic.display_name} className="h-14 w-28 object-contain" />
 						<div>
 							<p className="text-sm font-semibold text-slate-950">{clinic.display_name}</p>
 							<p className="text-xs text-slate-500">{clinic.contact}</p>
@@ -418,28 +417,22 @@ function Report({ clinic, client, assessment, professional }) {
 				</button>
 			</div>
 
-			<header className="report-header flex flex-col gap-5 bg-slate-900 px-8 py-8 text-white sm:flex-row sm:items-start sm:justify-between">
+			<header className="report-header relative flex flex-col gap-5 overflow-hidden border-b border-rose-200 bg-gradient-to-br from-rose-50 via-white to-stone-100 px-8 py-8 text-slate-900 sm:flex-row sm:items-center sm:justify-between">
+				<div className="pointer-events-none absolute inset-x-0 top-0 h-2 bg-gradient-to-r from-[#d88b9a] via-[#f2c7cf] to-[#4a4a4a]"></div>
 				<div className="flex items-center gap-5">
-					<div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-600 text-3xl font-bold text-white">
-						{clinic.logo_initials}
-					</div>
-					<div>
-						<p className="text-3xl font-bold tracking-wide">RICO STYLE</p>
-						<p className="mt-2 text-base font-bold uppercase tracking-wide text-emerald-200">Emagrecimento</p>
-						<p className="mt-3 text-sm text-slate-300">{clinic.contact}</p>
-					</div>
+					<img src={clinic.logo_url} alt={clinic.display_name} className="report-logo h-28 w-64 object-contain" />
 				</div>
 				<div className="text-left sm:text-right">
-					<p className="text-xl font-bold uppercase tracking-wide">Relatório de bioimpedância</p>
-					<p className="mt-5 text-sm text-slate-300">Avaliação Nº {assessmentNumber(assessment?.id)} | {assessment ? formatDate(assessment.evaluated_at) : 'Aguardando avaliação'}</p>
-					<p className="mt-4 text-sm text-slate-300">Responsável: {professional}</p>
+					<p className="text-xl font-bold uppercase tracking-wide text-[#4a4a4a]">Relatório de bioimpedância</p>
+					<p className="mt-5 text-sm text-slate-600">Avaliação Nº {assessmentNumber(assessment?.id)} | {assessment ? formatDate(assessment.evaluated_at) : 'Aguardando avaliação'}</p>
+					<p className="mt-4 text-sm text-slate-600">Responsável: {professional}</p>
 				</div>
 			</header>
 
-			<div className="report-body bg-slate-50 px-8 py-7">
-				<section className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:grid-cols-4">
-					<div className="sm:col-span-2">
-						<p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Cliente</p>
+			<div className="report-body bg-[#fbf8f8] px-8 py-7">
+				<section className="report-client-grid grid gap-4 rounded-2xl border border-rose-100 bg-white p-5 shadow-sm sm:grid-cols-[2fr_1fr_1fr_1fr]">
+					<div>
+						<p className="text-xs font-bold uppercase tracking-wide text-[#b96f7d]">Cliente</p>
 						<h2 className="mt-2 text-2xl font-bold text-slate-950">{client.full_name}</h2>
 					</div>
 					<MiniMetric label="Idade" value={`${client.age} anos`} />
@@ -449,7 +442,7 @@ function Report({ clinic, client, assessment, professional }) {
 
 				{assessment ? (
 					<>
-						<section className="mt-6 grid gap-4 rounded-2xl bg-emerald-50 p-5 md:grid-cols-[1fr_1fr_1.25fr]">
+						<section className="report-hero-grid mt-6 grid gap-4 rounded-2xl border border-rose-100 bg-[#f8e8eb] p-5 md:grid-cols-[1fr_1fr_1.25fr]">
 							<HeroMetric eyebrow="Visão geral" value={numberBr(assessment.weight_kg, 1)} unit="kg" />
 							<div>
 								<HeroMetric eyebrow="IMC calculado" value={numberBr(assessment.calculated_bmi, 1)} />
@@ -457,12 +450,12 @@ function Report({ clinic, client, assessment, professional }) {
 									{bmiClassification}
 								</span>
 							</div>
-							<div className="border-slate-300 md:border-l md:pl-8">
+							<div className="report-body-age border-slate-300 md:border-l md:pl-8">
 								<div className="grid grid-cols-[1fr_auto] gap-4">
 									<HeroMetric eyebrow="Idade corporal" value={assessment.body_age ?? '-'} unit="anos" />
 									{bodyAgeDelta !== null ? (
 										<div className="pt-8 text-right">
-											<p className={`text-lg font-bold ${bodyAgeDelta > 0 ? 'text-amber-600' : 'text-emerald-700'}`}>
+											<p className={`text-lg font-bold ${bodyAgeDelta > 0 ? 'text-[#b96f7d]' : 'text-emerald-700'}`}>
 												{bodyAgeDelta > 0 ? '+' : ''}{bodyAgeDelta} anos
 											</p>
 											<p className="mt-2 text-xs leading-5 text-slate-500">{bodyAgeDelta > 0 ? 'acima da idade cronológica' : 'em relação à idade cronológica'}</p>
@@ -473,8 +466,8 @@ function Report({ clinic, client, assessment, professional }) {
 						</section>
 
 						<section className="mt-6">
-							<h3 className="text-base font-bold uppercase tracking-wide text-slate-900">Composição corporal</h3>
-							<div className="mt-4 grid gap-4 md:grid-cols-2">
+							<h3 className="text-base font-bold uppercase tracking-wide text-[#4a4a4a]">Composição corporal</h3>
+							<div className="report-composition-grid mt-4 grid gap-4 md:grid-cols-2">
 								<ScaleCard
 									title="Gordura corporal"
 									value={numberBr(assessment.body_fat_percentage, 1)}
@@ -509,8 +502,8 @@ function Report({ clinic, client, assessment, professional }) {
 							</div>
 						</section>
 
-						<section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5">
-							<h3 className="text-base font-bold uppercase tracking-wide text-emerald-700">Síntese da avaliação</h3>
+						<section className="mt-6 rounded-2xl border border-rose-100 bg-white p-5">
+							<h3 className="text-base font-bold uppercase tracking-wide text-[#b96f7d]">Síntese da avaliação</h3>
 							<div className="mt-4 space-y-2 text-sm leading-6 text-slate-700">
 								<p>O IMC calculado foi de {numberBr(assessment.calculated_bmi, 1)} kg/m2, classificado como {bmiClassification}.</p>
 								<p>A gordura corporal registrada foi de {numberBr(assessment.body_fat_percentage, 1)}% e a idade corporal estimada foi de {assessment.body_age ?? '-'} anos.</p>
@@ -519,14 +512,14 @@ function Report({ clinic, client, assessment, professional }) {
 							{assessment.notes ? <p className="mt-3 text-sm text-slate-600"><strong>Observações:</strong> {assessment.notes}</p> : null}
 						</section>
 
-						<section className="mt-6 grid gap-4 md:grid-cols-2">
-							<div className={`rounded-2xl p-5 ${warnings.length ? 'bg-amber-50' : 'bg-emerald-50'}`}>
-								<h3 className={`text-sm font-bold uppercase tracking-wide ${warnings.length ? 'text-amber-700' : 'text-emerald-700'}`}>
+						<section className="report-protocol-grid mt-6 grid gap-4 md:grid-cols-2">
+							<div className={`rounded-2xl p-5 ${warnings.length ? 'bg-amber-50' : 'bg-rose-50'}`}>
+								<h3 className={`text-sm font-bold uppercase tracking-wide ${warnings.length ? 'text-amber-700' : 'text-[#b96f7d]'}`}>
 									{warnings.length ? '!' : '✓'} {validationTitle}
 								</h3>
 								<p className="mt-4 text-sm leading-6 text-slate-700">{validationText}</p>
 							</div>
-							<div className="rounded-2xl bg-slate-100 p-5">
+							<div className="rounded-2xl bg-stone-100 p-5">
 								<h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Protocolo de medição</h3>
 								<p className="mt-4 text-sm leading-6 text-slate-600">Equipamento Omron | Entrada manual | Conferência automática de IMC</p>
 							</div>
@@ -541,7 +534,7 @@ function Report({ clinic, client, assessment, professional }) {
 					<p className="mt-3">Os resultados de bioimpedância são estimativas e podem variar conforme hidratação, alimentação, ciclo hormonal, medicamentos e condições de medição. Este documento não substitui avaliação médica ou nutricional.</p>
 					<div className="mt-7 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
 						<div>
-							<p className="font-bold text-slate-900">Rico Style Emagrecimento</p>
+							<p className="font-bold text-slate-900">Ricosty Emagrecimento e Estética</p>
 							<p className="mt-1">Avaliação corporal e acompanhamento estético</p>
 						</div>
 						<p>Documento demonstrativo • Página 1 de 1</p>
@@ -555,7 +548,7 @@ function Report({ clinic, client, assessment, professional }) {
 function HeroMetric({ eyebrow, value, unit }) {
 	return (
 		<div>
-			<p className="text-xs font-bold uppercase tracking-wide text-emerald-700">{eyebrow}</p>
+			<p className="text-xs font-bold uppercase tracking-wide text-[#9f5f6b]">{eyebrow}</p>
 			<p className="mt-3 text-5xl font-bold leading-none text-slate-900">
 				{value}
 				{unit ? <span className="ml-1 text-lg text-slate-500">{unit}</span> : null}
@@ -566,10 +559,10 @@ function HeroMetric({ eyebrow, value, unit }) {
 
 function ScaleCard({ title, value, unit, badge, position = 50, labels = [], withoutScale = false }) {
 	return (
-		<div className="rounded-2xl border border-slate-200 bg-white p-5">
+		<div className="rounded-2xl border border-rose-100 bg-white p-5 shadow-sm">
 			<div className="flex items-start justify-between gap-4">
 				<p className="text-sm font-bold uppercase tracking-wide text-slate-500">{title}</p>
-				<span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-500">{badge}</span>
+				<span className="rounded-full border border-rose-100 bg-rose-50 px-4 py-2 text-xs font-bold text-[#8f5f67]">{badge}</span>
 			</div>
 			<p className="mt-4 text-4xl font-bold leading-none text-slate-900">
 				{value} <span className="text-lg text-slate-500">{unit}</span>
