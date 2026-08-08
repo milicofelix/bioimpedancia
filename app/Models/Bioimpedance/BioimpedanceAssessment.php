@@ -83,4 +83,9 @@ class BioimpedanceAssessment extends Model
     {
         return $this->hasMany(BioimpedanceAssessmentAudit::class);
     }
+
+    public function shares(): HasMany
+    {
+        return $this->hasMany(BioimpedanceReportShare::class);
+    }
 }

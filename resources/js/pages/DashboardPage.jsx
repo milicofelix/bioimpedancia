@@ -403,6 +403,8 @@ export default function DashboardPage({ userName }) {
 	const [savingAssessment, setSavingAssessment] = useState(false);
 	const [savingClinic, setSavingClinic] = useState(false);
 	const [savingUser, setSavingUser] = useState(false);
+	const [sharingAssessment, setSharingAssessment] = useState(false);
+	const [shareResult, setShareResult] = useState(null);
 	const [isOnline, setIsOnline] = useState(() => navigator.onLine);
 	const [assessmentDraftSavedAt, setAssessmentDraftSavedAt] = useState(null);
 	const [errors, setErrors] = useState({});
@@ -555,6 +557,7 @@ export default function DashboardPage({ userName }) {
 	function selectClient(client) {
 		setSelectedClientId(client.id);
 		setSelectedAssessmentId(client.assessments?.[0]?.id ?? null);
+		setShareResult(null);
 		setAssessmentMode('create');
 		setEditingAssessmentId(null);
 		setAssessmentForm({ ...emptyAssessment, evaluated_at: new Date().toISOString().slice(0, 16) });
@@ -565,6 +568,7 @@ export default function DashboardPage({ userName }) {
 	function startNewAssessment() {
 		setAssessmentMode('create');
 		setEditingAssessmentId(null);
+		setShareResult(null);
 		setAssessmentForm({ ...emptyAssessment, evaluated_at: new Date().toISOString().slice(0, 16) });
 		setAssessmentChangeReason('');
 		setAssessmentDraftSavedAt(null);
@@ -799,6 +803,51 @@ export default function DashboardPage({ userName }) {
 		});
 		setClients((current) => current.map((client) => (client.id === data.client.id ? data.client : client)));
 		setSelectedAssessmentId(data.assessment.id);
+	}
+
+	function updateAssessmentInState(assessment) {
+		setClients((current) => current.map((client) => {
+			if (client.id !== assessment.bioimpedance_client_id) return client;
+
+			return {
+				...client,
+				assessments: client.assessments.map((item) => (item.id === assessment.id ? assessment : item)),
+			};
+		}));
+	}
+
+	async function createShareLink(channel = 'whatsapp') {
+		if (!selectedAssessment || sharingAssessment) return;
+
+		setSharingAssessment(true);
+		try {
+			const { data } = await window.axios.post(`/bioimpedance/assessments/${selectedAssessment.id}/shares`, {
+				channel,
+				recipient: selectedClient?.phone || selectedClient?.email || '',
+				expires_in_days: 7,
+			});
+			setShareResult(data.share);
+			updateAssessmentInState(data.assessment);
+			setAuditEvents(data.audit_events ?? auditEvents);
+		} finally {
+			setSharingAssessment(false);
+		}
+	}
+
+	async function copyShareMessage() {
+		if (!shareResult?.message) return;
+		await navigator.clipboard?.writeText(shareResult.message);
+	}
+
+	async function revokeShare(share) {
+		if (!share || !window.confirm('Revogar este link temporário?')) return;
+
+		const { data } = await window.axios.patch(`/bioimpedance/report-shares/${share.id}/revoke`);
+		updateAssessmentInState(data.assessment);
+		setAuditEvents(data.audit_events ?? auditEvents);
+		if (shareResult?.id === share.id) {
+			setShareResult(null);
+		}
 	}
 
 	return (
@@ -1145,6 +1194,44 @@ export default function DashboardPage({ userName }) {
 												Anonimizar cliente
 											</button>
 										</>
+									) : null}
+								</div>
+							) : null}
+							{selectedAssessment && !selectedAssessment.is_canceled ? (
+								<div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50 p-4">
+									<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+										<div>
+											<p className="text-xs font-bold uppercase tracking-wide text-sky-700">Comunicação com o cliente</p>
+											<p className="mt-1 text-sm text-slate-600">Link temporário sem resultados clínicos na mensagem.</p>
+										</div>
+										<button type="button" disabled={!canWrite || sharingAssessment} onClick={() => createShareLink('whatsapp')} className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50">
+											{sharingAssessment ? 'Gerando...' : 'Gerar link WhatsApp'}
+										</button>
+									</div>
+									{shareResult ? (
+										<div className="mt-3 rounded-xl bg-white p-3">
+											<p className="text-sm leading-6 text-slate-700">{shareResult.message}</p>
+											<div className="mt-3 flex flex-wrap gap-2">
+												<button type="button" onClick={copyShareMessage} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">Copiar mensagem</button>
+												<a href={shareResult.whatsapp_url} target="_blank" rel="noreferrer" className="rounded-xl border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-700">Abrir WhatsApp</a>
+												<a href={shareResult.url} target="_blank" rel="noreferrer" className="rounded-xl border border-sky-200 px-3 py-2 text-xs font-bold text-sky-700">Ver link</a>
+											</div>
+										</div>
+									) : null}
+									{selectedAssessment.shares?.length ? (
+										<div className="mt-3 space-y-2">
+											{selectedAssessment.shares.map((share) => (
+												<div key={share.id} className="flex flex-col gap-2 rounded-xl bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+													<div>
+														<p className="text-xs font-bold uppercase text-slate-500">{share.channel} • expira {formatDate(share.expires_at)}</p>
+														<p className="mt-1 text-xs text-slate-500">Visualizações: {share.view_count} • {share.is_active ? 'Ativo' : 'Revogado/expirado'}</p>
+													</div>
+													<button type="button" disabled={!share.is_active} onClick={() => revokeShare(share)} className="rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-50">
+														Revogar
+													</button>
+												</div>
+											))}
+										</div>
 									) : null}
 								</div>
 							) : null}

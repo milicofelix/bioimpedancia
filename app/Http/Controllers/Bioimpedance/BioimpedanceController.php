@@ -8,6 +8,7 @@ use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceAssessmentAudit;
 use App\Models\Bioimpedance\BioimpedanceClient;
 use App\Models\Bioimpedance\BioimpedanceClinicSetting;
+use App\Models\Bioimpedance\BioimpedanceReportShare;
 use App\Models\User;
 use App\Services\Bioimpedance\BioimpedanceAnalyzer;
 use App\Services\Bioimpedance\LegacyBioimpedanceAnalysisRefresher;
@@ -26,7 +27,7 @@ class BioimpedanceController extends Controller
     public function index(): JsonResponse
     {
         $clients = BioimpedanceClient::query()
-            ->with(['assessments' => fn ($query) => $query->latest('evaluated_at')])
+            ->with(['assessments' => fn ($query) => $query->with('shares')->latest('evaluated_at')])
             ->orderBy('full_name')
             ->get()
             ->map(fn (BioimpedanceClient $client) => $this->clientPayload($client));
@@ -49,7 +50,7 @@ class BioimpedanceController extends Controller
         $this->audit($request, 'bioimpedance_client.created', $client, 'Cliente cadastrado', null, $this->clientAuditPayload($client));
 
         return response()->json([
-            'client' => $this->clientPayload($client->load('assessments')),
+            'client' => $this->clientPayload($this->loadClientAssessments($client)),
         ], 201);
     }
 
@@ -64,7 +65,7 @@ class BioimpedanceController extends Controller
         $this->audit($request, 'bioimpedance_client.updated', $client, 'Cliente atualizado', $oldValues, $this->clientAuditPayload($client->refresh()));
 
         return response()->json([
-            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
+            'client' => $this->clientPayload($this->loadClientAssessments($client->refresh())),
         ]);
     }
 
@@ -78,14 +79,14 @@ class BioimpedanceController extends Controller
         $this->audit($request, 'bioimpedance_client.inactivated', $client, 'Cliente inativado', $oldValues, $this->clientAuditPayload($client->refresh()));
 
         return response()->json([
-            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
+            'client' => $this->clientPayload($this->loadClientAssessments($client->refresh())),
         ]);
     }
 
     public function exportClientPrivacyData(Request $request, BioimpedanceClient $client): Response
     {
         $this->authorizeAdmin($request);
-        $client->load(['assessments' => fn ($query) => $query->latest('evaluated_at')]);
+        $this->loadClientAssessments($client);
         $exportCount = $client->privacy_export_count + 1;
         $client->update([
             'privacy_exported_at' => now(),
@@ -99,7 +100,7 @@ class BioimpedanceController extends Controller
         $payload = [
             'exported_at' => now()->toIso8601String(),
             'exported_by' => $this->userPayload($request->user()),
-            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
+            'client' => $this->clientPayload($this->loadClientAssessments($client->refresh())),
             'clinic' => $this->clinicPayload(),
             'purpose' => 'Exportação de dados pessoais e avaliações para atendimento de solicitação LGPD.',
         ];
@@ -115,7 +116,7 @@ class BioimpedanceController extends Controller
         $this->authorizeAdmin($request);
         if ($client->anonymized_at) {
             return response()->json([
-                'client' => $this->clientPayload($client->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
+                'client' => $this->clientPayload($this->loadClientAssessments($client)),
                 'audit_events' => $this->auditEventsPayload(),
             ]);
         }
@@ -149,7 +150,7 @@ class BioimpedanceController extends Controller
         $this->audit($request, 'bioimpedance_client.anonymized', $client, 'Cliente anonimizado: '.$validated['anonymization_reason'], $oldValues, $this->clientAuditPayload($client->refresh()));
 
         return response()->json([
-            'client' => $this->clientPayload($client->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
+            'client' => $this->clientPayload($this->loadClientAssessments($client)),
             'audit_events' => $this->auditEventsPayload(),
         ]);
     }
@@ -268,7 +269,7 @@ class BioimpedanceController extends Controller
         ]);
 
         return response()->json([
-            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
+            'client' => $this->clientPayload($this->loadClientAssessments($client->refresh())),
             'assessment' => $this->assessmentPayload($assessment),
         ], 201);
     }
@@ -309,7 +310,7 @@ class BioimpedanceController extends Controller
         $this->auditAssessment($assessment->refresh(), $request, 'corrected', $changeReason, $oldValues, $this->assessmentAuditValues($assessment));
 
         return response()->json([
-            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
+            'client' => $this->clientPayload($this->loadClientAssessments($client->refresh())),
             'assessment' => $this->assessmentPayload($assessment),
         ]);
     }
@@ -319,7 +320,7 @@ class BioimpedanceController extends Controller
         $this->authorizeWrite($request);
         if ($assessment->canceled_at) {
             return response()->json([
-                'client' => $this->clientPayload($assessment->client->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
+                'client' => $this->clientPayload($this->loadClientAssessments($assessment->client)),
                 'assessment' => $this->assessmentPayload($assessment),
             ]);
         }
@@ -338,7 +339,7 @@ class BioimpedanceController extends Controller
         $this->auditAssessment($assessment->refresh(), $request, 'canceled', $validated['cancellation_reason'], $oldValues, $this->assessmentAuditValues($assessment));
 
         return response()->json([
-            'client' => $this->clientPayload($assessment->client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
+            'client' => $this->clientPayload($this->loadClientAssessments($assessment->client->refresh())),
             'assessment' => $this->assessmentPayload($assessment),
         ]);
     }
@@ -371,6 +372,101 @@ class BioimpedanceController extends Controller
         ])->setPaper('a4');
 
         return $pdf->download($this->pdfFileName($assessment));
+    }
+
+    public function createAssessmentShare(Request $request, BioimpedanceAssessment $assessment): JsonResponse
+    {
+        $this->authorizeWrite($request);
+        $assessment->load('client');
+        if ($assessment->canceled_at) {
+            throw ValidationException::withMessages([
+                'bioimpedance_assessment_id' => 'Avaliação cancelada não pode ser compartilhada.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'channel' => ['required', Rule::in(['whatsapp', 'email', 'copy'])],
+            'recipient' => ['nullable', 'string', 'max:160'],
+            'expires_in_days' => ['required', 'integer', 'between:1,30'],
+        ]);
+
+        $plainToken = Str::random(48);
+        $expiresAt = now()->addDays((int) $validated['expires_in_days']);
+        $message = $this->shareMessage($assessment, $plainToken);
+        $share = BioimpedanceReportShare::query()->create([
+            'bioimpedance_assessment_id' => $assessment->id,
+            'created_by_user_id' => $request->user()->id,
+            'token_hash' => hash('sha256', $plainToken),
+            'channel' => $validated['channel'],
+            'recipient' => $validated['recipient'] ?? null,
+            'message' => $message,
+            'expires_at' => $expiresAt,
+        ]);
+
+        $this->audit($request, 'bioimpedance_report_share.created', $share, 'Link temporário do relatório gerado', null, $this->sharePayload($share, $plainToken));
+
+        return response()->json([
+            'share' => $this->sharePayload($share, $plainToken),
+            'assessment' => $this->assessmentPayload($assessment->refresh()->load('shares')),
+            'audit_events' => $request->user()->isAdmin() ? $this->auditEventsPayload() : [],
+        ], 201);
+    }
+
+    public function revokeAssessmentShare(Request $request, BioimpedanceReportShare $share): JsonResponse
+    {
+        $this->authorizeWrite($request);
+        $oldValues = $this->sharePayload($share);
+        $share->update(['revoked_at' => now()]);
+        $this->audit($request, 'bioimpedance_report_share.revoked', $share, 'Link temporário do relatório revogado', $oldValues, $this->sharePayload($share->refresh()));
+
+        return response()->json([
+            'share' => $this->sharePayload($share),
+            'assessment' => $this->assessmentPayload($share->assessment->refresh()->load('shares')),
+            'audit_events' => $request->user()->isAdmin() ? $this->auditEventsPayload() : [],
+        ]);
+    }
+
+    public function publicReport(string $token): Response
+    {
+        $share = BioimpedanceReportShare::query()
+            ->where('token_hash', hash('sha256', $token))
+            ->with(['assessment.client', 'assessment.professional', 'assessment.correctedBy', 'assessment.canceledBy'])
+            ->firstOrFail();
+
+        abort_if($share->revoked_at || $share->expires_at->isPast(), 410, 'Link expirado ou revogado.');
+
+        $share->update([
+            'viewed_at' => now(),
+            'view_count' => $share->view_count + 1,
+            'last_viewed_ip' => request()->ip(),
+        ]);
+        AppAudit::query()->create([
+            'user_id' => null,
+            'action' => 'bioimpedance_report_share.viewed',
+            'auditable_type' => $share::class,
+            'auditable_id' => $share->id,
+            'description' => 'Relatório público visualizado',
+            'new_values' => [
+                'share_id' => $share->id,
+                'assessment_id' => $share->bioimpedance_assessment_id,
+                'view_count' => $share->view_count + 1,
+            ],
+            'ip_address' => request()->ip(),
+            'user_agent' => (string) request()->userAgent(),
+        ]);
+
+        $assessment = $share->assessment;
+        config(['dompdf.public_path' => public_path()]);
+
+        return response()->view('bioimpedance.report-pdf', [
+            'clinic' => [
+                ...$this->clinicPayload(),
+                'logo_data_uri' => $this->logoDataUri(),
+            ],
+            'client' => $this->clientPayload($assessment->client->setRelation('assessments', collect([$assessment]))),
+            'assessment' => $this->assessmentPayload($assessment),
+            'issuedAt' => $assessment->report_issued_at ?? $assessment->evaluated_at,
+        ]);
     }
 
     private function validateAssessment(Request $request, bool $requireClient = true): array
@@ -647,6 +743,36 @@ class BioimpedanceController extends Controller
             ->all();
     }
 
+    private function sharePayload(BioimpedanceReportShare $share, ?string $plainToken = null): array
+    {
+        $url = $plainToken ? route('bioimpedance.public-report', $plainToken) : null;
+
+        return [
+            'id' => $share->id,
+            'bioimpedance_assessment_id' => $share->bioimpedance_assessment_id,
+            'channel' => $share->channel,
+            'recipient' => $share->recipient,
+            'message' => $share->message,
+            'url' => $url,
+            'whatsapp_url' => $url ? 'https://wa.me/?text='.rawurlencode($share->message) : null,
+            'expires_at' => $share->expires_at?->toIso8601String(),
+            'revoked_at' => $share->revoked_at?->toIso8601String(),
+            'viewed_at' => $share->viewed_at?->toIso8601String(),
+            'view_count' => $share->view_count,
+            'is_active' => ! $share->revoked_at && ! $share->expires_at->isPast(),
+        ];
+    }
+
+    private function shareMessage(BioimpedanceAssessment $assessment, string $plainToken): string
+    {
+        return sprintf(
+            'Olá, %s! Sua avaliação de bioimpedância realizada em %s está disponível. Acesse o relatório pelo link: %s',
+            $assessment->client->full_name,
+            $assessment->evaluated_at->format('d/m/Y'),
+            route('bioimpedance.public-report', $plainToken)
+        );
+    }
+
     private function audit(Request $request, string $action, Model $auditable, string $description, ?array $oldValues, ?array $newValues): void
     {
         AppAudit::query()->create([
@@ -695,6 +821,11 @@ class BioimpedanceController extends Controller
         ];
     }
 
+    private function loadClientAssessments(BioimpedanceClient $client): BioimpedanceClient
+    {
+        return $client->load(['assessments' => fn ($query) => $query->with('shares')->latest('evaluated_at')]);
+    }
+
     private function assessmentPayload(BioimpedanceAssessment $assessment): array
     {
         $analysis = $assessment->analysis;
@@ -728,6 +859,9 @@ class BioimpedanceController extends Controller
             'is_canceled' => $assessment->canceled_at !== null,
             'report_issued_at' => $assessment->report_issued_at?->toIso8601String(),
             'report_issue_count' => $assessment->report_issue_count,
+            'shares' => $assessment->relationLoaded('shares')
+                ? $assessment->shares->sortByDesc('created_at')->values()->map(fn (BioimpedanceReportShare $share) => $this->sharePayload($share))->all()
+                : [],
         ];
     }
 

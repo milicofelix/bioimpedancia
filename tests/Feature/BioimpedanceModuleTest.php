@@ -475,6 +475,55 @@ class BioimpedanceModuleTest extends TestCase
         ]);
     }
 
+    public function test_assessment_report_can_be_shared_with_temporary_public_link(): void
+    {
+        $user = User::factory()->create(['role' => User::ROLE_PROFESSIONAL]);
+        $assessment = $this->createAssessmentForUser($user);
+
+        $response = $this->actingAs($user)->postJson(route('bioimpedance.assessments.shares.store', $assessment->id), [
+            'channel' => 'whatsapp',
+            'recipient' => '11999999999',
+            'expires_in_days' => 7,
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('share.channel', 'whatsapp');
+        $this->assertStringContainsString('Sua avaliação de bioimpedância', $response->json('share.message'));
+        $this->assertStringNotContainsString('80', $response->json('share.message'));
+        $this->assertNotNull($response->json('share.url'));
+
+        $publicResponse = $this->get($response->json('share.url'));
+        $publicResponse->assertOk();
+        $publicResponse->assertSee('Relatório de bioimpedância');
+
+        $shareId = $response->json('share.id');
+        $this->assertDatabaseHas('bioimpedance_report_shares', [
+            'id' => $shareId,
+            'view_count' => 1,
+        ]);
+        $this->assertDatabaseHas('app_audits', [
+            'action' => 'bioimpedance_report_share.viewed',
+            'auditable_id' => $shareId,
+        ]);
+    }
+
+    public function test_report_share_can_be_revoked(): void
+    {
+        $user = User::factory()->create();
+        $assessment = $this->createAssessmentForUser($user);
+
+        $shareResponse = $this->actingAs($user)->postJson(route('bioimpedance.assessments.shares.store', $assessment->id), [
+            'channel' => 'copy',
+            'expires_in_days' => 7,
+        ]);
+
+        $this->actingAs($user)->patchJson(route('bioimpedance.report-shares.revoke', $shareResponse->json('share.id')))
+            ->assertOk()
+            ->assertJsonPath('share.is_active', false);
+
+        $this->get($shareResponse->json('share.url'))->assertStatus(410);
+    }
+
     public function test_legacy_pending_analysis_is_refreshed_before_pdf_download(): void
     {
         $user = User::factory()->create();
