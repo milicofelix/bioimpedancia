@@ -205,6 +205,37 @@ class BioimpedanceModuleTest extends TestCase
         ])->assertJsonValidationErrors(['bioimpedance_client_id']);
     }
 
+    public function test_clinic_settings_can_be_updated_for_reports(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->patchJson(route('bioimpedance.clinic.update'), [
+            'display_name' => 'Ricosty Emagrecimento e Estética',
+            'legal_name' => 'Ricosty Clinica LTDA',
+            'document' => '12.345.678/0001-99',
+            'phone' => '(11) 3333-4444',
+            'whatsapp' => '(11) 95555-4444',
+            'email' => 'contato@ricosty.local',
+            'address' => 'Rua da Clínica, 100',
+            'instagram' => '@ricosty',
+            'website' => 'https://ricosty.local',
+            'primary_color' => '#cc7a8a',
+            'secondary_color' => '#333333',
+            'logo_url' => '/images/brand/ricosty-logo.png',
+            'contact' => 'Emagrecimento e estética avançada',
+            'footer_text' => 'Rodapé personalizado da clínica',
+            'technical_notice' => 'Aviso técnico personalizado.',
+        ])->assertOk()
+            ->assertJsonPath('clinic.legal_name', 'Ricosty Clinica LTDA')
+            ->assertJsonPath('clinic.primary_color', '#cc7a8a')
+            ->assertJsonPath('clinic.footer_text', 'Rodapé personalizado da clínica');
+
+        $this->actingAs($user)->getJson(route('bioimpedance.index'))
+            ->assertOk()
+            ->assertJsonPath('clinic.contact', 'Emagrecimento e estética avançada')
+            ->assertJsonPath('clinic.technical_notice', 'Aviso técnico personalizado.');
+    }
+
     public function test_all_client_assessments_are_returned_for_history(): void
     {
         $user = User::factory()->create();

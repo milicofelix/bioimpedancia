@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceAssessmentAudit;
 use App\Models\Bioimpedance\BioimpedanceClient;
+use App\Models\Bioimpedance\BioimpedanceClinicSetting;
 use App\Services\Bioimpedance\BioimpedanceAnalyzer;
 use App\Services\Bioimpedance\LegacyBioimpedanceAnalysisRefresher;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -63,6 +64,34 @@ class BioimpedanceController extends Controller
 
         return response()->json([
             'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
+        ]);
+    }
+
+    public function updateClinicSettings(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'display_name' => ['required', 'string', 'max:160'],
+            'legal_name' => ['nullable', 'string', 'max:160'],
+            'document' => ['nullable', 'string', 'max:32'],
+            'phone' => ['nullable', 'string', 'max:40'],
+            'whatsapp' => ['nullable', 'string', 'max:40'],
+            'email' => ['nullable', 'email', 'max:160'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'instagram' => ['nullable', 'string', 'max:120'],
+            'website' => ['nullable', 'string', 'max:160'],
+            'primary_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'secondary_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'logo_url' => ['nullable', 'string', 'max:255'],
+            'contact' => ['nullable', 'string', 'max:180'],
+            'footer_text' => ['nullable', 'string', 'max:500'],
+            'technical_notice' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $settings = BioimpedanceClinicSetting::current();
+        $settings->update($validated);
+
+        return response()->json([
+            'clinic' => $this->clinicPayload($settings->refresh()),
         ]);
     }
 
@@ -214,14 +243,11 @@ class BioimpedanceController extends Controller
         ]);
     }
 
-    private function clinicPayload(): array
+    private function clinicPayload(?BioimpedanceClinicSetting $settings = null): array
     {
         return [
             'name' => config('app.name', 'Clínica'),
-            'display_name' => 'Ricosty Emagrecimento e Estética',
-            'contact' => 'Avaliação corporal e acompanhamento estético',
-            'logo_initials' => 'RS',
-            'logo_url' => '/images/brand/ricosty-logo.png',
+            ...($settings ?? BioimpedanceClinicSetting::current())->payload(),
         ];
     }
 
@@ -431,7 +457,8 @@ class BioimpedanceController extends Controller
 
     private function logoDataUri(): ?string
     {
-        $path = public_path('images/brand/ricosty-logo.png');
+        $logoUrl = BioimpedanceClinicSetting::current()->logo_url ?? BioimpedanceClinicSetting::DEFAULTS['logo_url'];
+        $path = public_path(ltrim((string) parse_url($logoUrl, PHP_URL_PATH), '/'));
 
         if (! is_file($path)) {
             return null;

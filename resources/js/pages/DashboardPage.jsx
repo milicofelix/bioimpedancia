@@ -28,6 +28,24 @@ const emptyAssessment = {
 	notes: '',
 };
 
+const defaultClinic = {
+	display_name: 'Ricosty Emagrecimento e Estética',
+	legal_name: 'Ricosty Emagrecimento e Estética',
+	document: '',
+	phone: '',
+	whatsapp: '',
+	email: '',
+	address: '',
+	instagram: '',
+	website: '',
+	primary_color: '#d88b9a',
+	secondary_color: '#4a4a4a',
+	logo_url: '/images/brand/ricosty-logo.png',
+	contact: 'Avaliação corporal e acompanhamento estético',
+	footer_text: 'Ricosty Emagrecimento e Estética - Avaliação corporal e acompanhamento estético',
+	technical_notice: 'Os resultados de bioimpedância são estimativas e podem variar conforme hidratação, alimentação, ciclo hormonal, medicamentos e condições de medição. Este documento não substitui avaliação médica ou nutricional.',
+};
+
 const sexLabels = {
 	female: 'Feminino',
 	male: 'Masculino',
@@ -307,14 +325,17 @@ function assessmentFormFromAssessment(assessment) {
 	};
 }
 
+function clinicFormFromClinic(clinic) {
+	return {
+		...defaultClinic,
+		...Object.fromEntries(Object.entries(clinic ?? {}).map(([key, value]) => [key, value ?? ''])),
+	};
+}
+
 export default function DashboardPage({ userName }) {
 	const [clients, setClients] = useState([]);
-	const [clinic, setClinic] = useState({
-		display_name: 'Ricosty Emagrecimento e Estética',
-		contact: 'Avaliação corporal e acompanhamento estético',
-		logo_initials: 'RS',
-		logo_url: '/images/brand/ricosty-logo.png',
-	});
+	const [clinic, setClinic] = useState(defaultClinic);
+	const [clinicForm, setClinicForm] = useState(defaultClinic);
 	const [selectedClientId, setSelectedClientId] = useState(null);
 	const [selectedAssessmentId, setSelectedAssessmentId] = useState(null);
 	const [clientForm, setClientForm] = useState(emptyClient);
@@ -329,12 +350,15 @@ export default function DashboardPage({ userName }) {
 	const [loading, setLoading] = useState(true);
 	const [savingClient, setSavingClient] = useState(false);
 	const [savingAssessment, setSavingAssessment] = useState(false);
+	const [savingClinic, setSavingClinic] = useState(false);
 	const [errors, setErrors] = useState({});
+	const [clinicErrors, setClinicErrors] = useState({});
 
 	useEffect(() => {
 		window.axios.get('/bioimpedance').then(({ data }) => {
 			setClients(data.clients);
 			setClinic(data.clinic);
+			setClinicForm(clinicFormFromClinic(data.clinic));
 			setSelectedClientId(data.clients[0]?.id ?? null);
 			setSelectedAssessmentId(data.clients[0]?.assessments?.[0]?.id ?? null);
 		}).finally(() => setLoading(false));
@@ -453,6 +477,12 @@ export default function DashboardPage({ userName }) {
 		setAssessmentForm((current) => ({ ...current, [field]: maskedValue }));
 	}
 
+	function updateClinic(field, value) {
+		const maskedValue = ['phone', 'whatsapp'].includes(field) ? phoneMask(value) : value;
+
+		setClinicForm((current) => ({ ...current, [field]: maskedValue }));
+	}
+
 	async function submitClient(event) {
 		event.preventDefault();
 		setSavingClient(true);
@@ -487,6 +517,22 @@ export default function DashboardPage({ userName }) {
 		const { data } = await window.axios.patch(`/bioimpedance/clients/${client.id}/inactivate`);
 		setClients((current) => current.map((item) => (item.id === data.client.id ? data.client : item)));
 		setSelectedClientId(data.client.id);
+	}
+
+	async function submitClinic(event) {
+		event.preventDefault();
+		setSavingClinic(true);
+		setClinicErrors({});
+
+		try {
+			const { data } = await window.axios.patch('/bioimpedance/clinic', clinicForm);
+			setClinic(data.clinic);
+			setClinicForm(clinicFormFromClinic(data.clinic));
+		} catch (error) {
+			setClinicErrors(error.response?.data?.errors ?? {});
+		} finally {
+			setSavingClinic(false);
+		}
 	}
 
 	async function submitAssessment(event) {
@@ -670,6 +716,80 @@ export default function DashboardPage({ userName }) {
 							) : null}
 						</form>
 					</section>
+
+					<section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+						<div className="flex items-center justify-between gap-3">
+							<div>
+								<h2 className="text-base font-semibold text-slate-950">Configurações da clínica</h2>
+								<p className="mt-1 text-xs text-slate-500">Identidade usada no dashboard e no PDF.</p>
+							</div>
+							<div className="flex gap-1">
+								<span className="h-5 w-5 rounded-full border border-slate-200" style={{ backgroundColor: clinicForm.primary_color }}></span>
+								<span className="h-5 w-5 rounded-full border border-slate-200" style={{ backgroundColor: clinicForm.secondary_color }}></span>
+							</div>
+						</div>
+						<form onSubmit={submitClinic} className="mt-4 space-y-3">
+							<Field label="Nome comercial">
+								<input value={clinicForm.display_name} onChange={(event) => updateClinic('display_name', event.target.value)} className={inputClass()} />
+							</Field>
+							<Field label="Nome jurídico">
+								<input value={clinicForm.legal_name} onChange={(event) => updateClinic('legal_name', event.target.value)} className={inputClass()} />
+							</Field>
+							<div className="grid grid-cols-2 gap-3">
+								<Field label="Documento">
+									<input value={clinicForm.document} onChange={(event) => updateClinic('document', event.target.value)} className={inputClass()} />
+								</Field>
+								<Field label="Instagram">
+									<input value={clinicForm.instagram} onChange={(event) => updateClinic('instagram', event.target.value)} className={inputClass()} />
+								</Field>
+							</div>
+							<div className="grid grid-cols-2 gap-3">
+								<Field label="Telefone">
+									<input inputMode="tel" value={clinicForm.phone} onChange={(event) => updateClinic('phone', event.target.value)} className={inputClass()} />
+								</Field>
+								<Field label="WhatsApp">
+									<input inputMode="tel" value={clinicForm.whatsapp} onChange={(event) => updateClinic('whatsapp', event.target.value)} className={inputClass()} />
+								</Field>
+							</div>
+							<Field label="E-mail">
+								<input type="email" value={clinicForm.email} onChange={(event) => updateClinic('email', event.target.value)} className={inputClass()} />
+							</Field>
+							<Field label="Endereço">
+								<input value={clinicForm.address} onChange={(event) => updateClinic('address', event.target.value)} className={inputClass()} />
+							</Field>
+							<Field label="Site">
+								<input value={clinicForm.website} onChange={(event) => updateClinic('website', event.target.value)} className={inputClass()} />
+							</Field>
+							<Field label="Logo">
+								<input value={clinicForm.logo_url} onChange={(event) => updateClinic('logo_url', event.target.value)} className={inputClass()} />
+							</Field>
+							<div className="grid grid-cols-2 gap-3">
+								<Field label="Cor principal">
+									<input type="color" value={clinicForm.primary_color} onChange={(event) => updateClinic('primary_color', event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white p-1" />
+								</Field>
+								<Field label="Cor secundária">
+									<input type="color" value={clinicForm.secondary_color} onChange={(event) => updateClinic('secondary_color', event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white p-1" />
+								</Field>
+							</div>
+							<Field label="Descrição curta">
+								<input value={clinicForm.contact} onChange={(event) => updateClinic('contact', event.target.value)} className={inputClass()} />
+							</Field>
+							<Field label="Rodapé do relatório">
+								<textarea value={clinicForm.footer_text} onChange={(event) => updateClinic('footer_text', event.target.value)} rows="2" className={inputClass()} />
+							</Field>
+							<Field label="Aviso técnico">
+								<textarea value={clinicForm.technical_notice} onChange={(event) => updateClinic('technical_notice', event.target.value)} rows="3" className={inputClass()} />
+							</Field>
+							{Object.keys(clinicErrors).length ? (
+								<div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+									Confira os dados da clínica antes de salvar.
+								</div>
+							) : null}
+							<button type="submit" disabled={savingClinic} className="w-full rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
+								{savingClinic ? 'Salvando...' : 'Salvar configurações'}
+							</button>
+						</form>
+					</section>
 				</aside>
 
 				<section className="space-y-5">
@@ -826,12 +946,12 @@ function Report({ clinic, client, assessment, professional }) {
 			</div>
 
 			<header className="report-header relative flex flex-col gap-5 overflow-hidden border-b border-rose-200 bg-gradient-to-br from-rose-50 via-white to-stone-100 px-8 py-8 text-slate-900 sm:flex-row sm:items-center sm:justify-between">
-				<div className="pointer-events-none absolute inset-x-0 top-0 h-2 bg-gradient-to-r from-[#d88b9a] via-[#f2c7cf] to-[#4a4a4a]"></div>
+				<div className="pointer-events-none absolute inset-x-0 top-0 h-2" style={{ background: `linear-gradient(90deg, ${clinic.primary_color}, #f2c7cf, ${clinic.secondary_color})` }}></div>
 				<div className="flex items-center gap-5">
 					<img src={clinic.logo_url} alt={clinic.display_name} className="report-logo h-36 w-96 object-contain" />
 				</div>
 				<div className="text-left sm:text-right">
-					<p className="text-xl font-bold uppercase tracking-wide text-[#4a4a4a]">Relatório de bioimpedância</p>
+					<p className="text-xl font-bold uppercase tracking-wide" style={{ color: clinic.secondary_color }}>Relatório de bioimpedância</p>
 					<p className="mt-5 text-sm text-slate-600">Avaliação Nº {assessmentNumber(assessment?.id)} | {assessment ? formatDate(assessment.evaluated_at) : 'Aguardando avaliação'}</p>
 					<p className="mt-4 text-sm text-slate-600">Responsável: {formattedProfessional}</p>
 				</div>
@@ -953,15 +1073,15 @@ function Report({ clinic, client, assessment, professional }) {
 
 				<footer className="report-footer mt-7 border-t border-slate-200 pt-5 text-xs leading-5 text-slate-500">
 					<p className="font-bold uppercase text-slate-900">Observações importantes</p>
-					<p className="mt-3">Os resultados de bioimpedância são estimativas e podem variar conforme hidratação, alimentação, ciclo hormonal, medicamentos e condições de medição. Este documento não substitui avaliação médica ou nutricional.</p>
+					<p className="mt-3">{clinic.technical_notice}</p>
 					<div className="mt-7 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
 						<div>
-							<p className="font-bold text-slate-900">Ricosty Emagrecimento e Estética</p>
-							<p className="mt-1">Avaliação corporal e acompanhamento estético</p>
-						</div>
-						<p>Relatório nº {assessmentNumber(assessment?.id)} • Emitido em {assessment ? formatIssueDate(assessment.evaluated_at) : '-'}</p>
+						<p className="font-bold text-slate-900">{clinic.display_name}</p>
+						<p className="mt-1">{clinic.contact}</p>
 					</div>
-				</footer>
+					<p>{clinic.footer_text} • Relatório nº {assessmentNumber(assessment?.id)} • Emitido em {assessment ? formatIssueDate(assessment.evaluated_at) : '-'}</p>
+				</div>
+			</footer>
 			</div>
 		</article>
 	);

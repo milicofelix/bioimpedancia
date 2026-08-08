@@ -136,9 +136,11 @@
     $sexLabels = ['female' => 'Feminino', 'male' => 'Masculino'];
     $tone = fn ($indicator) => $indicator['tone'] ?? 'neutral';
     $br = fn ($value, $decimals = 1) => $value === null || $value === '' ? '-' : number_format((float) $value, $decimals, ',', '.');
+    $primaryColor = $clinic['primary_color'] ?? '#d88b9a';
+    $secondaryColor = $clinic['secondary_color'] ?? '#4a4a4a';
 @endphp
 <div class="page">
-    <div class="header">
+    <div class="header" style="border-bottom-color: {{ $primaryColor }};">
         <div class="brand">
             @if($clinic['logo_data_uri'])
                 <img class="logo" src="{{ $clinic['logo_data_uri'] }}" alt="{{ $clinic['display_name'] }}">
@@ -147,7 +149,7 @@
             @endif
         </div>
         <div class="report-title">
-            <h1>Relatório de bioimpedância</h1>
+            <h1 style="color: {{ $secondaryColor }};">Relatório de bioimpedância</h1>
             <div>Avaliação Nº {{ str_pad((string) $assessment['id'], 4, '0', STR_PAD_LEFT) }}</div>
             <div class="muted">{{ \Illuminate\Support\Carbon::parse($assessment['evaluated_at'])->format('d/m/Y H:i') }}</div>
             <div class="muted">Emitido em {{ $issuedAt?->format('d/m/Y H:i') }}</div>
@@ -161,7 +163,7 @@
         <table class="client-grid">
             <tr>
                 <td class="box" style="width: 46%;">
-                    <div class="label">Cliente</div>
+                    <div class="label" style="color: {{ $primaryColor }};">Cliente</div>
                     <div class="client-name">{{ $client['full_name'] }}</div>
                 </td>
                 <td class="box"><div class="label">Idade</div><strong>{{ $assessmentAge }} anos</strong></td>
@@ -173,16 +175,16 @@
         <table class="hero-grid">
             <tr>
                 <td class="box" style="background: #f8e8eb;">
-                    <div class="label">Peso</div>
+                    <div class="label" style="color: {{ $primaryColor }};">Peso</div>
                     <div class="metric-value">{{ $br($assessment['weight_kg']) }} <span class="metric-unit">kg</span></div>
                 </td>
                 <td class="box" style="background: #f8e8eb;">
-                    <div class="label">IMC calculado</div>
+                    <div class="label" style="color: {{ $primaryColor }};">IMC calculado</div>
                     <div class="metric-value">{{ $br($assessment['calculated_bmi']) }}</div>
                     <span class="badge {{ $tone($bmi) }}">{{ $bmi['classification'] ?? '-' }}</span>
                 </td>
                 <td class="box" style="background: #f8e8eb;">
-                    <div class="label">Idade corporal</div>
+                    <div class="label" style="color: {{ $primaryColor }};">Idade corporal</div>
                     <div class="metric-value">{{ $assessment['body_age'] ?? '-' }} <span class="metric-unit">anos</span></div>
                     @if($assessment['body_age'])
                         <div class="muted">{{ abs($assessment['body_age'] - $assessmentAge) }} anos {{ $assessment['body_age'] > $assessmentAge ? 'acima' : 'abaixo' }} da idade cronológica</div>
@@ -191,7 +193,7 @@
             </tr>
         </table>
 
-        <div class="section-title">Composição corporal</div>
+        <div class="section-title" style="color: {{ $secondaryColor }};">Composição corporal</div>
         <table class="composition-grid">
             <tr>
                 <td class="box" style="width: 50%;">@include('bioimpedance.partials.pdf-scale', ['title' => 'Gordura corporal', 'value' => $br($assessment['body_fat_percentage']).' %', 'indicator' => $bodyFat])</td>
@@ -208,7 +210,7 @@
         </table>
 
         <div class="summary">
-            <div class="section-title" style="margin-top: 0;">Síntese da avaliação</div>
+            <div class="section-title" style="margin-top: 0; color: {{ $primaryColor }};">Síntese da avaliação</div>
             <p>{{ $assessment['analysis']['summary'] ?? 'Síntese indisponível.' }}</p>
             @if($assessment['notes'])
                 <p><strong>Observações:</strong> {{ $assessment['notes'] }}</p>
@@ -217,9 +219,9 @@
         </div>
     </div>
     <div class="footer">
-        <strong>Observações importantes.</strong> Os resultados de bioimpedância são estimativas e podem variar conforme hidratação, alimentação, ciclo hormonal, medicamentos e condições de medição. Este documento não substitui avaliação médica ou nutricional.
+        <strong>Observações importantes.</strong> {{ $clinic['technical_notice'] }}
         <br>
-        {{ $clinic['display_name'] }} - {{ $clinic['contact'] }} - Relatório nº {{ str_pad((string) $assessment['id'], 4, '0', STR_PAD_LEFT) }}
+        {{ $clinic['footer_text'] ?? ($clinic['display_name'].' - '.$clinic['contact']) }} - Relatório nº {{ str_pad((string) $assessment['id'], 4, '0', STR_PAD_LEFT) }}
     </div>
 </div>
 </body>
