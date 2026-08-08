@@ -13,6 +13,21 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
+    public const ROLE_ADMIN = 'admin';
+
+    public const ROLE_PROFESSIONAL = 'professional';
+
+    public const ROLE_RECEPTION = 'reception';
+
+    public const ROLE_VIEWER = 'viewer';
+
+    public const ROLES = [
+        self::ROLE_ADMIN,
+        self::ROLE_PROFESSIONAL,
+        self::ROLE_RECEPTION,
+        self::ROLE_VIEWER,
+    ];
+
     /**
      * The attributes that are mass assignable.
      *
@@ -22,6 +37,10 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
+        'last_login_at',
+        'last_login_ip',
+        'inactivated_at',
     ];
 
     /**
@@ -44,6 +63,18 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'last_login_at' => 'datetime',
+            'inactivated_at' => 'datetime',
         ];
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === self::ROLE_ADMIN;
+    }
+
+    public function isActive(): bool
+    {
+        return $this->inactivated_at === null;
     }
 }

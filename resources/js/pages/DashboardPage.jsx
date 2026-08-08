@@ -46,9 +46,23 @@ const defaultClinic = {
 	technical_notice: 'Os resultados de bioimpedância são estimativas e podem variar conforme hidratação, alimentação, ciclo hormonal, medicamentos e condições de medição. Este documento não substitui avaliação médica ou nutricional.',
 };
 
+const emptyUserForm = {
+	name: '',
+	email: '',
+	password: '',
+	role: 'professional',
+};
+
 const sexLabels = {
 	female: 'Feminino',
 	male: 'Masculino',
+};
+
+const roleLabels = {
+	admin: 'Administrador',
+	professional: 'Profissional',
+	reception: 'Recepção',
+	viewer: 'Visualização',
 };
 
 const evolutionMetrics = [
@@ -336,6 +350,10 @@ export default function DashboardPage({ userName }) {
 	const [clients, setClients] = useState([]);
 	const [clinic, setClinic] = useState(defaultClinic);
 	const [clinicForm, setClinicForm] = useState(defaultClinic);
+	const [currentUser, setCurrentUser] = useState(null);
+	const [users, setUsers] = useState([]);
+	const [auditEvents, setAuditEvents] = useState([]);
+	const [userForm, setUserForm] = useState(emptyUserForm);
 	const [selectedClientId, setSelectedClientId] = useState(null);
 	const [selectedAssessmentId, setSelectedAssessmentId] = useState(null);
 	const [clientForm, setClientForm] = useState(emptyClient);
@@ -351,14 +369,19 @@ export default function DashboardPage({ userName }) {
 	const [savingClient, setSavingClient] = useState(false);
 	const [savingAssessment, setSavingAssessment] = useState(false);
 	const [savingClinic, setSavingClinic] = useState(false);
+	const [savingUser, setSavingUser] = useState(false);
 	const [errors, setErrors] = useState({});
 	const [clinicErrors, setClinicErrors] = useState({});
+	const [userErrors, setUserErrors] = useState({});
 
 	useEffect(() => {
 		window.axios.get('/bioimpedance').then(({ data }) => {
 			setClients(data.clients);
 			setClinic(data.clinic);
 			setClinicForm(clinicFormFromClinic(data.clinic));
+			setCurrentUser(data.current_user);
+			setUsers(data.users ?? []);
+			setAuditEvents(data.audit_events ?? []);
 			setSelectedClientId(data.clients[0]?.id ?? null);
 			setSelectedAssessmentId(data.clients[0]?.assessments?.[0]?.id ?? null);
 		}).finally(() => setLoading(false));
@@ -390,6 +413,7 @@ export default function DashboardPage({ userName }) {
 		if (!height || !weight) return null;
 		return (weight / (height * height)).toFixed(1);
 	}, [assessmentForm.weight_kg, clientForm.height_cm, selectedClient]);
+	const canWrite = currentUser?.role !== 'viewer';
 
 	async function handleLogout() {
 		await window.axios.post('/logout', {}, { headers: { Accept: 'application/json' } });
@@ -483,8 +507,13 @@ export default function DashboardPage({ userName }) {
 		setClinicForm((current) => ({ ...current, [field]: maskedValue }));
 	}
 
+	function updateUserForm(field, value) {
+		setUserForm((current) => ({ ...current, [field]: value }));
+	}
+
 	async function submitClient(event) {
 		event.preventDefault();
+		if (!canWrite) return;
 		setSavingClient(true);
 		setErrors({});
 
@@ -512,6 +541,7 @@ export default function DashboardPage({ userName }) {
 	}
 
 	async function inactivateClient(client) {
+		if (!canWrite) return;
 		if (!client || !window.confirm(`Inativar ${client.full_name}? O histórico será preservado.`)) return;
 
 		const { data } = await window.axios.patch(`/bioimpedance/clients/${client.id}/inactivate`);
@@ -528,6 +558,7 @@ export default function DashboardPage({ userName }) {
 			const { data } = await window.axios.patch('/bioimpedance/clinic', clinicForm);
 			setClinic(data.clinic);
 			setClinicForm(clinicFormFromClinic(data.clinic));
+			setAuditEvents(data.audit_events ?? auditEvents);
 		} catch (error) {
 			setClinicErrors(error.response?.data?.errors ?? {});
 		} finally {
@@ -535,9 +566,56 @@ export default function DashboardPage({ userName }) {
 		}
 	}
 
+	async function submitUser(event) {
+		event.preventDefault();
+		setSavingUser(true);
+		setUserErrors({});
+
+		try {
+			const { data } = await window.axios.post('/bioimpedance/users', userForm);
+			setUsers(data.users ?? []);
+			setAuditEvents(data.audit_events ?? []);
+			setUserForm(emptyUserForm);
+		} catch (error) {
+			setUserErrors(error.response?.data?.errors ?? {});
+		} finally {
+			setSavingUser(false);
+		}
+	}
+
+	async function updateUserRole(user, role) {
+		setUserErrors({});
+
+		try {
+			const { data } = await window.axios.put(`/bioimpedance/users/${user.id}`, {
+				name: user.name,
+				email: user.email,
+				role,
+				password: '',
+			});
+			setUsers(data.users ?? []);
+			setAuditEvents(data.audit_events ?? []);
+		} catch (error) {
+			setUserErrors(error.response?.data?.errors ?? {});
+		}
+	}
+
+	async function inactivateUser(user) {
+		if (!user || !window.confirm(`Inativar o usuário ${user.name}?`)) return;
+		setUserErrors({});
+
+		try {
+			const { data } = await window.axios.patch(`/bioimpedance/users/${user.id}/inactivate`);
+			setUsers(data.users ?? []);
+			setAuditEvents(data.audit_events ?? []);
+		} catch (error) {
+			setUserErrors(error.response?.data?.errors ?? {});
+		}
+	}
+
 	async function submitAssessment(event) {
 		event.preventDefault();
-		if (!selectedClient) return;
+		if (!selectedClient || !canWrite) return;
 
 		setSavingAssessment(true);
 		setErrors({});
@@ -571,6 +649,7 @@ export default function DashboardPage({ userName }) {
 	}
 
 	async function cancelAssessment(assessment) {
+		if (!canWrite) return;
 		if (!assessment || assessment.is_canceled) return;
 
 		const reason = window.prompt('Informe o motivo do cancelamento da avaliação:');
@@ -653,7 +732,7 @@ export default function DashboardPage({ userName }) {
 							<h2 className="text-base font-semibold text-slate-950">{clientMode === 'edit' ? 'Editar cliente' : 'Cadastro rápido'}</h2>
 							<div className="flex gap-2">
 								<button type="button" onClick={() => startNewClient()} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600">Novo</button>
-								{selectedClient ? <button type="button" onClick={() => startEditClient(selectedClient)} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-700">Editar</button> : null}
+								{selectedClient ? <button type="button" disabled={!canWrite} onClick={() => startEditClient(selectedClient)} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">Editar</button> : null}
 							</div>
 						</div>
 						<form onSubmit={submitClient} className="mt-4 space-y-3">
@@ -706,18 +785,19 @@ export default function DashboardPage({ userName }) {
 								<input type="checkbox" checked={clientForm.consent_accepted} onChange={(event) => updateClient('consent_accepted', event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600" />
 								<span>Cliente autorizou o registro dos dados para acompanhamento corporal.</span>
 							</label>
-							<button type="submit" disabled={savingClient} className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
+							<button type="submit" disabled={!canWrite || savingClient} className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
 								{savingClient ? 'Salvando...' : clientMode === 'edit' ? 'Salvar alterações' : 'Salvar cliente'}
 							</button>
 							{clientMode === 'edit' && selectedClient?.is_active ? (
-								<button type="button" onClick={() => inactivateClient(selectedClient)} className="w-full rounded-xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50">
+								<button type="button" disabled={!canWrite} onClick={() => inactivateClient(selectedClient)} className="w-full rounded-xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
 									Inativar cliente
 								</button>
 							) : null}
 						</form>
 					</section>
 
-					<section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+					{currentUser?.is_admin ? (
+						<section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
 						<div className="flex items-center justify-between gap-3">
 							<div>
 								<h2 className="text-base font-semibold text-slate-950">Configurações da clínica</h2>
@@ -789,7 +869,81 @@ export default function DashboardPage({ userName }) {
 								{savingClinic ? 'Salvando...' : 'Salvar configurações'}
 							</button>
 						</form>
-					</section>
+						</section>
+					) : null}
+
+					{currentUser?.is_admin ? (
+						<section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+							<div>
+								<h2 className="text-base font-semibold text-slate-950">Usuários e auditoria</h2>
+								<p className="mt-1 text-xs text-slate-500">Controle de acesso e eventos recentes.</p>
+							</div>
+							<form onSubmit={submitUser} className="mt-4 space-y-3">
+								<Field label="Nome">
+									<input value={userForm.name} onChange={(event) => updateUserForm('name', event.target.value)} className={inputClass()} />
+								</Field>
+								<Field label="E-mail">
+									<input type="email" value={userForm.email} onChange={(event) => updateUserForm('email', event.target.value)} className={inputClass()} />
+								</Field>
+								<div className="grid grid-cols-2 gap-3">
+									<Field label="Senha inicial">
+										<input type="password" value={userForm.password} onChange={(event) => updateUserForm('password', event.target.value)} className={inputClass()} />
+									</Field>
+									<Field label="Perfil">
+										<select value={userForm.role} onChange={(event) => updateUserForm('role', event.target.value)} className={inputClass()}>
+											{Object.entries(roleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+										</select>
+									</Field>
+								</div>
+								{Object.keys(userErrors).length ? (
+									<div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+										Confira os dados do usuário antes de salvar.
+									</div>
+								) : null}
+								<button type="submit" disabled={savingUser} className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
+									{savingUser ? 'Salvando...' : 'Cadastrar usuário'}
+								</button>
+							</form>
+
+							<div className="mt-5 space-y-2">
+								{users.map((user) => (
+									<div key={user.id} className={`rounded-xl border p-3 ${user.is_active ? 'border-slate-200 bg-white' : 'border-slate-200 bg-slate-50 opacity-70'}`}>
+										<div className="flex items-start justify-between gap-3">
+											<div>
+												<p className="text-sm font-bold text-slate-900">{user.name}</p>
+												<p className="mt-1 text-xs text-slate-500">{user.email}</p>
+												<p className="mt-1 text-xs text-slate-400">Último acesso: {formatDate(user.last_login_at)}</p>
+											</div>
+											<span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${user.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+												{user.is_active ? 'Ativo' : 'Inativo'}
+											</span>
+										</div>
+										<div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
+											<select value={user.role} disabled={!user.is_active} onChange={(event) => updateUserRole(user, event.target.value)} className={inputClass()}>
+												{Object.entries(roleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+											</select>
+											<button type="button" disabled={!user.is_active || user.id === currentUser.id} onClick={() => inactivateUser(user)} className="mt-2 rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
+												Inativar
+											</button>
+										</div>
+									</div>
+								))}
+							</div>
+
+							<div className="mt-5 border-t border-slate-200 pt-4">
+								<h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Auditoria recente</h3>
+								<div className="mt-3 max-h-72 space-y-2 overflow-auto pr-1">
+									{auditEvents.map((event) => (
+										<div key={event.id} className="rounded-xl bg-slate-50 p-3">
+											<p className="text-xs font-bold text-slate-800">{event.description ?? event.action}</p>
+											<p className="mt-1 text-[11px] text-slate-500">{event.user_name} • {formatDate(event.created_at)} • {event.ip_address ?? '-'}</p>
+										</div>
+									))}
+									{!auditEvents.length ? <p className="text-sm text-slate-500">Nenhum evento registrado.</p> : null}
+								</div>
+							</div>
+						</section>
+					) : null}
 				</aside>
 
 				<section className="space-y-5">
@@ -800,7 +954,7 @@ export default function DashboardPage({ userName }) {
 									<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Histórico de avaliações</p>
 									<h2 className="mt-1 text-lg font-semibold text-slate-950">{selectedClient.assessments?.length ?? 0} registro(s)</h2>
 								</div>
-								<button type="button" onClick={startNewAssessment} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700">
+								<button type="button" disabled={!canWrite} onClick={startNewAssessment} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
 									Nova avaliação
 								</button>
 							</div>
@@ -823,13 +977,13 @@ export default function DashboardPage({ userName }) {
 							</div>
 							{selectedAssessment ? (
 								<div className="mt-4 flex flex-wrap gap-2">
-									<button type="button" onClick={() => duplicateAssessment(selectedAssessment)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
+									<button type="button" disabled={!canWrite} onClick={() => duplicateAssessment(selectedAssessment)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50">
 										Duplicar como base
 									</button>
-									<button type="button" disabled={selectedAssessment.is_canceled} onClick={() => startEditAssessment(selectedAssessment)} className="rounded-xl border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50">
+									<button type="button" disabled={!canWrite || selectedAssessment.is_canceled} onClick={() => startEditAssessment(selectedAssessment)} className="rounded-xl border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50">
 										Corrigir avaliação
 									</button>
-									<button type="button" disabled={selectedAssessment.is_canceled} onClick={() => cancelAssessment(selectedAssessment)} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
+									<button type="button" disabled={!canWrite || selectedAssessment.is_canceled} onClick={() => cancelAssessment(selectedAssessment)} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
 										Cancelar avaliação
 									</button>
 								</div>
@@ -893,9 +1047,9 @@ export default function DashboardPage({ userName }) {
 									Confira os campos obrigatórios e valores digitados.
 								</div>
 							) : null}
-							<button type="submit" disabled={!selectedClient || !selectedClient.is_active || savingAssessment} className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-4">
-								{savingAssessment ? 'Salvando...' : assessmentMode === 'edit' ? 'Salvar correção e gerar relatório' : 'Salvar avaliação e gerar relatório'}
-							</button>
+						<button type="submit" disabled={!canWrite || !selectedClient || !selectedClient.is_active || savingAssessment} className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-4">
+							{savingAssessment ? 'Salvando...' : assessmentMode === 'edit' ? 'Salvar correção e gerar relatório' : 'Salvar avaliação e gerar relatório'}
+						</button>
 						</form>
 					</div>
 

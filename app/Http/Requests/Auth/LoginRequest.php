@@ -42,6 +42,15 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        if (! Auth::user()->isActive()) {
+            Auth::logout();
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'email' => 'Usuário inativo. Solicite reativação ao administrador.',
+            ]);
+        }
+
         RateLimiter::clear($this->throttleKey());
     }
 

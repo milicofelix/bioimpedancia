@@ -17,6 +17,9 @@ Route::middleware('auth')->group(function () {
     Route::view('/dashboard', 'dashboard')->name('dashboard');
     Route::get('/bioimpedance', [BioimpedanceController::class, 'index'])->name('bioimpedance.index');
     Route::patch('/bioimpedance/clinic', [BioimpedanceController::class, 'updateClinicSettings'])->name('bioimpedance.clinic.update');
+    Route::post('/bioimpedance/users', [BioimpedanceController::class, 'storeUser'])->name('bioimpedance.users.store');
+    Route::put('/bioimpedance/users/{user}', [BioimpedanceController::class, 'updateUser'])->name('bioimpedance.users.update');
+    Route::patch('/bioimpedance/users/{user}/inactivate', [BioimpedanceController::class, 'inactivateUser'])->name('bioimpedance.users.inactivate');
     Route::post('/bioimpedance/clients', [BioimpedanceController::class, 'storeClient'])->name('bioimpedance.clients.store');
     Route::put('/bioimpedance/clients/{client}', [BioimpedanceController::class, 'updateClient'])->name('bioimpedance.clients.update');
     Route::patch('/bioimpedance/clients/{client}/inactivate', [BioimpedanceController::class, 'inactivateClient'])->name('bioimpedance.clients.inactivate');

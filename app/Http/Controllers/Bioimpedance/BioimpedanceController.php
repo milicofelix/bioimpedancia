@@ -3,13 +3,16 @@
 namespace App\Http\Controllers\Bioimpedance;
 
 use App\Http\Controllers\Controller;
+use App\Models\AppAudit;
 use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceAssessmentAudit;
 use App\Models\Bioimpedance\BioimpedanceClient;
 use App\Models\Bioimpedance\BioimpedanceClinicSetting;
+use App\Models\User;
 use App\Services\Bioimpedance\BioimpedanceAnalyzer;
 use App\Services\Bioimpedance\LegacyBioimpedanceAnalysisRefresher;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -31,14 +34,19 @@ class BioimpedanceController extends Controller
         return response()->json([
             'clients' => $clients,
             'clinic' => $this->clinicPayload(),
+            'current_user' => $this->userPayload(request()->user()),
+            'users' => request()->user()->isAdmin() ? $this->usersPayload() : [],
+            'audit_events' => request()->user()->isAdmin() ? $this->auditEventsPayload() : [],
         ]);
     }
 
     public function storeClient(Request $request): JsonResponse
     {
+        $this->authorizeWrite($request);
         $validated = $this->validateClient($request);
 
         $client = BioimpedanceClient::query()->create($validated);
+        $this->audit($request, 'bioimpedance_client.created', $client, 'Cliente cadastrado', null, $this->clientAuditPayload($client));
 
         return response()->json([
             'client' => $this->clientPayload($client->load('assessments')),
@@ -47,20 +55,26 @@ class BioimpedanceController extends Controller
 
     public function updateClient(Request $request, BioimpedanceClient $client): JsonResponse
     {
+        $this->authorizeWrite($request);
         $validated = $this->validateClient($request, $client);
+        $oldValues = $this->clientAuditPayload($client);
 
         $client->update($validated);
+        $this->audit($request, 'bioimpedance_client.updated', $client, 'Cliente atualizado', $oldValues, $this->clientAuditPayload($client->refresh()));
 
         return response()->json([
             'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
         ]);
     }
 
-    public function inactivateClient(BioimpedanceClient $client): JsonResponse
+    public function inactivateClient(Request $request, BioimpedanceClient $client): JsonResponse
     {
+        $this->authorizeWrite($request);
+        $oldValues = $this->clientAuditPayload($client);
         $client->update([
             'inactivated_at' => now(),
         ]);
+        $this->audit($request, 'bioimpedance_client.inactivated', $client, 'Cliente inativado', $oldValues, $this->clientAuditPayload($client->refresh()));
 
         return response()->json([
             'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
@@ -69,6 +83,8 @@ class BioimpedanceController extends Controller
 
     public function updateClinicSettings(Request $request): JsonResponse
     {
+        $this->authorizeAdmin($request);
+
         $validated = $request->validate([
             'display_name' => ['required', 'string', 'max:160'],
             'legal_name' => ['nullable', 'string', 'max:160'],
@@ -88,15 +104,72 @@ class BioimpedanceController extends Controller
         ]);
 
         $settings = BioimpedanceClinicSetting::current();
+        $oldValues = $settings->payload();
         $settings->update($validated);
+        $this->audit($request, 'clinic_settings.updated', $settings, 'Configurações da clínica atualizadas', $oldValues, $settings->refresh()->payload());
 
         return response()->json([
             'clinic' => $this->clinicPayload($settings->refresh()),
+            'audit_events' => $this->auditEventsPayload(),
+        ]);
+    }
+
+    public function storeUser(Request $request): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+
+        $user = User::query()->create($this->validateUser($request, requirePassword: true));
+        $this->audit($request, 'user.created', $user, 'Usuário cadastrado', null, $this->userPayload($user));
+
+        return response()->json([
+            'users' => $this->usersPayload(),
+            'audit_events' => $this->auditEventsPayload(),
+        ], 201);
+    }
+
+    public function updateUser(Request $request, User $user): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+
+        $validated = $this->validateUser($request, $user);
+        if (($validated['role'] ?? null) !== User::ROLE_ADMIN && $user->id === $request->user()->id) {
+            throw ValidationException::withMessages([
+                'role' => 'Você não pode remover seu próprio perfil de administrador.',
+            ]);
+        }
+
+        $oldValues = $this->userPayload($user);
+        $user->update($validated);
+        $this->audit($request, 'user.updated', $user, 'Usuário atualizado', $oldValues, $this->userPayload($user->refresh()));
+
+        return response()->json([
+            'users' => $this->usersPayload(),
+            'audit_events' => $this->auditEventsPayload(),
+        ]);
+    }
+
+    public function inactivateUser(Request $request, User $user): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+        if ($user->id === $request->user()->id) {
+            throw ValidationException::withMessages([
+                'user_id' => 'Você não pode inativar seu próprio usuário.',
+            ]);
+        }
+
+        $oldValues = $this->userPayload($user);
+        $user->update(['inactivated_at' => now()]);
+        $this->audit($request, 'user.inactivated', $user, 'Usuário inativado', $oldValues, $this->userPayload($user->refresh()));
+
+        return response()->json([
+            'users' => $this->usersPayload(),
+            'audit_events' => $this->auditEventsPayload(),
         ]);
     }
 
     public function storeAssessment(Request $request, BioimpedanceAnalyzer $analyzer): JsonResponse
     {
+        $this->authorizeWrite($request);
         $validated = $this->validateAssessment($request);
 
         $client = BioimpedanceClient::query()->findOrFail($validated['bioimpedance_client_id']);
@@ -128,6 +201,7 @@ class BioimpedanceController extends Controller
 
     public function updateAssessment(Request $request, BioimpedanceAssessment $assessment, BioimpedanceAnalyzer $analyzer): JsonResponse
     {
+        $this->authorizeWrite($request);
         if ($assessment->canceled_at) {
             throw ValidationException::withMessages([
                 'bioimpedance_assessment_id' => 'Avaliação cancelada não pode ser alterada.',
@@ -168,6 +242,7 @@ class BioimpedanceController extends Controller
 
     public function cancelAssessment(Request $request, BioimpedanceAssessment $assessment): JsonResponse
     {
+        $this->authorizeWrite($request);
         if ($assessment->canceled_at) {
             return response()->json([
                 'client' => $this->clientPayload($assessment->client->load(['assessments' => fn ($query) => $query->latest('evaluated_at')])),
@@ -388,6 +463,111 @@ class BioimpedanceController extends Controller
         $digits = preg_replace('/\D+/', '', (string) $value);
 
         return $digits === '' ? null : $digits;
+    }
+
+    private function authorizeAdmin(Request $request): void
+    {
+        abort_unless($request->user()->isAdmin(), 403, 'Apenas administradores podem executar esta ação.');
+    }
+
+    private function authorizeWrite(Request $request): void
+    {
+        abort_if($request->user()->role === User::ROLE_VIEWER, 403, 'Usuário de visualização não pode alterar registros.');
+    }
+
+    private function validateUser(Request $request, ?User $user = null, bool $requirePassword = false): array
+    {
+        $rules = [
+            'name' => ['required', 'string', 'max:160'],
+            'email' => ['required', 'email', 'max:160', Rule::unique('users', 'email')->ignore($user)],
+            'role' => ['required', Rule::in(User::ROLES)],
+            'password' => [$requirePassword ? 'required' : 'nullable', 'string', 'min:8', 'max:160'],
+        ];
+
+        $validated = $request->validate($rules);
+        if (empty($validated['password'])) {
+            unset($validated['password']);
+        }
+
+        return $validated;
+    }
+
+    private function usersPayload(): array
+    {
+        return User::query()
+            ->orderBy('name')
+            ->get()
+            ->map(fn (User $user) => $this->userPayload($user))
+            ->all();
+    }
+
+    private function userPayload(User $user): array
+    {
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role,
+            'is_admin' => $user->isAdmin(),
+            'is_active' => $user->isActive(),
+            'last_login_at' => $user->last_login_at?->toIso8601String(),
+            'last_login_ip' => $user->last_login_ip,
+            'inactivated_at' => $user->inactivated_at?->toIso8601String(),
+        ];
+    }
+
+    private function clientAuditPayload(BioimpedanceClient $client): array
+    {
+        return collect($client->only([
+            'full_name',
+            'birth_date',
+            'biological_sex',
+            'height_cm',
+            'phone',
+            'phone_digits',
+            'email',
+            'cpf',
+            'address',
+            'emergency_contact_name',
+            'emergency_contact_phone',
+            'consent_accepted_at',
+            'next_assessment_at',
+            'inactivated_at',
+            'notes',
+        ]))->map(fn ($value) => $value instanceof Carbon ? $value->toIso8601String() : $value)->all();
+    }
+
+    private function auditEventsPayload(): array
+    {
+        return AppAudit::query()
+            ->with('user')
+            ->latest()
+            ->limit(20)
+            ->get()
+            ->map(fn (AppAudit $audit) => [
+                'id' => $audit->id,
+                'user_name' => $audit->user?->name ?? 'Sistema',
+                'action' => $audit->action,
+                'description' => $audit->description,
+                'ip_address' => $audit->ip_address,
+                'created_at' => $audit->created_at?->toIso8601String(),
+            ])
+            ->all();
+    }
+
+    private function audit(Request $request, string $action, Model $auditable, string $description, ?array $oldValues, ?array $newValues): void
+    {
+        AppAudit::query()->create([
+            'user_id' => $request->user()->id,
+            'action' => $action,
+            'auditable_type' => $auditable::class,
+            'auditable_id' => $auditable->getKey(),
+            'description' => $description,
+            'old_values' => $oldValues,
+            'new_values' => $newValues,
+            'ip_address' => $request->ip(),
+            'user_agent' => (string) $request->userAgent(),
+        ]);
     }
 
     private function clientPayload(BioimpedanceClient $client): array

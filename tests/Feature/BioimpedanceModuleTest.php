@@ -207,7 +207,7 @@ class BioimpedanceModuleTest extends TestCase
 
     public function test_clinic_settings_can_be_updated_for_reports(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => User::ROLE_ADMIN]);
 
         $this->actingAs($user)->patchJson(route('bioimpedance.clinic.update'), [
             'display_name' => 'Ricosty Emagrecimento e Estética',
@@ -234,6 +234,54 @@ class BioimpedanceModuleTest extends TestCase
             ->assertOk()
             ->assertJsonPath('clinic.contact', 'Emagrecimento e estética avançada')
             ->assertJsonPath('clinic.technical_notice', 'Aviso técnico personalizado.');
+    }
+
+    public function test_only_admin_can_manage_clinic_settings_and_users(): void
+    {
+        $professional = User::factory()->create(['role' => User::ROLE_PROFESSIONAL]);
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+
+        $this->actingAs($professional)->patchJson(route('bioimpedance.clinic.update'), [
+            'display_name' => 'Bloqueada',
+            'primary_color' => '#cc7a8a',
+            'secondary_color' => '#333333',
+        ])->assertForbidden();
+
+        $this->actingAs($professional)->postJson(route('bioimpedance.users.store'), [
+            'name' => 'Nova Pessoa',
+            'email' => 'nova@example.com',
+            'password' => 'password',
+            'role' => User::ROLE_VIEWER,
+        ])->assertForbidden();
+
+        $this->actingAs($admin)->postJson(route('bioimpedance.users.store'), [
+            'name' => 'Recepção Ricosty',
+            'email' => 'recepcao@example.com',
+            'password' => 'password',
+            'role' => User::ROLE_RECEPTION,
+        ])->assertCreated()
+            ->assertJsonFragment(['email' => 'recepcao@example.com']);
+
+        $createdUser = User::query()->where('email', 'recepcao@example.com')->first();
+        $this->actingAs($admin)->patchJson(route('bioimpedance.users.inactivate', $createdUser->id))
+            ->assertOk();
+
+        $this->assertNotNull($createdUser->refresh()->inactivated_at);
+    }
+
+    public function test_viewer_user_can_read_but_cannot_change_records(): void
+    {
+        $viewer = User::factory()->create(['role' => User::ROLE_VIEWER]);
+
+        $this->actingAs($viewer)->getJson(route('bioimpedance.index'))
+            ->assertOk();
+
+        $this->actingAs($viewer)->postJson(route('bioimpedance.clients.store'), [
+            'full_name' => 'Cliente Bloqueado',
+            'birth_date' => '1990-01-01',
+            'biological_sex' => 'female',
+            'height_cm' => 165,
+        ])->assertForbidden();
     }
 
     public function test_all_client_assessments_are_returned_for_history(): void

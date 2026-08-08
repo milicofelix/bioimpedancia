@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             'email' => 'milicofelix@gmail.com',
         ], [
             'name' => 'Milico Félix',
+            'role' => User::ROLE_ADMIN,
             'password' => Hash::make('password'),
         ]);
 
@@ -27,6 +28,7 @@ class DatabaseSeeder extends Seeder
             'email' => 'test@example.com',
         ], [
             'name' => 'Test User',
+            'role' => User::ROLE_PROFESSIONAL,
             'password' => Hash::make('password'),
         ]);
     }
