@@ -386,6 +386,7 @@ export default function DashboardPage({ userName }) {
 	const [currentUser, setCurrentUser] = useState(null);
 	const [users, setUsers] = useState([]);
 	const [auditEvents, setAuditEvents] = useState([]);
+	const [adminDashboard, setAdminDashboard] = useState(null);
 	const [userForm, setUserForm] = useState(emptyUserForm);
 	const [selectedClientId, setSelectedClientId] = useState(null);
 	const [selectedAssessmentId, setSelectedAssessmentId] = useState(null);
@@ -405,6 +406,7 @@ export default function DashboardPage({ userName }) {
 	const [savingUser, setSavingUser] = useState(false);
 	const [sharingAssessment, setSharingAssessment] = useState(false);
 	const [shareResult, setShareResult] = useState(null);
+	const [refreshingDashboard, setRefreshingDashboard] = useState(false);
 	const [isOnline, setIsOnline] = useState(() => navigator.onLine);
 	const [assessmentDraftSavedAt, setAssessmentDraftSavedAt] = useState(null);
 	const [errors, setErrors] = useState({});
@@ -419,6 +421,7 @@ export default function DashboardPage({ userName }) {
 			setCurrentUser(data.current_user);
 			setUsers(data.users ?? []);
 			setAuditEvents(data.audit_events ?? []);
+			setAdminDashboard(data.admin_dashboard ?? null);
 			setSelectedClientId(data.clients[0]?.id ?? null);
 			setSelectedAssessmentId(data.clients[0]?.assessments?.[0]?.id ?? null);
 		}).finally(() => setLoading(false));
@@ -526,6 +529,18 @@ export default function DashboardPage({ userName }) {
 		window.location.assign('/login');
 	}
 
+	async function refreshAdminDashboard() {
+		if (!canAdmin || refreshingDashboard) return;
+
+		setRefreshingDashboard(true);
+		try {
+			const { data } = await window.axios.get('/bioimpedance/admin-dashboard');
+			setAdminDashboard(data.admin_dashboard ?? null);
+		} finally {
+			setRefreshingDashboard(false);
+		}
+	}
+
 	function updateClient(field, value) {
 		const maskedValue = field === 'height_cm'
 			? heightMask(value)
@@ -563,6 +578,13 @@ export default function DashboardPage({ userName }) {
 		setAssessmentForm({ ...emptyAssessment, evaluated_at: new Date().toISOString().slice(0, 16) });
 		setAssessmentChangeReason('');
 		window.setTimeout(() => assessmentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+	}
+
+	function selectClientById(clientId) {
+		const client = clients.find((item) => item.id === clientId);
+		if (client) {
+			selectClient(client);
+		}
 	}
 
 	function startNewAssessment() {
@@ -1146,6 +1168,15 @@ export default function DashboardPage({ userName }) {
 				</aside>
 
 				<section className="space-y-5">
+					{canAdmin ? (
+						<AdminDashboard
+							dashboard={adminDashboard}
+							onRefresh={refreshAdminDashboard}
+							refreshing={refreshingDashboard}
+							onSelectClient={selectClientById}
+						/>
+					) : null}
+
 					{selectedClient ? (
 						<div className="no-print rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
 							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1314,6 +1345,142 @@ export default function DashboardPage({ userName }) {
 				</section>
 			</div>
 		</main>
+	);
+}
+
+function AdminDashboard({ dashboard, onRefresh, refreshing, onSelectClient }) {
+	if (!dashboard) {
+		return (
+			<section className="no-print rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">
+				Indicadores administrativos indisponíveis.
+			</section>
+		);
+	}
+
+	const cards = [
+		{ key: 'assessments_this_month', label: 'Avaliações no mês', tone: 'emerald' },
+		{ key: 'clients_new_this_month', label: 'Clientes novos', tone: 'sky' },
+		{ key: 'returning_clients_this_month', label: 'Clientes recorrentes', tone: 'violet' },
+		{ key: 'clients_without_return', label: 'Sem retorno', tone: 'rose' },
+		{ key: 'upcoming_reassessments', label: 'Próximas reavaliações', tone: 'amber' },
+		{ key: 'evolutions_registered', label: 'Com evolução', tone: 'emerald' },
+		{ key: 'reports_issued_this_month', label: 'Relatórios emitidos', tone: 'slate' },
+		{ key: 'shares_sent_this_month', label: 'Envios realizados', tone: 'sky' },
+	];
+
+	return (
+		<section className="no-print rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+				<div>
+					<p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Administração</p>
+					<h2 className="mt-1 text-xl font-semibold text-slate-950">Indicadores de {dashboard.period_label}</h2>
+					<p className="mt-1 text-xs text-slate-500">Atualizado em {formatDate(dashboard.generated_at)}</p>
+				</div>
+				<button type="button" onClick={onRefresh} disabled={refreshing} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50">
+					{refreshing ? 'Atualizando...' : 'Atualizar indicadores'}
+				</button>
+			</div>
+
+			<div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+				{cards.map((card) => (
+					<AdminMetric key={card.key} label={card.label} value={dashboard.cards?.[card.key] ?? 0} tone={card.tone} />
+				))}
+			</div>
+
+			<div className="mt-5 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+				<div className="rounded-2xl border border-slate-200">
+					<div className="border-b border-slate-100 px-4 py-3">
+						<h3 className="text-sm font-bold uppercase tracking-wide text-slate-600">Produção por profissional</h3>
+					</div>
+					<div className="divide-y divide-slate-100">
+						{dashboard.professionals?.length ? dashboard.professionals.map((professional) => (
+							<div key={professional.name} className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-3">
+								<div>
+									<p className="text-sm font-bold text-slate-900">{professionalName(professional.name)}</p>
+									<p className="mt-1 text-xs text-slate-500">Média geral: {numberBr(dashboard.average_assessments_per_professional, 1)} por profissional</p>
+								</div>
+								<span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">{professional.assessments_count}</span>
+							</div>
+						)) : (
+							<p className="px-4 py-4 text-sm text-slate-500">Nenhuma avaliação no mês.</p>
+						)}
+					</div>
+				</div>
+
+				<div className="grid gap-4 md:grid-cols-2">
+					<ReminderList title="Clientes sem retorno" clients={dashboard.clients_without_return ?? []} emptyText="Nenhum retorno vencido." onSelectClient={onSelectClient} />
+					<ReminderList title="Próximas reavaliações" clients={dashboard.upcoming_reassessments ?? []} emptyText="Nenhuma reavaliação nos próximos 14 dias." onSelectClient={onSelectClient} />
+				</div>
+			</div>
+
+			<div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
+				<table className="w-full text-left text-sm">
+					<thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+						<tr>
+							<th className="px-4 py-3 font-bold">Avaliação recente</th>
+							<th className="px-4 py-3 font-bold">Profissional</th>
+							<th className="px-4 py-3 font-bold">Peso</th>
+							<th className="px-4 py-3 font-bold">IMC</th>
+						</tr>
+					</thead>
+					<tbody className="divide-y divide-slate-100">
+						{dashboard.recent_assessments?.length ? dashboard.recent_assessments.map((assessment) => (
+							<tr key={assessment.id}>
+								<td className="px-4 py-3">
+									<p className="font-semibold text-slate-900">{assessment.client_name}</p>
+									<p className="mt-1 text-xs text-slate-500">{formatDate(assessment.evaluated_at)}</p>
+								</td>
+								<td className="px-4 py-3 text-slate-600">{professionalName(assessment.professional_name)}</td>
+								<td className="px-4 py-3 text-slate-900">{numberBr(assessment.weight_kg, 1)} kg</td>
+								<td className="px-4 py-3 text-slate-900">{numberBr(assessment.calculated_bmi, 1)} kg/m²</td>
+							</tr>
+						)) : (
+							<tr>
+								<td colSpan="4" className="px-4 py-5 text-center text-sm text-slate-500">Nenhuma avaliação registrada.</td>
+							</tr>
+						)}
+					</tbody>
+				</table>
+			</div>
+		</section>
+	);
+}
+
+function AdminMetric({ label, value, tone }) {
+	const classes = {
+		emerald: 'bg-emerald-50 text-emerald-700',
+		sky: 'bg-sky-50 text-sky-700',
+		violet: 'bg-violet-50 text-violet-700',
+		rose: 'bg-rose-50 text-rose-700',
+		amber: 'bg-amber-50 text-amber-700',
+		slate: 'bg-slate-100 text-slate-700',
+	}[tone] ?? 'bg-slate-100 text-slate-700';
+
+	return (
+		<div className={`rounded-2xl p-4 ${classes}`}>
+			<p className="text-xs font-bold uppercase tracking-wide opacity-80">{label}</p>
+			<p className="mt-3 text-3xl font-bold leading-none">{value}</p>
+		</div>
+	);
+}
+
+function ReminderList({ title, clients, emptyText, onSelectClient }) {
+	return (
+		<div className="rounded-2xl border border-slate-200">
+			<div className="border-b border-slate-100 px-4 py-3">
+				<h3 className="text-sm font-bold uppercase tracking-wide text-slate-600">{title}</h3>
+			</div>
+			<div className="divide-y divide-slate-100">
+				{clients.length ? clients.map((client) => (
+					<button type="button" key={client.id} onClick={() => onSelectClient(client.id)} className="block w-full px-4 py-3 text-left transition hover:bg-slate-50">
+						<span className="block text-sm font-bold text-slate-900">{client.full_name}</span>
+						<span className="mt-1 block text-xs text-slate-500">Prevista: {formatIssueDate(client.next_assessment_at)} • {client.phone || client.email || 'Sem contato'}</span>
+					</button>
+				)) : (
+					<p className="px-4 py-4 text-sm text-slate-500">{emptyText}</p>
+				)}
+			</div>
+		</div>
 	);
 }
 

@@ -2,11 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\AppAudit;
 use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceAssessmentAudit;
 use App\Models\Bioimpedance\BioimpedanceClient;
+use App\Models\Bioimpedance\BioimpedanceReportShare;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class BioimpedanceModuleTest extends TestCase
@@ -811,6 +814,71 @@ class BioimpedanceModuleTest extends TestCase
         $this->assertBodyFatClassification($user, $clientId, 12.0, 'Baixa', '2026-08-08 09:30:00');
     }
 
+    public function test_admin_index_includes_operational_dashboard_metrics(): void
+    {
+        Carbon::setTestNow('2026-08-08 10:00:00');
+
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+        ]);
+        $professional = User::factory()->create([
+            'name' => 'Milico Felix',
+            'role' => User::ROLE_PROFESSIONAL,
+        ]);
+
+        $newClient = $this->createClientRecord('Cliente Novo', 'novo@example.com');
+        $returningClient = $this->createClientRecord('Cliente Recorrente', 'recorrente@example.com');
+        $overdueClient = $this->createClientRecord('Cliente Sem Retorno', 'sem.retorno@example.com', '2026-08-01');
+        $upcomingClient = $this->createClientRecord('Cliente Proxima Avaliacao', 'proxima@example.com', '2026-08-15');
+
+        $returningClient->forceFill(['created_at' => '2026-07-01 10:00:00'])->save();
+        $overdueClient->forceFill(['created_at' => '2026-07-01 10:00:00'])->save();
+        $upcomingClient->forceFill(['created_at' => '2026-07-01 10:00:00'])->save();
+
+        $this->createAssessmentRecord($returningClient, $professional, '2026-07-15 09:00:00');
+        $monthlyAssessment = $this->createAssessmentRecord($returningClient, $professional, '2026-08-06 09:00:00');
+        $this->createAssessmentRecord($newClient, $professional, '2026-08-07 09:00:00');
+        $this->createAssessmentRecord($overdueClient, $professional, '2026-07-20 09:00:00');
+
+        AppAudit::query()->create([
+            'user_id' => $admin->id,
+            'action' => 'bioimpedance_assessment.report_downloaded',
+            'auditable_type' => BioimpedanceAssessment::class,
+            'auditable_id' => $monthlyAssessment->id,
+            'description' => 'Relatório PDF acessado',
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'PHPUnit',
+        ]);
+
+        BioimpedanceReportShare::query()->create([
+            'bioimpedance_assessment_id' => $monthlyAssessment->id,
+            'created_by_user_id' => $admin->id,
+            'token_hash' => hash('sha256', 'token-admin-dashboard'),
+            'channel' => 'whatsapp',
+            'recipient' => '(11) 90000-0000',
+            'message' => 'Mensagem de compartilhamento',
+            'expires_at' => now()->addDays(7),
+        ]);
+
+        $response = $this->actingAs($admin)->getJson(route('bioimpedance.index'));
+
+        $response->assertOk();
+        $response->assertJsonPath('admin_dashboard.cards.assessments_this_month', 2);
+        $response->assertJsonPath('admin_dashboard.cards.clients_new_this_month', 1);
+        $response->assertJsonPath('admin_dashboard.cards.returning_clients_this_month', 1);
+        $response->assertJsonPath('admin_dashboard.cards.clients_without_return', 1);
+        $response->assertJsonPath('admin_dashboard.cards.upcoming_reassessments', 1);
+        $response->assertJsonPath('admin_dashboard.cards.evolutions_registered', 1);
+        $response->assertJsonPath('admin_dashboard.cards.reports_issued_this_month', 1);
+        $response->assertJsonPath('admin_dashboard.cards.shares_sent_this_month', 1);
+        $response->assertJsonPath('admin_dashboard.professionals.0.name', 'Milico Felix');
+        $response->assertJsonPath('admin_dashboard.professionals.0.assessments_count', 2);
+        $response->assertJsonPath('admin_dashboard.clients_without_return.0.full_name', 'Cliente Sem Retorno');
+        $response->assertJsonPath('admin_dashboard.upcoming_reassessments.0.full_name', 'Cliente Proxima Avaliacao');
+
+        Carbon::setTestNow();
+    }
+
     public function test_guest_cannot_access_bioimpedance_data(): void
     {
         $this->getJson(route('bioimpedance.index'))->assertUnauthorized();
@@ -887,5 +955,41 @@ class BioimpedanceModuleTest extends TestCase
         ]);
 
         return BioimpedanceAssessment::query()->findOrFail($assessmentResponse->json('assessment.id'));
+    }
+
+    private function createClientRecord(string $name, string $email, ?string $nextAssessmentAt = null): BioimpedanceClient
+    {
+        return BioimpedanceClient::query()->create([
+            'full_name' => $name,
+            'birth_date' => '1988-01-01',
+            'biological_sex' => 'male',
+            'height_cm' => 174,
+            'email' => $email,
+            'next_assessment_at' => $nextAssessmentAt,
+        ]);
+    }
+
+    private function createAssessmentRecord(BioimpedanceClient $client, User $professional, string $evaluatedAt): BioimpedanceAssessment
+    {
+        return BioimpedanceAssessment::query()->create([
+            'bioimpedance_client_id' => $client->id,
+            'user_id' => $professional->id,
+            'age_at_assessment' => 38,
+            'height_cm_at_assessment' => 174,
+            'biological_sex_at_assessment' => 'male',
+            'device_model' => 'HBF-514C',
+            'reference_version' => '1.0.0',
+            'evaluated_at' => $evaluatedAt,
+            'weight_kg' => 80,
+            'scale_bmi' => 26.4,
+            'calculated_bmi' => 26.4,
+            'bmi_difference' => 0,
+            'body_fat_percentage' => 20,
+            'skeletal_muscle_percentage' => 37,
+            'resting_metabolism_kcal' => 1800,
+            'body_age' => 40,
+            'visceral_fat_level' => 9,
+            'analysis' => [],
+        ]);
     }
 }

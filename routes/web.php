@@ -18,6 +18,7 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::view('/dashboard', 'dashboard')->name('dashboard');
     Route::get('/bioimpedance', [BioimpedanceController::class, 'index'])->name('bioimpedance.index');
+    Route::get('/bioimpedance/admin-dashboard', [BioimpedanceController::class, 'adminDashboard'])->name('bioimpedance.admin-dashboard');
     Route::patch('/bioimpedance/clinic', [BioimpedanceController::class, 'updateClinicSettings'])->name('bioimpedance.clinic.update');
     Route::post('/bioimpedance/users', [BioimpedanceController::class, 'storeUser'])->name('bioimpedance.users.store');
     Route::put('/bioimpedance/users/{user}', [BioimpedanceController::class, 'updateUser'])->name('bioimpedance.users.update');
