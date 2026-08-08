@@ -7,6 +7,12 @@ const emptyClient = {
 	height_cm: '',
 	phone: '',
 	email: '',
+	cpf: '',
+	address: '',
+	emergency_contact_name: '',
+	emergency_contact_phone: '',
+	consent_accepted: false,
+	next_assessment_at: '',
 	notes: '',
 };
 
@@ -134,6 +140,36 @@ function phoneMask(value) {
 	return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 }
 
+function cpfMask(value) {
+	const digits = normalizeInteger(value).slice(0, 11);
+
+	if (digits.length <= 3) return digits;
+	if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+	if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+
+	return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+}
+
+function clientFormFromClient(client) {
+	if (!client) return emptyClient;
+
+	return {
+		full_name: client.full_name ?? '',
+		birth_date: client.birth_date ?? '',
+		biological_sex: client.biological_sex ?? 'female',
+		height_cm: client.height_cm ? numberBr(client.height_cm, 0) : '',
+		phone: client.phone ?? '',
+		email: client.email ?? '',
+		cpf: client.cpf ? cpfMask(client.cpf) : '',
+		address: client.address ?? '',
+		emergency_contact_name: client.emergency_contact_name ?? '',
+		emergency_contact_phone: client.emergency_contact_phone ? phoneMask(client.emergency_contact_phone) : '',
+		consent_accepted: Boolean(client.consent_accepted_at),
+		next_assessment_at: client.next_assessment_at ?? '',
+		notes: client.notes ?? '',
+	};
+}
+
 export default function DashboardPage({ userName }) {
 	const [clients, setClients] = useState([]);
 	const [clinic, setClinic] = useState({
@@ -146,6 +182,9 @@ export default function DashboardPage({ userName }) {
 	const [clientForm, setClientForm] = useState(emptyClient);
 	const [assessmentForm, setAssessmentForm] = useState(emptyAssessment);
 	const [query, setQuery] = useState('');
+	const [showInactive, setShowInactive] = useState(false);
+	const [clientMode, setClientMode] = useState('create');
+	const [editingClientId, setEditingClientId] = useState(null);
 	const [loading, setLoading] = useState(true);
 	const [savingClient, setSavingClient] = useState(false);
 	const [savingAssessment, setSavingAssessment] = useState(false);
@@ -164,10 +203,16 @@ export default function DashboardPage({ userName }) {
 
 	const filteredClients = useMemo(() => {
 		const term = query.trim().toLowerCase();
-		if (!term) return clients;
+		const source = showInactive ? clients : clients.filter((client) => client.is_active);
+		if (!term) return source;
 
-		return clients.filter((client) => client.full_name.toLowerCase().includes(term));
-	}, [clients, query]);
+		return source.filter((client) => [
+			client.full_name,
+			client.phone,
+			client.email,
+			client.cpf,
+		].some((value) => String(value ?? '').toLowerCase().includes(term)));
+	}, [clients, query, showInactive]);
 
 	const calculatedBmi = useMemo(() => {
 		const heightCm = selectedClient?.height_cm || normalizeHeightToCentimeters(clientForm.height_cm);
@@ -188,14 +233,32 @@ export default function DashboardPage({ userName }) {
 			? heightMask(value)
 			: field === 'phone'
 				? phoneMask(value)
-				: value;
+				: field === 'emergency_contact_phone'
+					? phoneMask(value)
+					: field === 'cpf'
+						? cpfMask(value)
+						: value;
 
 		setClientForm((current) => ({ ...current, [field]: maskedValue }));
 	}
 
+	function startNewClient(prefillName = '') {
+		setClientMode('create');
+		setEditingClientId(null);
+		setClientForm({ ...emptyClient, full_name: prefillName });
+		setErrors({});
+	}
+
+	function startEditClient(client) {
+		setClientMode('edit');
+		setEditingClientId(client.id);
+		setClientForm(clientFormFromClient(client));
+		setErrors({});
+	}
+
 	function updateAssessment(field, value) {
-		const integerFields = ['resting_metabolism_kcal', 'body_age'];
-		const decimalFields = ['weight_kg', 'scale_bmi', 'body_fat_percentage', 'skeletal_muscle_percentage', 'visceral_fat_level'];
+		const integerFields = ['resting_metabolism_kcal', 'body_age', 'visceral_fat_level'];
+		const decimalFields = ['weight_kg', 'scale_bmi', 'body_fat_percentage', 'skeletal_muscle_percentage'];
 		const maskedValue = integerFields.includes(field)
 			? normalizeInteger(value).slice(0, 4)
 			: decimalFields.includes(field)
@@ -216,15 +279,29 @@ export default function DashboardPage({ userName }) {
 		};
 
 		try {
-			const { data } = await window.axios.post('/bioimpedance/clients', payload);
-			setClients((current) => [...current, data.client].sort((a, b) => a.full_name.localeCompare(b.full_name)));
+			const { data } = clientMode === 'edit' && editingClientId
+				? await window.axios.put(`/bioimpedance/clients/${editingClientId}`, payload)
+				: await window.axios.post('/bioimpedance/clients', payload);
+			setClients((current) => {
+				const others = current.filter((client) => client.id !== data.client.id);
+				return [...others, data.client].sort((a, b) => a.full_name.localeCompare(b.full_name));
+			});
 			setSelectedClientId(data.client.id);
-			setClientForm(emptyClient);
+			setClientForm(clientMode === 'edit' ? clientFormFromClient(data.client) : emptyClient);
+			setClientMode(clientMode === 'edit' ? 'edit' : 'create');
 		} catch (error) {
 			setErrors(error.response?.data?.errors ?? {});
 		} finally {
 			setSavingClient(false);
 		}
+	}
+
+	async function inactivateClient(client) {
+		if (!client || !window.confirm(`Inativar ${client.full_name}? O histórico será preservado.`)) return;
+
+		const { data } = await window.axios.patch(`/bioimpedance/clients/${client.id}/inactivate`);
+		setClients((current) => current.map((item) => (item.id === data.client.id ? data.client : item)));
+		setSelectedClientId(data.client.id);
 	}
 
 	async function submitAssessment(event) {
@@ -280,14 +357,18 @@ export default function DashboardPage({ userName }) {
 					<section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
 						<div className="flex items-center justify-between">
 							<h2 className="text-base font-semibold text-slate-950">Clientes</h2>
-							<span className="text-xs text-slate-500">{clients.length} cadastro(s)</span>
+							<span className="text-xs text-slate-500">{filteredClients.length} cadastro(s)</span>
 						</div>
 						<input
 							value={query}
 							onChange={(event) => setQuery(event.target.value)}
-							placeholder="Localizar cliente"
+							placeholder="Pesquisar nome, telefone, e-mail ou CPF"
 							className={inputClass()}
 						/>
+						<label className="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-500">
+							<input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
+							Mostrar clientes inativos
+						</label>
 						<div className="mt-3 max-h-64 space-y-2 overflow-auto pr-1">
 							{loading ? <p className="text-sm text-slate-500">Carregando...</p> : null}
 							{filteredClients.map((client) => (
@@ -297,15 +378,33 @@ export default function DashboardPage({ userName }) {
 									onClick={() => setSelectedClientId(client.id)}
 									className={`w-full rounded-xl border px-3 py-3 text-left transition ${selectedClientId === client.id ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
 								>
-									<span className="block text-sm font-semibold text-slate-900">{client.full_name}</span>
-									<span className="mt-1 block text-xs text-slate-500">{client.age} anos - {sexLabels[client.biological_sex]} - {client.height_cm} cm</span>
+									<span className="flex items-center justify-between gap-2 text-sm font-semibold text-slate-900">
+										{client.full_name}
+										{client.is_active ? null : <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] uppercase text-slate-600">Inativo</span>}
+									</span>
+									<span className="mt-1 block text-xs text-slate-500">{client.age} anos - {sexLabels[client.biological_sex]} - {numberBr(client.height_cm, 0)} cm</span>
+									<span className="mt-1 block text-xs text-slate-400">{client.phone || client.email || 'Sem contato cadastrado'}</span>
 								</button>
 							))}
+							{!loading && !filteredClients.length ? (
+								<div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
+									<p className="text-sm text-slate-600">Cliente não encontrado.</p>
+									<button type="button" onClick={() => startNewClient(query)} className="mt-2 text-sm font-bold text-emerald-700">
+										Fazer cadastro rápido
+									</button>
+								</div>
+							) : null}
 						</div>
 					</section>
 
 					<section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-						<h2 className="text-base font-semibold text-slate-950">Cadastrar cliente</h2>
+						<div className="flex items-center justify-between gap-2">
+							<h2 className="text-base font-semibold text-slate-950">{clientMode === 'edit' ? 'Editar cliente' : 'Cadastro rápido'}</h2>
+							<div className="flex gap-2">
+								<button type="button" onClick={() => startNewClient()} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600">Novo</button>
+								{selectedClient ? <button type="button" onClick={() => startEditClient(selectedClient)} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-700">Editar</button> : null}
+							</div>
+						</div>
 						<form onSubmit={submitClient} className="mt-4 space-y-3">
 							<Field label="Nome completo">
 								<input value={clientForm.full_name} onChange={(event) => updateClient('full_name', event.target.value)} className={inputClass()} />
@@ -332,12 +431,38 @@ export default function DashboardPage({ userName }) {
 									<input type="email" value={clientForm.email} onChange={(event) => updateClient('email', event.target.value)} className={inputClass()} />
 								</Field>
 							</div>
+							<Field label="CPF opcional">
+								<input inputMode="numeric" placeholder="000.000.000-00" value={clientForm.cpf} onChange={(event) => updateClient('cpf', event.target.value)} className={inputClass()} />
+							</Field>
+							<Field label="Endereço opcional">
+								<input value={clientForm.address} onChange={(event) => updateClient('address', event.target.value)} className={inputClass()} />
+							</Field>
+							<div className="grid grid-cols-2 gap-3">
+								<Field label="Contato emergência">
+									<input value={clientForm.emergency_contact_name} onChange={(event) => updateClient('emergency_contact_name', event.target.value)} className={inputClass()} />
+								</Field>
+								<Field label="Telefone emergência">
+									<input inputMode="tel" value={clientForm.emergency_contact_phone} onChange={(event) => updateClient('emergency_contact_phone', event.target.value)} className={inputClass()} />
+								</Field>
+							</div>
+							<Field label="Próxima avaliação">
+								<input type="date" value={clientForm.next_assessment_at} onChange={(event) => updateClient('next_assessment_at', event.target.value)} className={inputClass()} />
+							</Field>
 							<Field label="Observações">
 								<textarea value={clientForm.notes} onChange={(event) => updateClient('notes', event.target.value)} rows="3" className={inputClass()} />
 							</Field>
+							<label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+								<input type="checkbox" checked={clientForm.consent_accepted} onChange={(event) => updateClient('consent_accepted', event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600" />
+								<span>Cliente autorizou o registro dos dados para acompanhamento corporal.</span>
+							</label>
 							<button type="submit" disabled={savingClient} className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
-								{savingClient ? 'Salvando...' : 'Salvar cliente'}
+								{savingClient ? 'Salvando...' : clientMode === 'edit' ? 'Salvar alterações' : 'Salvar cliente'}
 							</button>
+							{clientMode === 'edit' && selectedClient?.is_active ? (
+								<button type="button" onClick={() => inactivateClient(selectedClient)} className="w-full rounded-xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50">
+									Inativar cliente
+								</button>
+							) : null}
 						</form>
 					</section>
 				</aside>
@@ -390,7 +515,7 @@ export default function DashboardPage({ userName }) {
 									Confira os campos obrigatórios e valores digitados.
 								</div>
 							) : null}
-							<button type="submit" disabled={!selectedClient || savingAssessment} className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-4">
+							<button type="submit" disabled={!selectedClient || !selectedClient.is_active || savingAssessment} className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-4">
 								{savingAssessment ? 'Gerando relatório...' : 'Salvar avaliação e gerar relatório'}
 							</button>
 						</form>

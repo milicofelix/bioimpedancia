@@ -101,6 +101,108 @@ class BioimpedanceModuleTest extends TestCase
         $response->assertJsonPath('client.height_cm', 174);
     }
 
+    public function test_client_can_be_updated_with_management_fields(): void
+    {
+        $user = User::factory()->create();
+
+        $clientResponse = $this->actingAs($user)->postJson(route('bioimpedance.clients.store'), [
+            'full_name' => 'Cliente Editavel',
+            'birth_date' => '1991-04-10',
+            'biological_sex' => 'female',
+            'height_cm' => 165,
+            'phone' => '(11) 90000-0001',
+            'email' => 'cliente.editavel@example.com',
+        ]);
+
+        $response = $this->actingAs($user)->putJson(route('bioimpedance.clients.update', $clientResponse->json('client.id')), [
+            'full_name' => 'Cliente Editada',
+            'birth_date' => '1991-04-10',
+            'biological_sex' => 'female',
+            'height_cm' => '1,66',
+            'phone' => '(11) 90000-0002',
+            'email' => 'cliente.editada@example.com',
+            'cpf' => '123.456.789-01',
+            'address' => 'Rua das Flores, 123',
+            'emergency_contact_name' => 'Contato Familiar',
+            'emergency_contact_phone' => '(11) 98888-7777',
+            'consent_accepted' => true,
+            'next_assessment_at' => now()->addMonth()->toDateString(),
+            'notes' => 'Cadastro revisado.',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('client.full_name', 'Cliente Editada');
+        $response->assertJsonPath('client.height_cm', 166);
+        $response->assertJsonPath('client.cpf', '12345678901');
+        $response->assertJsonPath('client.address', 'Rua das Flores, 123');
+        $response->assertJsonPath('client.emergency_contact_name', 'Contato Familiar');
+        $response->assertJsonPath('client.emergency_contact_phone', '11988887777');
+        $this->assertNotNull($response->json('client.consent_accepted_at'));
+    }
+
+    public function test_client_duplicate_contact_data_is_rejected(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->postJson(route('bioimpedance.clients.store'), [
+            'full_name' => 'Cliente Original',
+            'birth_date' => '1990-01-01',
+            'biological_sex' => 'male',
+            'height_cm' => 174,
+            'phone' => '(11) 95555-0000',
+            'email' => 'duplicado@example.com',
+            'cpf' => '111.222.333-44',
+        ])->assertCreated();
+
+        $this->actingAs($user)->postJson(route('bioimpedance.clients.store'), [
+            'full_name' => 'Cliente Duplicado',
+            'birth_date' => '1992-01-01',
+            'biological_sex' => 'female',
+            'height_cm' => 164,
+            'phone' => '11955550000',
+            'email' => 'duplicado@example.com',
+            'cpf' => '11122233344',
+        ])->assertJsonValidationErrors(['phone_digits', 'email', 'cpf']);
+    }
+
+    public function test_client_can_be_inactivated_without_losing_history(): void
+    {
+        $user = User::factory()->create();
+
+        $clientResponse = $this->actingAs($user)->postJson(route('bioimpedance.clients.store'), [
+            'full_name' => 'Cliente Inativado',
+            'birth_date' => '1988-01-01',
+            'biological_sex' => 'male',
+            'height_cm' => 174,
+            'email' => 'cliente.inativado@example.com',
+        ]);
+
+        $assessmentPayload = [
+            'bioimpedance_client_id' => $clientResponse->json('client.id'),
+            'evaluated_at' => '2026-08-07 09:30:00',
+            'weight_kg' => 80,
+            'scale_bmi' => 26.4,
+            'body_fat_percentage' => 20,
+            'skeletal_muscle_percentage' => 37,
+            'resting_metabolism_kcal' => 1800,
+            'body_age' => 42,
+            'visceral_fat_level' => 9,
+        ];
+
+        $this->actingAs($user)->postJson(route('bioimpedance.assessments.store'), $assessmentPayload)
+            ->assertCreated();
+
+        $this->actingAs($user)->patchJson(route('bioimpedance.clients.inactivate', $clientResponse->json('client.id')))
+            ->assertOk()
+            ->assertJsonPath('client.is_active', false)
+            ->assertJsonCount(1, 'client.assessments');
+
+        $this->actingAs($user)->postJson(route('bioimpedance.assessments.store'), [
+            ...$assessmentPayload,
+            'evaluated_at' => '2026-08-08 09:30:00',
+        ])->assertJsonValidationErrors(['bioimpedance_client_id']);
+    }
+
     public function test_assessment_age_is_calculated_from_evaluation_date(): void
     {
         $user = User::factory()->create();

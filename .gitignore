@@ -1,5 +1,6 @@
 *.log
 .DS_Store
+__MACOSX/
 .env
 .env.backup
 .env.production
@@ -15,8 +16,14 @@
 /node_modules
 /public/build
 /public/hot
+/public_html/hot
 /public/storage
+/database/*.sqlite
 /storage/*.key
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/logs/*.log
 /storage/pail
 /vendor
 Homestead.json

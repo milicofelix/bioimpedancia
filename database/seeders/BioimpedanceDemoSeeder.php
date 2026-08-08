@@ -21,6 +21,7 @@ class BioimpedanceDemoSeeder extends Seeder
         foreach ($this->clients() as $clientData) {
             $assessments = $clientData['assessments'];
             unset($clientData['assessments']);
+            $clientData['phone_digits'] = $this->digits($clientData['phone'] ?? null);
 
             $client = BioimpedanceClient::query()->updateOrCreate([
                 'email' => $clientData['email'],
@@ -53,6 +54,17 @@ class BioimpedanceDemoSeeder extends Seeder
         $heightM = $heightCm / 100;
 
         return round($weightKg / ($heightM * $heightM), 1);
+    }
+
+    private function digits(?string $value): ?string
+    {
+        if (! $value) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $value);
+
+        return $digits === '' ? null : $digits;
     }
 
     private function snapshot(array $clientData, string $evaluatedAt): array

@@ -16,7 +16,15 @@ class BioimpedanceClient extends Model
         'biological_sex',
         'height_cm',
         'phone',
+        'phone_digits',
         'email',
+        'cpf',
+        'address',
+        'emergency_contact_name',
+        'emergency_contact_phone',
+        'consent_accepted_at',
+        'next_assessment_at',
+        'inactivated_at',
         'notes',
     ];
 
@@ -25,6 +33,9 @@ class BioimpedanceClient extends Model
         return [
             'birth_date' => 'date',
             'height_cm' => 'decimal:2',
+            'consent_accepted_at' => 'datetime',
+            'next_assessment_at' => 'date',
+            'inactivated_at' => 'datetime',
         ];
     }
 

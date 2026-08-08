@@ -36,28 +36,35 @@ class BioimpedanceController extends Controller
 
     public function storeClient(Request $request): JsonResponse
     {
-        $request->merge([
-            'height_cm' => $this->normalizeHeightToCentimeters($request->input('height_cm')),
-        ]);
-
-        $validated = $request->validate([
-            'full_name' => ['required', 'string', 'max:160'],
-            'birth_date' => ['required', 'date', 'before:today'],
-            'biological_sex' => ['required', Rule::in(['female', 'male'])],
-            'height_cm' => ['required', 'numeric', 'between:100,199.5'],
-            'phone' => ['nullable', 'string', 'max:40'],
-            'email' => ['nullable', 'email', 'max:160'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-        ], [
-            'height_cm.between' => 'Informe a altura em metros ou centimetros. Exemplo: 1,74 ou 174.',
-            'height_cm.numeric' => 'Informe uma altura valida. Exemplo: 1,74 ou 174.',
-        ]);
+        $validated = $this->validateClient($request);
 
         $client = BioimpedanceClient::query()->create($validated);
 
         return response()->json([
             'client' => $this->clientPayload($client->load('assessments')),
         ], 201);
+    }
+
+    public function updateClient(Request $request, BioimpedanceClient $client): JsonResponse
+    {
+        $validated = $this->validateClient($request, $client);
+
+        $client->update($validated);
+
+        return response()->json([
+            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')->limit(5)])),
+        ]);
+    }
+
+    public function inactivateClient(BioimpedanceClient $client): JsonResponse
+    {
+        $client->update([
+            'inactivated_at' => now(),
+        ]);
+
+        return response()->json([
+            'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')->limit(5)])),
+        ]);
     }
 
     public function storeAssessment(Request $request, BioimpedanceAnalyzer $analyzer): JsonResponse
@@ -84,6 +91,12 @@ class BioimpedanceController extends Controller
         ]);
 
         $client = BioimpedanceClient::query()->findOrFail($validated['bioimpedance_client_id']);
+        if ($client->inactivated_at) {
+            throw ValidationException::withMessages([
+                'bioimpedance_client_id' => 'Cliente inativo não pode receber novas avaliações.',
+            ]);
+        }
+
         $this->validateEvaluationDateAgainstBirthDate($client, $validated['evaluated_at']);
 
         $snapshot = $this->assessmentSnapshot($client, $validated['evaluated_at']);
@@ -102,6 +115,43 @@ class BioimpedanceController extends Controller
             'client' => $this->clientPayload($client->refresh()->load(['assessments' => fn ($query) => $query->latest('evaluated_at')->limit(5)])),
             'assessment' => $this->assessmentPayload($assessment),
         ], 201);
+    }
+
+    private function validateClient(Request $request, ?BioimpedanceClient $client = null): array
+    {
+        $request->merge([
+            'height_cm' => $this->normalizeHeightToCentimeters($request->input('height_cm')),
+            'phone_digits' => $this->normalizeDigits($request->input('phone')),
+            'cpf' => $this->normalizeDigits($request->input('cpf')),
+            'emergency_contact_phone' => $this->normalizeDigits($request->input('emergency_contact_phone')),
+            'consent_accepted_at' => $request->boolean('consent_accepted')
+                ? ($client?->consent_accepted_at?->toDateTimeString() ?? now()->toDateTimeString())
+                : null,
+        ]);
+
+        return $request->validate([
+            'full_name' => ['required', 'string', 'max:160'],
+            'birth_date' => ['required', 'date', 'before:today'],
+            'biological_sex' => ['required', Rule::in(['female', 'male'])],
+            'height_cm' => ['required', 'numeric', 'between:100,199.5'],
+            'phone' => ['nullable', 'string', 'max:40'],
+            'phone_digits' => ['nullable', 'string', 'max:20', Rule::unique('bioimpedance_clients', 'phone_digits')->ignore($client)],
+            'email' => ['nullable', 'email', 'max:160', Rule::unique('bioimpedance_clients', 'email')->ignore($client)],
+            'cpf' => ['nullable', 'string', 'size:11', Rule::unique('bioimpedance_clients', 'cpf')->ignore($client)],
+            'address' => ['nullable', 'string', 'max:255'],
+            'emergency_contact_name' => ['nullable', 'string', 'max:160'],
+            'emergency_contact_phone' => ['nullable', 'string', 'max:20'],
+            'consent_accepted_at' => ['nullable', 'date'],
+            'next_assessment_at' => ['nullable', 'date', 'after_or_equal:today'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'height_cm.between' => 'Informe a altura em metros ou centimetros. Exemplo: 1,74 ou 174.',
+            'height_cm.numeric' => 'Informe uma altura valida. Exemplo: 1,74 ou 174.',
+            'phone_digits.unique' => 'Ja existe um cliente cadastrado com este telefone.',
+            'email.unique' => 'Ja existe um cliente cadastrado com este e-mail.',
+            'cpf.size' => 'Informe o CPF com 11 digitos.',
+            'cpf.unique' => 'Ja existe um cliente cadastrado com este CPF.',
+        ]);
     }
 
     private function validateEvaluationDateAgainstBirthDate(BioimpedanceClient $client, string $evaluatedAt): void
@@ -150,6 +200,17 @@ class BioimpedanceController extends Controller
         return $value;
     }
 
+    private function normalizeDigits(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', (string) $value);
+
+        return $digits === '' ? null : $digits;
+    }
+
     private function clientPayload(BioimpedanceClient $client): array
     {
         return [
@@ -161,6 +222,15 @@ class BioimpedanceController extends Controller
             'height_cm' => (float) $client->height_cm,
             'phone' => $client->phone,
             'email' => $client->email,
+            'cpf' => $client->cpf,
+            'address' => $client->address,
+            'emergency_contact_name' => $client->emergency_contact_name,
+            'emergency_contact_phone' => $client->emergency_contact_phone,
+            'consent_accepted_at' => $client->consent_accepted_at?->toIso8601String(),
+            'next_assessment_at' => $client->next_assessment_at?->toDateString(),
+            'inactivated_at' => $client->inactivated_at?->toIso8601String(),
+            'is_active' => $client->inactivated_at === null,
+            'last_assessment_at' => $client->assessments->max('evaluated_at')?->toIso8601String(),
             'notes' => $client->notes,
             'assessments' => $client->assessments
                 ->sortByDesc('evaluated_at')
