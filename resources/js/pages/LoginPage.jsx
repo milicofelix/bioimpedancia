@@ -61,45 +61,28 @@ export default function LoginPage() {
     }
 
     return (
-        <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10 sm:px-6 lg:px-8">
-            <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.92),rgba(241,245,249,0.8))]" />
-            <div className="absolute left-0 top-0 -z-10 h-72 w-72 rounded-full bg-orange-200/40 blur-3xl" />
-            <div className="absolute bottom-0 right-0 -z-10 h-80 w-80 rounded-full bg-sky-200/40 blur-3xl" />
-
-            <section className="grid w-full max-w-6xl gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-                <div className="flex flex-col justify-between rounded-4xl border border-white/70 bg-slate-950 p-8 text-white shadow-2xl shadow-slate-300/60 sm:p-10 lg:p-12">
-                    <div className="space-y-6">
-                        <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-200">
-                            Ricostye Magrecimento
-                        </span>
-                        <div className="space-y-4">
-                            <h1 className="max-w-xl text-4xl font-semibold tracking-tight sm:text-5xl">
-                                Acesso rápido, interface limpa e fluxo de autenticação consistente.
-                            </h1>
-                            <p className="max-w-lg text-base leading-7 text-slate-300">
-                                Esta tela foi construída com React no frontend e Laravel cuidando da sessão, validação e segurança.
-                            </p>
-                        </div>
+        <main className="flex min-h-screen items-center justify-center bg-[#fbf7fa] px-4 py-10 text-slate-900 sm:px-6 lg:px-8">
+            <section className="grid w-full max-w-6xl overflow-hidden rounded-[2rem] border border-rose-100 bg-white shadow-2xl shadow-rose-200/40 lg:grid-cols-[1fr_0.9fr]">
+                <div className="flex min-h-[420px] flex-col justify-between bg-gradient-to-br from-[#f8dfe8] via-white to-[#eee6fb] p-7 sm:p-10 lg:p-12">
+                    <div>
+                        <img src="/images/brand/ricosty-logo.png" alt="Ricosty Emagrecimento e Estética" className="h-auto w-full max-w-[520px] object-contain" />
                     </div>
 
-                    <div className="mt-10 grid gap-4 sm:grid-cols-3">
-                        {[
-                            ['Sessão segura', 'CSRF + sessão + redirect intended'],
-                            ['UI reativa', 'Estados claros e feedback imediato'],
-                            ['Código limpo', 'Componentes pequenos e responsabilidades separadas'],
-                        ].map(([title, description]) => (
-                            <article key={title} className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-                                <h2 className="text-sm font-semibold text-white">{title}</h2>
-                                <p className="mt-1 text-sm leading-6 text-slate-300">{description}</p>
-                            </article>
-                        ))}
+                    <div className="mt-10 max-w-xl">
+                        <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b96f7d]">Ricosty Emagrecimento e Estética</p>
+                        <h1 className="mt-4 text-3xl font-semibold leading-tight text-[#3f3f46] sm:text-4xl">
+                            Sistema profissional de avaliação corporal
+                        </h1>
+                        <p className="mt-4 text-base leading-7 text-slate-600">
+                            Acesse o painel para registrar avaliações, acompanhar evolução e gerar relatórios de bioimpedância.
+                        </p>
                     </div>
                 </div>
 
-                <div className="flex items-center">
-                    <div className="w-full rounded-4xl border border-white/80 bg-white/90 p-6 shadow-2xl shadow-slate-300/70 backdrop-blur sm:p-8 lg:p-10">
+                <div className="flex items-center bg-white">
+                    <div className="w-full p-6 sm:p-8 lg:p-10">
                         <div className="mb-8 space-y-2">
-                            <h2 className="text-3xl font-semibold tracking-tight text-slate-950">Entrar na conta</h2>
+                            <h2 className="text-3xl font-semibold tracking-tight text-[#3f3f46]">Entrar na conta</h2>
                             <p className="text-sm leading-6 text-slate-600">
                                 Use suas credenciais para acessar o painel.
                             </p>
@@ -155,9 +138,9 @@ export default function LoginPage() {
                                     type="checkbox"
                                     checked={remember}
                                     onChange={(event) => setRemember(event.target.checked)}
-                                    className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                                    className="h-4 w-4 rounded border-rose-200 text-[#b96f7d] focus:ring-rose-300"
                                 />
-                                Lembrar de mim
+                                Manter conectado neste dispositivo
                             </label>
 
                             <PrimaryButton type="submit" disabled={processing || !canSubmit}>
