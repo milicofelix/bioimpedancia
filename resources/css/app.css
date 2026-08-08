@@ -21,12 +21,70 @@ body {
 
 body {
     margin: 0;
-    background:
-        radial-gradient(circle at top left, rgba(255, 209, 179, 0.28), transparent 32%),
-        radial-gradient(circle at top right, rgba(191, 219, 254, 0.26), transparent 28%),
-        linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+    background: #f8fafc;
 }
 
 #app {
     min-height: 100vh;
+}
+
+@media print {
+    @page {
+        margin: 0;
+        size: A4;
+    }
+
+    html,
+    body {
+        background: #ffffff;
+        height: auto;
+    }
+
+    .no-print {
+        display: none !important;
+    }
+
+    main {
+        background: #ffffff !important;
+        min-height: auto !important;
+    }
+
+    .report {
+        border-radius: 0;
+        box-shadow: none !important;
+        height: 297mm;
+        width: 210mm;
+        overflow: hidden;
+        page-break-after: avoid;
+        page-break-before: avoid;
+    }
+
+    .report-header {
+        padding: 12mm 13mm !important;
+    }
+
+    .report-body {
+        padding: 7mm 13mm 9mm !important;
+    }
+
+    .report-footer {
+        margin-top: 7mm !important;
+    }
+
+    .report * {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    #app,
+    #app > main,
+    #app > main > div,
+    #app > main > div > section {
+        display: block !important;
+        margin: 0 !important;
+        max-width: none !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+        width: auto !important;
+    }
 }
