@@ -17,7 +17,7 @@ const emptyClient = {
 };
 
 const emptyAssessment = {
-	evaluated_at: new Date().toISOString().slice(0, 16),
+	evaluated_at: localDatetimeNow(),
 	weight_kg: '',
 	scale_bmi: '',
 	body_fat_percentage: '',
@@ -117,6 +117,30 @@ function inputClass() {
 	return 'mt-2 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:text-sm';
 }
 
+function localDatetimeNow() {
+	const date = new Date();
+	const timezoneOffset = date.getTimezoneOffset() * 60000;
+
+	return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
+}
+
+function fieldErrors(errors, field) {
+	const messages = errors?.[field];
+
+	return Array.isArray(messages) ? messages : [];
+}
+
+function errorMessages(errors) {
+	return Object.values(errors ?? {}).flat().filter(Boolean);
+}
+
+function FieldError({ errors, field }) {
+	const messages = fieldErrors(errors, field);
+	if (!messages.length) return null;
+
+	return <p className="mt-1 text-xs font-semibold text-rose-700">{messages[0]}</p>;
+}
+
 function formatDate(value) {
 	if (!value) return '-';
 	return new Intl.DateTimeFormat('pt-BR', {
@@ -131,7 +155,7 @@ function formatIssueDate(value) {
 }
 
 function toDatetimeLocal(value) {
-	if (!value) return new Date().toISOString().slice(0, 16);
+	if (!value) return localDatetimeNow();
 
 	const date = new Date(value);
 	const timezoneOffset = date.getTimezoneOffset() * 60000;
@@ -619,7 +643,7 @@ export default function DashboardPage({ userName }) {
 		setObservationDraft('');
 		setAssessmentMode('create');
 		setEditingAssessmentId(null);
-		setAssessmentForm({ ...emptyAssessment, evaluated_at: new Date().toISOString().slice(0, 16) });
+		setAssessmentForm({ ...emptyAssessment, evaluated_at: localDatetimeNow() });
 		setAssessmentChangeReason('');
 		window.setTimeout(() => assessmentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
 	}
@@ -644,7 +668,7 @@ export default function DashboardPage({ userName }) {
 		setShareResult(null);
 		setObservationAssistant(null);
 		setObservationDraft('');
-		setAssessmentForm({ ...emptyAssessment, evaluated_at: new Date().toISOString().slice(0, 16) });
+		setAssessmentForm({ ...emptyAssessment, evaluated_at: localDatetimeNow() });
 		setAssessmentChangeReason('');
 		setAssessmentDraftSavedAt(null);
 		setErrors({});
@@ -655,7 +679,7 @@ export default function DashboardPage({ userName }) {
 		if (key) {
 			window.localStorage.removeItem(key);
 		}
-		setAssessmentForm({ ...emptyAssessment, evaluated_at: new Date().toISOString().slice(0, 16) });
+		setAssessmentForm({ ...emptyAssessment, evaluated_at: localDatetimeNow() });
 		setAssessmentDraftSavedAt(null);
 	}
 
@@ -678,7 +702,7 @@ export default function DashboardPage({ userName }) {
 		setEditingAssessmentId(null);
 		setAssessmentForm({
 			...assessmentFormFromAssessment(assessment),
-			evaluated_at: new Date().toISOString().slice(0, 16),
+			evaluated_at: localDatetimeNow(),
 			notes: '',
 		});
 		setAssessmentChangeReason('');
@@ -1454,32 +1478,41 @@ export default function DashboardPage({ userName }) {
 
 						<form onSubmit={submitAssessment} onKeyDownCapture={focusNextFormField} className="mt-5 grid gap-3 md:grid-cols-4">
 							<Field label="Data da avaliação">
-								<input type="datetime-local" value={assessmentForm.evaluated_at} onChange={(event) => updateAssessment('evaluated_at', event.target.value)} className={inputClass()} />
+								<input type="datetime-local" value={assessmentForm.evaluated_at} max={localDatetimeNow()} onChange={(event) => updateAssessment('evaluated_at', event.target.value)} className={inputClass()} />
+								<FieldError errors={errors} field="evaluated_at" />
 							</Field>
 							<Field label="Peso kg">
 								<input inputMode="decimal" placeholder="90,2" value={assessmentForm.weight_kg} onChange={(event) => updateAssessment('weight_kg', event.target.value)} className={inputClass()} />
+								<FieldError errors={errors} field="weight_kg" />
 							</Field>
 							<Field label="IMC da balança">
 								<input inputMode="decimal" placeholder="29,8" value={assessmentForm.scale_bmi} onChange={(event) => updateAssessment('scale_bmi', event.target.value)} className={inputClass()} />
+								<FieldError errors={errors} field="scale_bmi" />
 							</Field>
 							<Field label="Gordura %">
 								<input inputMode="decimal" placeholder="28,4" value={assessmentForm.body_fat_percentage} onChange={(event) => updateAssessment('body_fat_percentage', event.target.value)} className={inputClass()} />
+								<FieldError errors={errors} field="body_fat_percentage" />
 							</Field>
 							<Field label="Músculo %">
 								<input inputMode="decimal" placeholder="31,2" value={assessmentForm.skeletal_muscle_percentage} onChange={(event) => updateAssessment('skeletal_muscle_percentage', event.target.value)} className={inputClass()} />
+								<FieldError errors={errors} field="skeletal_muscle_percentage" />
 							</Field>
 							<Field label="RM kcal">
 								<input inputMode="numeric" placeholder="1780" value={assessmentForm.resting_metabolism_kcal} onChange={(event) => updateAssessment('resting_metabolism_kcal', event.target.value)} className={inputClass()} />
+								<FieldError errors={errors} field="resting_metabolism_kcal" />
 							</Field>
 							<Field label="Idade corporal">
 								<input inputMode="numeric" placeholder="47" value={assessmentForm.body_age} onChange={(event) => updateAssessment('body_age', event.target.value)} className={inputClass()} />
+								<FieldError errors={errors} field="body_age" />
 							</Field>
 							<Field label="Gordura visceral">
 								<input inputMode="decimal" placeholder="12" value={assessmentForm.visceral_fat_level} onChange={(event) => updateAssessment('visceral_fat_level', event.target.value)} className={inputClass()} />
+								<FieldError errors={errors} field="visceral_fat_level" />
 							</Field>
 							<div className="md:col-span-4">
 								<Field label="Observação da avaliação">
 									<textarea value={assessmentForm.notes} onChange={(event) => updateAssessment('notes', event.target.value)} rows="3" className={inputClass()} />
+									<FieldError errors={errors} field="notes" />
 								</Field>
 							</div>
 							{assessmentMode === 'edit' ? (
@@ -1491,7 +1524,10 @@ export default function DashboardPage({ userName }) {
 							) : null}
 							{Object.keys(errors).length ? (
 								<div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 md:col-span-4">
-									Confira os campos obrigatórios e valores digitados.
+									<p className="font-bold">Não foi possível salvar a avaliação.</p>
+									<ul className="mt-2 list-disc space-y-1 pl-5">
+										{errorMessages(errors).map((message) => <li key={message}>{message}</li>)}
+									</ul>
 								</div>
 							) : null}
 						<button type="submit" disabled={(assessmentMode === 'edit' ? !canClinicalProfessional : !canCreateClinicalRecords) || !selectedClient || !selectedClient.is_active || savingAssessment} className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-4">

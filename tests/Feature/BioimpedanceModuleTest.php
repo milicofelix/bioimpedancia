@@ -842,7 +842,9 @@ class BioimpedanceModuleTest extends TestCase
         $this->actingAs($user)->postJson(route('bioimpedance.assessments.store'), [
             ...$payload,
             'evaluated_at' => now()->addDay()->toDateTimeString(),
-        ])->assertJsonValidationErrors(['evaluated_at']);
+        ])
+            ->assertJsonValidationErrors(['evaluated_at'])
+            ->assertJsonPath('errors.evaluated_at.0', 'A avaliação não pode ser registrada no futuro. Confira a data e o horário informados.');
 
         $this->actingAs($user)->postJson(route('bioimpedance.assessments.store'), [
             ...$payload,

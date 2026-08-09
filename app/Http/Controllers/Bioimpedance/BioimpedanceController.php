@@ -572,6 +572,28 @@ class BioimpedanceController extends Controller
             'body_age' => ['nullable', 'integer', 'between:18,80'],
             'visceral_fat_level' => ['nullable', 'integer', 'between:1,30'],
             'notes' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'bioimpedance_client_id.required' => 'Selecione um cliente antes de salvar a avaliação.',
+            'bioimpedance_client_id.exists' => 'O cliente selecionado não foi encontrado.',
+            'evaluated_at.required' => 'Informe a data e hora da avaliação.',
+            'evaluated_at.date' => 'Informe uma data e hora de avaliação válida.',
+            'evaluated_at.before_or_equal' => 'A avaliação não pode ser registrada no futuro. Confira a data e o horário informados.',
+            'weight_kg.required' => 'Informe o peso exibido pela balança.',
+            'weight_kg.numeric' => 'Informe o peso em kg. Exemplo: 95,2.',
+            'weight_kg.between' => 'O peso deve estar entre 2 kg e 150 kg para a Omron HBF-514C.',
+            'scale_bmi.numeric' => 'Informe o IMC da balança com número válido. Exemplo: 31,4.',
+            'scale_bmi.between' => 'O IMC da balança deve estar entre 7 e 90.',
+            'body_fat_percentage.numeric' => 'Informe a gordura corporal em percentual. Exemplo: 20,5.',
+            'body_fat_percentage.between' => 'A gordura corporal deve estar entre 5% e 60%.',
+            'skeletal_muscle_percentage.numeric' => 'Informe o músculo esquelético em percentual. Exemplo: 37,6.',
+            'skeletal_muscle_percentage.between' => 'O músculo esquelético deve estar entre 5% e 50%.',
+            'resting_metabolism_kcal.integer' => 'Informe o metabolismo basal em kcal, sem casas decimais.',
+            'resting_metabolism_kcal.between' => 'O metabolismo basal deve estar entre 385 e 3999 kcal.',
+            'body_age.integer' => 'Informe a idade corporal em anos, sem casas decimais.',
+            'body_age.between' => 'A idade corporal deve estar entre 18 e 80 anos.',
+            'visceral_fat_level.integer' => 'Informe a gordura visceral como número inteiro, de 1 a 30.',
+            'visceral_fat_level.between' => 'A gordura visceral deve estar entre 1 e 30.',
+            'notes.max' => 'A observação da avaliação pode ter no máximo 2000 caracteres.',
         ]);
     }
 
