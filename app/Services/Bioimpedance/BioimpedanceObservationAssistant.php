@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
 
 class BioimpedanceObservationAssistant
 {
-    public const PROMPT_VERSION = 'rag-guardrails-client-facing-1.1.0';
+    public const PROMPT_VERSION = 'rag-client-1.1.0';
 
     public const MODEL_NAME = 'local-validated-rag-agent';
 

@@ -10,6 +10,7 @@ use App\Models\Bioimpedance\BioimpedanceAssessmentAudit;
 use App\Models\Bioimpedance\BioimpedanceClient;
 use App\Models\Bioimpedance\BioimpedanceReportShare;
 use App\Models\User;
+use App\Services\Bioimpedance\BioimpedanceObservationAssistant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -972,8 +973,10 @@ class BioimpedanceModuleTest extends TestCase
         $this->assertDatabaseHas('bioimpedance_ai_analysis_requests', [
             'id' => $suggestionResponse->json('assistant.request_id'),
             'bioimpedance_assessment_id' => $assessmentId,
+            'prompt_version' => BioimpedanceObservationAssistant::PROMPT_VERSION,
             'status' => 'generated',
         ]);
+        $this->assertLessThanOrEqual(32, strlen(BioimpedanceObservationAssistant::PROMPT_VERSION));
         $this->assertDatabaseHas('bioimpedance_ai_analysis_outputs', [
             'id' => $suggestionResponse->json('assistant.output_id'),
             'validation_status' => 'passed',
