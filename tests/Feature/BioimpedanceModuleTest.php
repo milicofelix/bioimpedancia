@@ -1052,6 +1052,50 @@ class BioimpedanceModuleTest extends TestCase
         ]);
     }
 
+    public function test_observation_assistant_uses_backend_fallback_when_openai_response_is_blocked(): void
+    {
+        config([
+            'bioimpedance.assistant.provider' => 'hybrid',
+            'services.openai.api_key' => 'test-openai-key',
+            'services.openai.model' => 'gpt-5.1',
+            'services.openai.base_url' => 'https://api.openai.com/v1',
+            'services.openai.timeout' => 45,
+        ]);
+
+        Http::fake([
+            'https://api.openai.com/v1/responses' => Http::response([
+                'output_text' => json_encode([
+                    'status' => 'generated',
+                    'summary' => 'Sugestão gerada pela OpenAI com conteúdo inadequado.',
+                    'positive_points' => [],
+                    'attention_points' => [],
+                    'general_guidance' => [],
+                    'professional_observation' => 'Diagnóstico provável com prescrição de dieta de emergência.',
+                    'prohibited_content_detected' => false,
+                ], JSON_UNESCAPED_UNICODE),
+            ], 200),
+        ]);
+
+        $user = User::factory()->create(['role' => User::ROLE_PROFESSIONAL]);
+        $assessment = $this->createAssessmentForUser($user);
+
+        $response = $this->actingAs($user)->getJson(route('bioimpedance.assessments.observation-suggestion', $assessment->id));
+
+        $response->assertOk();
+        $response->assertJsonPath('assistant.status', 'generated');
+        $response->assertJsonPath('assistant.provider', 'local_reference_engine');
+        $response->assertJsonPath('assistant.validation_status', 'passed');
+        $response->assertJsonPath('assistant.blocked_provider', 'openai');
+        $this->assertNotEmpty($response->json('assistant.suggestion'));
+        $this->assertContains('Conteúdo proibido detectado: diagnóstico', $response->json('assistant.blocked_provider_errors'));
+        $this->assertContains('Conteúdo proibido detectado: prescrição', $response->json('assistant.blocked_provider_errors'));
+        $this->assertStringContainsString('observação segura gerada pelo backend', $response->json('assistant.notice'));
+
+        $output = BioimpedanceAiAnalysisOutput::query()->findOrFail($response->json('assistant.output_id'));
+        $this->assertNotNull($output->professional_observation);
+        $this->assertSame('passed', $output->validation_status);
+    }
+
     public function test_admin_index_includes_operational_dashboard_metrics(): void
     {
         Carbon::setTestNow('2026-08-08 10:00:00');

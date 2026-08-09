@@ -131,6 +131,20 @@ class BioimpedanceObservationAssistant
 
         $response = $this->generateResponse($assessment, $context, $chunks);
         $validationErrors = $this->validateResponse($response, $assessment, $chunks);
+        if (count($validationErrors) && ($response['provider'] ?? null) === 'openai') {
+            $openAiValidationErrors = $validationErrors;
+            $localResponse = [
+                ...$this->generateStructuredResponse($assessment, $context, $chunks),
+                'provider' => 'local_reference_engine',
+                'fallback_reason' => 'Resposta da OpenAI bloqueada pelo validador; observação segura gerada pelo backend.',
+            ];
+            $validationErrors = $this->validateResponse($localResponse, $assessment, $chunks);
+            $response = [
+                ...$localResponse,
+                'blocked_provider' => 'openai',
+                'blocked_provider_errors' => $openAiValidationErrors,
+            ];
+        }
         $status = count($validationErrors) ? 'blocked' : $response['status'];
 
         $request->update([

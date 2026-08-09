@@ -81,6 +81,29 @@ const evolutionPeriods = [
 	{ key: 'all', label: 'Tudo', days: null },
 ];
 
+const observationLoadingSteps = [
+	{
+		title: 'Preparando avaliação',
+		description: 'Organizando dados do cliente, snapshot de idade, sexo e resultados da Omron.',
+	},
+	{
+		title: 'Buscando referências',
+		description: 'Selecionando manual, protocolo e fontes aprovadas para esta avaliação.',
+	},
+	{
+		title: 'Gerando sugestão',
+		description: 'Consultando o assistente configurado e preservando as classificações oficiais.',
+	},
+	{
+		title: 'Validando segurança',
+		description: 'Conferindo fontes, linguagem permitida e possíveis inconsistências.',
+	},
+	{
+		title: 'Montando observação',
+		description: 'Preparando o texto para revisão e aprovação do profissional.',
+	},
+];
+
 function Field({ label, children }) {
 	return (
 		<label className="block">
@@ -407,6 +430,7 @@ export default function DashboardPage({ userName }) {
 	const [sharingAssessment, setSharingAssessment] = useState(false);
 	const [shareResult, setShareResult] = useState(null);
 	const [generatingObservation, setGeneratingObservation] = useState(false);
+	const [observationLoadingStep, setObservationLoadingStep] = useState(0);
 	const [observationAssistant, setObservationAssistant] = useState(null);
 	const [observationDraft, setObservationDraft] = useState('');
 	const [refreshingDashboard, setRefreshingDashboard] = useState(false);
@@ -429,6 +453,19 @@ export default function DashboardPage({ userName }) {
 			setSelectedAssessmentId(data.clients[0]?.assessments?.[0]?.id ?? null);
 		}).finally(() => setLoading(false));
 	}, []);
+
+	useEffect(() => {
+		if (!generatingObservation) {
+			setObservationLoadingStep(0);
+			return undefined;
+		}
+
+		const interval = window.setInterval(() => {
+			setObservationLoadingStep((current) => Math.min(current + 1, observationLoadingSteps.length - 1));
+		}, 1400);
+
+		return () => window.clearInterval(interval);
+	}, [generatingObservation]);
 
 	useEffect(() => {
 		const updateConnectionStatus = () => setIsOnline(navigator.onLine);
@@ -878,9 +915,11 @@ export default function DashboardPage({ userName }) {
 	async function generateObservationSuggestion() {
 		if (!selectedAssessment || !canClinicalProfessional || generatingObservation) return;
 
+		setObservationLoadingStep(0);
 		setGeneratingObservation(true);
 		try {
 			const { data } = await window.axios.get(`/bioimpedance/assessments/${selectedAssessment.id}/observation-suggestion`);
+			setObservationLoadingStep(observationLoadingSteps.length - 1);
 			setObservationAssistant(data.assistant);
 			setObservationDraft(data.assistant?.suggestion ?? '');
 		} finally {
@@ -1337,6 +1376,14 @@ export default function DashboardPage({ userName }) {
 													{observationAssistant.validation_errors.map((error) => <li key={error}>{error}</li>)}
 												</ul>
 											) : null}
+											{observationAssistant.blocked_provider_errors?.length ? (
+												<div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+													<p className="font-bold uppercase tracking-wide">Resposta da IA substituída pelo backend</p>
+													<ul className="mt-2 space-y-1">
+														{observationAssistant.blocked_provider_errors.map((error) => <li key={error}>{error}</li>)}
+													</ul>
+												</div>
+											) : null}
 											<p className="mt-3 text-xs text-slate-500">{observationAssistant.notice}</p>
 										</div>
 									) : null}
@@ -1458,6 +1505,43 @@ export default function DashboardPage({ userName }) {
 					</div>
 				</section>
 			</div>
+			{generatingObservation ? (
+				<div className="no-print fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="assistant-loading-title">
+					<div className="w-full max-w-xl rounded-2xl border border-white/70 bg-white p-6 shadow-2xl">
+						<div className="flex items-start gap-4">
+							<div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-100">
+								<div className="h-6 w-6 animate-spin rounded-full border-2 border-violet-200 border-t-violet-700"></div>
+							</div>
+							<div>
+								<p className="text-xs font-bold uppercase tracking-wide text-violet-700">Assistente inteligente</p>
+								<h2 id="assistant-loading-title" className="mt-1 text-lg font-bold text-slate-950">{observationLoadingSteps[observationLoadingStep]?.title}</h2>
+								<p className="mt-2 text-sm leading-6 text-slate-600">{observationLoadingSteps[observationLoadingStep]?.description}</p>
+							</div>
+						</div>
+
+						<div className="mt-5 space-y-3">
+							{observationLoadingSteps.map((step, index) => {
+								const isDone = index < observationLoadingStep;
+								const isCurrent = index === observationLoadingStep;
+
+								return (
+									<div key={step.title} className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isCurrent ? 'border-violet-200 bg-violet-50' : 'border-slate-100 bg-slate-50'}`}>
+										<span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${isDone ? 'bg-emerald-500 text-white' : isCurrent ? 'bg-violet-600 text-white' : 'bg-white text-slate-400'}`}>
+											{isDone ? '✓' : index + 1}
+										</span>
+										<div>
+											<p className={`text-sm font-semibold ${isCurrent ? 'text-violet-900' : 'text-slate-700'}`}>{step.title}</p>
+											<p className="text-xs text-slate-500">{step.description}</p>
+										</div>
+									</div>
+								);
+							})}
+						</div>
+
+						<p className="mt-5 text-xs leading-5 text-slate-500">A sugestão será entregue para revisão. As classificações oficiais da HBF-514C continuam sendo calculadas somente pelo backend.</p>
+					</div>
+				</div>
+			) : null}
 		</main>
 	);
 }
