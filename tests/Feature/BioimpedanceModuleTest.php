@@ -643,6 +643,7 @@ class BioimpedanceModuleTest extends TestCase
         $this->assertSame('Normal', $assessment->analysis['indicators']['visceral_fat']['classification']);
         $this->assertSame('1.0.0', $assessment->analysis['reference']['classification_version']);
         $this->assertStringContainsString('kg/m²', $assessment->analysis['summary']);
+        $this->assertStringContainsString('26,4 kg/m²', $assessment->analysis['summary']);
     }
 
     public function test_assessment_age_is_calculated_from_evaluation_date(): void
@@ -1026,7 +1027,7 @@ class BioimpedanceModuleTest extends TestCase
                         'text' => 'Manter condições semelhantes entre as medições.',
                         'source_chunk_ids' => ['ricosty-measurement-protocol'],
                     ]],
-                    'professional_observation' => 'A avaliação apresentou gordura corporal elevada, músculo esquelético normal e gordura visceral normal. O IMC calculado foi classificado como sobrepeso. Recomenda-se acompanhamento periódico da evolução corporal, mantendo condições semelhantes entre as medições e avaliação individualizada com profissional habilitado.',
+                    'professional_observation' => 'Os resultados mostram gordura corporal elevada, músculo esquelético normal e gordura visceral normal. O IMC calculado foi classificado como sobrepeso. Recomenda-se acompanhar a evolução nas próximas avaliações, mantendo condições semelhantes de medição.',
                     'prohibited_content_detected' => false,
                 ], JSON_UNESCAPED_UNICODE),
             ], 200),
@@ -1046,7 +1047,8 @@ class BioimpedanceModuleTest extends TestCase
         Http::assertSent(fn ($request) => $request->url() === 'https://api.openai.com/v1/responses'
             && $request->hasHeader('Authorization', 'Bearer test-openai-key')
             && $request['model'] === 'gpt-5.1'
-            && $request['text']['format']['type'] === 'json_schema');
+            && $request['text']['format']['type'] === 'json_schema'
+            && str_contains(json_encode($request['input'], JSON_UNESCAPED_UNICODE), 'relatório entregue ao cliente'));
 
         $this->assertDatabaseHas('bioimpedance_ai_analysis_requests', [
             'id' => $response->json('assistant.request_id'),
@@ -1096,6 +1098,45 @@ class BioimpedanceModuleTest extends TestCase
         $output = BioimpedanceAiAnalysisOutput::query()->findOrFail($response->json('assistant.output_id'));
         $this->assertNotNull($output->professional_observation);
         $this->assertSame('passed', $output->validation_status);
+    }
+
+    public function test_observation_assistant_replaces_openai_internal_language_with_backend_fallback(): void
+    {
+        config([
+            'bioimpedance.assistant.provider' => 'hybrid',
+            'services.openai.api_key' => 'test-openai-key',
+            'services.openai.model' => 'gpt-5.1',
+            'services.openai.base_url' => 'https://api.openai.com/v1',
+            'services.openai.timeout' => 45,
+        ]);
+
+        Http::fake([
+            'https://api.openai.com/v1/responses' => Http::response([
+                'output_text' => json_encode([
+                    'status' => 'generated',
+                    'summary' => 'Sugestão gerada pela OpenAI com linguagem interna.',
+                    'positive_points' => [],
+                    'attention_points' => [],
+                    'general_guidance' => [],
+                    'professional_observation' => 'Sugestão ao profissional: considerar a combinação de IMC e gordura visceral. Esse padrão pode indicar fatores clínicos associados e exige acompanhamento longitudinal.',
+                    'prohibited_content_detected' => false,
+                ], JSON_UNESCAPED_UNICODE),
+            ], 200),
+        ]);
+
+        $user = User::factory()->create(['role' => User::ROLE_PROFESSIONAL]);
+        $assessment = $this->createAssessmentForUser($user);
+
+        $response = $this->actingAs($user)->getJson(route('bioimpedance.assessments.observation-suggestion', $assessment->id));
+
+        $response->assertOk();
+        $response->assertJsonPath('assistant.status', 'generated');
+        $response->assertJsonPath('assistant.provider', 'local_reference_engine');
+        $response->assertJsonPath('assistant.validation_status', 'passed');
+        $response->assertJsonPath('assistant.blocked_provider', 'openai');
+        $this->assertStringNotContainsString('Sugestão ao profissional', $response->json('assistant.suggestion'));
+        $this->assertStringNotContainsString('pode indicar', $response->json('assistant.suggestion'));
+        $this->assertContains('Linguagem interna ou técnica demais para o cliente: sugestão ao profissional', $response->json('assistant.blocked_provider_errors'));
     }
 
     public function test_admin_index_includes_operational_dashboard_metrics(): void

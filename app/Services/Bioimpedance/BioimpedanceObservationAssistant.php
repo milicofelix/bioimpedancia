@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
 
 class BioimpedanceObservationAssistant
 {
-    public const PROMPT_VERSION = 'rag-guardrails-1.0.0';
+    public const PROMPT_VERSION = 'rag-guardrails-client-facing-1.1.0';
 
     public const MODEL_NAME = 'local-validated-rag-agent';
 
@@ -287,11 +287,15 @@ class BioimpedanceObservationAssistant
     {
         return <<<'PROMPT'
 Você é um assistente de apoio à avaliação de bioimpedância da Ricosty.
-Gere apenas uma sugestão profissional para revisão humana.
+Gere uma observação final clara, acolhedora e adequada para constar no relatório entregue ao cliente.
+A observação será revisada e aprovada pelo profissional antes de entrar no relatório.
 Use somente o contexto estruturado e as fontes aprovadas enviadas.
 Não altere, recalcule nem questione as classificações oficiais do backend.
 Não gere diagnóstico, prescrição, dieta, medicação, suplemento ou tratamento.
 Não afirme causalidade médica. Não substitua avaliação de profissional habilitado.
+Evite linguagem interna, acadêmica ou excessivamente técnica.
+Não use expressões como "Sugestão ao profissional", "considerar a combinação", "pode indicar", "fatores clínicos associados" ou "acompanhamento longitudinal".
+Prefira frases curtas, humanas e compreensíveis para o cliente.
 Todo ponto positivo, atenção ou orientação deve citar source_chunk_ids recuperados.
 Responda exclusivamente no JSON Schema solicitado.
 PROMPT;
@@ -426,7 +430,7 @@ PROMPT;
             $bodyAge,
             $variation,
             count($warnings) ? 'Há alerta de consistência registrado: '.$warnings[0] : null,
-            'Recomenda-se acompanhamento periódico da evolução corporal, mantendo condições semelhantes entre as medições e avaliação individualizada com profissional habilitado para definição de condutas.',
+            'Recomenda-se acompanhar a evolução nas próximas avaliações, mantendo condições semelhantes de medição para comparar os resultados com mais segurança.',
         ];
         $observation = collect($observationParts)->filter()->implode(' ');
 
@@ -453,6 +457,21 @@ PROMPT;
         foreach (['diagnóstico', 'diagnostico', 'prescrevo', 'prescrição', 'medicamento', 'suplemento obrigatório', 'dieta de'] as $forbidden) {
             if (str_contains($text, $forbidden)) {
                 $errors[] = 'Conteúdo proibido detectado: '.$forbidden;
+            }
+        }
+
+        foreach ([
+            'sugestão ao profissional',
+            'sugestao ao profissional',
+            'considerar a combinação',
+            'considerar a combinacao',
+            'pode indicar',
+            'fatores clínicos associados',
+            'fatores clinicos associados',
+            'acompanhamento longitudinal',
+        ] as $internalPhrase) {
+            if (str_contains($text, $internalPhrase)) {
+                $errors[] = 'Linguagem interna ou técnica demais para o cliente: '.$internalPhrase;
             }
         }
 
@@ -592,7 +611,7 @@ PROMPT;
         }
 
         $sentence = $segments
-            ? 'A avaliação apresentou '.implode(', ', $segments).', conforme fontes aprovadas para interpretação.'
+            ? 'Os resultados mostram '.implode(', ', $segments).'.'
             : 'A avaliação foi registrada com os indicadores disponíveis.';
 
         if (filled($metrics['bmi']['classification'] ?? null)) {
