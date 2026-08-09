@@ -5,7 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -22,29 +22,21 @@ class DatabaseSeeder extends Seeder
             return;
         }
 
-        User::query()->updateOrCreate([
-            'email' => 'milicofelix@gmail.com',
-        ], [
-            'name' => 'Milico Félix',
-            'role' => User::ROLE_ADMIN,
-            'password' => Hash::make('password'),
-        ]);
+        $password = config('bioimpedance.demo_password') ?: Str::password(16);
 
-        User::query()->updateOrCreate([
-            'email' => 'profissional@ricosty.local',
-        ], [
-            'name' => 'Profissional Ricosty',
-            'role' => User::ROLE_PROFESSIONAL,
-            'password' => Hash::make('password'),
-        ]);
+        if (! config('bioimpedance.demo_password')) {
+            $this->command?->warn('RICOSTY_DEMO_PASSWORD não foi definido. Senha demo temporária gerada para este seed: '.$password);
+        }
 
-        User::query()->updateOrCreate([
-            'email' => 'recepcao@ricosty.local',
-        ], [
-            'name' => 'Recepção Ricosty',
-            'role' => User::ROLE_RECEPTION,
-            'password' => Hash::make('password'),
-        ]);
+        foreach (config('bioimpedance.demo_users', []) as $demoUser) {
+            User::query()->updateOrCreate([
+                'email' => $demoUser['email'],
+            ], [
+                'name' => $demoUser['name'],
+                'role' => $demoUser['role'],
+                'password' => $password,
+            ]);
+        }
 
         $this->call(BioimpedanceDemoSeeder::class);
     }

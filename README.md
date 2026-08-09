@@ -46,12 +46,14 @@ http://localhost:8081/login
 Usuários demo:
 
 ```text
-Admin: milicofelix@gmail.com / password
-Profissional: profissional@ricosty.local / password
-Recepção: recepcao@ricosty.local / password
+Admin: valor de RICOSTY_DEMO_ADMIN_EMAIL
+Profissional: valor de RICOSTY_DEMO_PROFESSIONAL_EMAIL
+Recepção: valor de RICOSTY_DEMO_RECEPTION_EMAIL
+Senha: valor de RICOSTY_DEMO_PASSWORD
 ```
 
 Esses usuários demo são ignorados automaticamente quando `APP_ENV=production`.
+Defina `RICOSTY_DEMO_PASSWORD` no `.env` local antes de rodar `php artisan migrate --seed`.
 
 ## Desenvolvimento Frontend
 
@@ -107,6 +109,19 @@ SESSION_SECURE_COOKIE=true
 SESSION_ENCRYPT=true
 LOG_LEVEL=warning
 MAIL_MAILER=smtp
+OPENAI_API_KEY=chave_producao
+OPENAI_MODEL=gpt-5.1
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_TIMEOUT=45
+BIOIMPEDANCE_ASSISTANT_PROVIDER=hybrid
+```
+
+Modos do assistente:
+
+```text
+hybrid: usa OpenAI quando OPENAI_API_KEY existe; se falhar, usa o motor local.
+openai: exige OpenAI; sem chave ou com erro de API, bloqueia a sugestão.
+local_reference_engine: usa somente o motor local fundamentado em referências parametrizadas.
 ```
 
 Depois do deploy:

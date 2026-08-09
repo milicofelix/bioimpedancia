@@ -12,6 +12,7 @@ use App\Models\Bioimpedance\BioimpedanceReportShare;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class BioimpedanceModuleTest extends TestCase
@@ -906,6 +907,11 @@ class BioimpedanceModuleTest extends TestCase
 
     public function test_observation_assistant_suggests_and_professional_approves_notes_without_changing_classification(): void
     {
+        config([
+            'bioimpedance.assistant.provider' => 'local_reference_engine',
+            'services.openai.api_key' => null,
+        ]);
+
         $user = User::factory()->create([
             'role' => User::ROLE_PROFESSIONAL,
         ]);
@@ -954,7 +960,7 @@ class BioimpedanceModuleTest extends TestCase
         $suggestionResponse->assertJsonPath('assistant.validation_status', 'passed');
         $suggestionResponse->assertJsonPath('assistant.context.age_at_assessment', 45);
         $suggestionResponse->assertJsonPath('assistant.context.device_model', 'HBF-514C');
-        $suggestionResponse->assertJsonPath('assistant.notice', 'Sugestão RAG validada para revisão do profissional. As classificações oficiais não foram alteradas.');
+        $suggestionResponse->assertJsonPath('assistant.notice', 'Sugestão local fundamentada em referências parametrizadas e validada para revisão do profissional. As classificações oficiais não foram alteradas.');
         $this->assertStringContainsString('gordura corporal normal', $suggestionResponse->json('assistant.suggestion'));
         $this->assertStringContainsString('gordura visceral elevada', $suggestionResponse->json('assistant.suggestion'));
         $this->assertStringContainsString('19 anos acima', $suggestionResponse->json('assistant.suggestion'));
@@ -986,6 +992,64 @@ class BioimpedanceModuleTest extends TestCase
         $this->assertNotNull(BioimpedanceAiAnalysisOutput::query()->find($suggestionResponse->json('assistant.output_id'))->approved_at);
         $this->assertSame(1, BioimpedanceAiAnalysisRequest::query()->where('bioimpedance_assessment_id', $assessmentId)->count());
         $this->assertSame($originalAnalysis, BioimpedanceAssessment::query()->findOrFail($assessmentId)->analysis);
+    }
+
+    public function test_observation_assistant_calls_openai_when_provider_is_configured(): void
+    {
+        config([
+            'bioimpedance.assistant.provider' => 'openai',
+            'services.openai.api_key' => 'test-openai-key',
+            'services.openai.model' => 'gpt-5.1',
+            'services.openai.base_url' => 'https://api.openai.com/v1',
+            'services.openai.timeout' => 45,
+        ]);
+
+        Http::fake([
+            'https://api.openai.com/v1/responses' => Http::response([
+                'output_text' => json_encode([
+                    'status' => 'generated',
+                    'summary' => 'Sugestão gerada pela OpenAI com fontes aprovadas.',
+                    'positive_points' => [[
+                        'text' => 'Músculo esquelético normal conforme classificação oficial.',
+                        'source_chunk_ids' => ['omron-hbf514c-skeletal-muscle'],
+                    ]],
+                    'attention_points' => [[
+                        'text' => 'IMC classificado como sobrepeso conforme resultado oficial.',
+                        'source_chunk_ids' => ['who-adult-bmi-classification'],
+                    ], [
+                        'text' => 'Gordura corporal elevada conforme classificação oficial.',
+                        'source_chunk_ids' => ['omron-hbf514c-body-fat'],
+                    ]],
+                    'general_guidance' => [[
+                        'text' => 'Manter condições semelhantes entre as medições.',
+                        'source_chunk_ids' => ['ricosty-measurement-protocol'],
+                    ]],
+                    'professional_observation' => 'A avaliação apresentou gordura corporal elevada, músculo esquelético normal e gordura visceral normal. O IMC calculado foi classificado como sobrepeso. Recomenda-se acompanhamento periódico da evolução corporal, mantendo condições semelhantes entre as medições e avaliação individualizada com profissional habilitado.',
+                    'prohibited_content_detected' => false,
+                ], JSON_UNESCAPED_UNICODE),
+            ], 200),
+        ]);
+
+        $user = User::factory()->create(['role' => User::ROLE_PROFESSIONAL]);
+        $assessment = $this->createAssessmentForUser($user);
+
+        $response = $this->actingAs($user)->getJson(route('bioimpedance.assessments.observation-suggestion', $assessment->id));
+
+        $response->assertOk();
+        $response->assertJsonPath('assistant.status', 'generated');
+        $response->assertJsonPath('assistant.provider', 'openai');
+        $response->assertJsonPath('assistant.validation_status', 'passed');
+        $this->assertStringContainsString('Sugestão gerada pela OpenAI', $response->json('assistant.notice'));
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://api.openai.com/v1/responses'
+            && $request->hasHeader('Authorization', 'Bearer test-openai-key')
+            && $request['model'] === 'gpt-5.1'
+            && $request['text']['format']['type'] === 'json_schema');
+
+        $this->assertDatabaseHas('bioimpedance_ai_analysis_requests', [
+            'id' => $response->json('assistant.request_id'),
+            'model_name' => 'gpt-5.1',
+        ]);
     }
 
     public function test_admin_index_includes_operational_dashboard_metrics(): void

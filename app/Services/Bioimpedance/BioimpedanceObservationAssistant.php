@@ -9,7 +9,10 @@ use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceKnowledgeChunk;
 use App\Models\Bioimpedance\BioimpedanceKnowledgeDocument;
 use App\Models\User;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 class BioimpedanceObservationAssistant
@@ -113,7 +116,7 @@ class BioimpedanceObservationAssistant
             'requested_by_user_id' => $requestedBy?->id,
             'prompt_version' => self::PROMPT_VERSION,
             'reference_version' => $assessment->reference_version,
-            'model_name' => self::MODEL_NAME,
+            'model_name' => $this->modelName(),
             'status' => 'processing',
             'structured_context' => $context,
         ]);
@@ -126,7 +129,7 @@ class BioimpedanceObservationAssistant
             ]);
         }
 
-        $response = $this->generateStructuredResponse($assessment, $context, $chunks);
+        $response = $this->generateResponse($assessment, $context, $chunks);
         $validationErrors = $this->validateResponse($response, $assessment, $chunks);
         $status = count($validationErrors) ? 'blocked' : $response['status'];
 
@@ -161,8 +164,222 @@ class BioimpedanceObservationAssistant
                 'warnings' => $assessment->analysis['warnings'] ?? [],
             ],
             'references' => $this->sourcesPayload($chunks),
-            'notice' => 'Sugestão RAG validada para revisão do profissional. As classificações oficiais não foram alteradas.',
+            'notice' => $this->noticeText($response),
         ];
+    }
+
+    private function modelName(): string
+    {
+        return filled(config('services.openai.api_key'))
+            ? (string) config('services.openai.model', 'gpt-5.1')
+            : self::MODEL_NAME;
+    }
+
+    private function generateResponse(BioimpedanceAssessment $assessment, array $context, Collection $chunks): array
+    {
+        $provider = config('bioimpedance.assistant.provider', 'hybrid');
+
+        if ($provider === 'local_reference_engine') {
+            return $this->generateStructuredResponse($assessment, $context, $chunks);
+        }
+
+        if (! filled(config('services.openai.api_key'))) {
+            if ($provider === 'openai') {
+                return $this->blockedResponse('OPENAI_API_KEY não configurada para o provedor OpenAI.');
+            }
+
+            return [
+                ...$this->generateStructuredResponse($assessment, $context, $chunks),
+                'provider' => 'local_reference_engine',
+                'fallback_reason' => 'OPENAI_API_KEY ausente.',
+            ];
+        }
+
+        try {
+            return [
+                ...$this->generateOpenAiResponse($context, $chunks),
+                'provider' => 'openai',
+                'fallback_reason' => null,
+            ];
+        } catch (ConnectionException|RequestException $exception) {
+            if ($provider === 'openai') {
+                return $this->blockedResponse('Falha na chamada OpenAI: '.$exception->getMessage());
+            }
+
+            return [
+                ...$this->generateStructuredResponse($assessment, $context, $chunks),
+                'provider' => 'local_reference_engine',
+                'fallback_reason' => 'Falha na chamada OpenAI: '.$exception->getMessage(),
+            ];
+        }
+    }
+
+    private function generateOpenAiResponse(array $context, Collection $chunks): array
+    {
+        $response = Http::withToken((string) config('services.openai.api_key'))
+            ->acceptJson()
+            ->asJson()
+            ->timeout((int) config('services.openai.timeout', 45))
+            ->post(rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/').'/responses', [
+                'model' => config('services.openai.model', 'gpt-5.1'),
+                'input' => [
+                    [
+                        'role' => 'system',
+                        'content' => [[
+                            'type' => 'input_text',
+                            'text' => $this->openAiSystemPrompt(),
+                        ]],
+                    ],
+                    [
+                        'role' => 'user',
+                        'content' => [[
+                            'type' => 'input_text',
+                            'text' => json_encode([
+                                'contexto_estruturado' => $context,
+                                'fontes_aprovadas' => $this->sourcesForPrompt($chunks),
+                            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
+                        ]],
+                    ],
+                ],
+                'text' => [
+                    'format' => [
+                        'type' => 'json_schema',
+                        'name' => 'bioimpedance_observation_suggestion',
+                        'strict' => true,
+                        'schema' => $this->openAiResponseSchema(),
+                    ],
+                ],
+            ])
+            ->throw()
+            ->json();
+
+        $payload = json_decode($this->extractOpenAiText($response), true);
+        if (! is_array($payload)) {
+            return $this->blockedResponse('A OpenAI retornou uma resposta fora do JSON esperado.');
+        }
+
+        return [
+            'status' => $payload['status'] ?? 'generated',
+            'summary' => $payload['summary'] ?? 'Sugestão gerada pela OpenAI com fontes aprovadas.',
+            'positive_points' => $payload['positive_points'] ?? [],
+            'attention_points' => $payload['attention_points'] ?? [],
+            'general_guidance' => $payload['general_guidance'] ?? [],
+            'professional_observation' => $payload['professional_observation'] ?? null,
+            'prohibited_content_detected' => (bool) ($payload['prohibited_content_detected'] ?? false),
+        ];
+    }
+
+    private function openAiSystemPrompt(): string
+    {
+        return <<<'PROMPT'
+Você é um assistente de apoio à avaliação de bioimpedância da Ricosty.
+Gere apenas uma sugestão profissional para revisão humana.
+Use somente o contexto estruturado e as fontes aprovadas enviadas.
+Não altere, recalcule nem questione as classificações oficiais do backend.
+Não gere diagnóstico, prescrição, dieta, medicação, suplemento ou tratamento.
+Não afirme causalidade médica. Não substitua avaliação de profissional habilitado.
+Todo ponto positivo, atenção ou orientação deve citar source_chunk_ids recuperados.
+Responda exclusivamente no JSON Schema solicitado.
+PROMPT;
+    }
+
+    private function openAiResponseSchema(): array
+    {
+        $pointSchema = [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'required' => ['text', 'source_chunk_ids'],
+            'properties' => [
+                'text' => ['type' => 'string'],
+                'source_chunk_ids' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                ],
+            ],
+        ];
+
+        return [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'required' => [
+                'status',
+                'summary',
+                'positive_points',
+                'attention_points',
+                'general_guidance',
+                'professional_observation',
+                'prohibited_content_detected',
+            ],
+            'properties' => [
+                'status' => ['type' => 'string', 'enum' => ['generated', 'insufficient_evidence']],
+                'summary' => ['type' => 'string'],
+                'positive_points' => ['type' => 'array', 'items' => $pointSchema],
+                'attention_points' => ['type' => 'array', 'items' => $pointSchema],
+                'general_guidance' => ['type' => 'array', 'items' => $pointSchema],
+                'professional_observation' => ['type' => ['string', 'null']],
+                'prohibited_content_detected' => ['type' => 'boolean'],
+            ],
+        ];
+    }
+
+    private function extractOpenAiText(array $response): string
+    {
+        if (filled($response['output_text'] ?? null)) {
+            return (string) $response['output_text'];
+        }
+
+        foreach ($response['output'] ?? [] as $output) {
+            foreach ($output['content'] ?? [] as $content) {
+                if (($content['type'] ?? null) === 'output_text' && filled($content['text'] ?? null)) {
+                    return (string) $content['text'];
+                }
+            }
+        }
+
+        return '';
+    }
+
+    private function sourcesForPrompt(Collection $chunks): array
+    {
+        return $chunks
+            ->map(fn (BioimpedanceKnowledgeChunk $chunk) => [
+                'source_chunk_id' => $chunk->chunk_key,
+                'documento' => $chunk->document?->title,
+                'secao' => $chunk->section,
+                'pagina' => $chunk->page,
+                'conteudo' => $chunk->content,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function blockedResponse(string $summary): array
+    {
+        return [
+            'status' => 'blocked',
+            'summary' => $summary,
+            'positive_points' => [],
+            'attention_points' => [],
+            'general_guidance' => [],
+            'professional_observation' => null,
+            'prohibited_content_detected' => false,
+            'provider' => 'openai',
+            'fallback_reason' => null,
+        ];
+    }
+
+    private function noticeText(array $response): string
+    {
+        $provider = $response['provider'] ?? 'local_reference_engine';
+        $base = $provider === 'openai'
+            ? 'Sugestão gerada pela OpenAI e validada pelo backend para revisão do profissional.'
+            : 'Sugestão local fundamentada em referências parametrizadas e validada para revisão do profissional.';
+
+        if (filled($response['fallback_reason'] ?? null)) {
+            $base .= ' Fallback local utilizado: '.$response['fallback_reason'];
+        }
+
+        return $base.' As classificações oficiais não foram alteradas.';
     }
 
     private function generateStructuredResponse(BioimpedanceAssessment $assessment, array $context, Collection $chunks): array
