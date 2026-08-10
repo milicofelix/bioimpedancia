@@ -13,6 +13,7 @@ use App\Models\Bioimpedance\BioimpedanceReportShare;
 use App\Models\User;
 use App\Services\Bioimpedance\BioimpedanceAnalyzer;
 use App\Services\Bioimpedance\BioimpedanceObservationAssistant;
+use App\Services\Bioimpedance\BioimpedanceReportSharePresenter;
 use App\Services\Bioimpedance\LegacyBioimpedanceAnalysisRefresher;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Model;
@@ -26,6 +27,8 @@ use Illuminate\Validation\ValidationException;
 
 class BioimpedanceController extends Controller
 {
+    public function __construct(private readonly BioimpedanceReportSharePresenter $reportSharePresenter) {}
+
     public function index(): JsonResponse
     {
         $clients = BioimpedanceClient::query()
@@ -410,7 +413,7 @@ class BioimpedanceController extends Controller
 
         $plainToken = Str::random(48);
         $expiresAt = now()->addDays((int) $validated['expires_in_days']);
-        $message = $this->shareMessage($assessment);
+        $message = $this->reportSharePresenter->message($assessment);
         $share = BioimpedanceReportShare::query()->create([
             'bioimpedance_assessment_id' => $assessment->id,
             'created_by_user_id' => $request->user()->id,
@@ -421,10 +424,10 @@ class BioimpedanceController extends Controller
             'expires_at' => $expiresAt,
         ]);
 
-        $this->audit($request, 'bioimpedance_report_share.created', $share, 'Link temporário do relatório gerado', null, $this->sharePayload($share));
+        $this->audit($request, 'bioimpedance_report_share.created', $share, 'Link temporário do relatório gerado', null, $this->reportSharePresenter->payload($share));
 
         return response()->json([
-            'share' => $this->sharePayload($share, $plainToken),
+            'share' => $this->reportSharePresenter->payload($share, $plainToken),
             'assessment' => $this->assessmentPayload($assessment->refresh()->load('shares')),
             'audit_events' => $request->user()->isAdmin() ? $this->auditEventsPayload() : [],
         ], 201);
@@ -493,12 +496,12 @@ class BioimpedanceController extends Controller
     public function revokeAssessmentShare(Request $request, BioimpedanceReportShare $share): JsonResponse
     {
         $this->authorizeClinicalProfessional($request);
-        $oldValues = $this->sharePayload($share);
+        $oldValues = $this->reportSharePresenter->payload($share);
         $share->update(['revoked_at' => now()]);
-        $this->audit($request, 'bioimpedance_report_share.revoked', $share, 'Link temporário do relatório revogado', $oldValues, $this->sharePayload($share->refresh()));
+        $this->audit($request, 'bioimpedance_report_share.revoked', $share, 'Link temporário do relatório revogado', $oldValues, $this->reportSharePresenter->payload($share->refresh()));
 
         return response()->json([
-            'share' => $this->sharePayload($share),
+            'share' => $this->reportSharePresenter->payload($share),
             'assessment' => $this->assessmentPayload($share->assessment->refresh()->load('shares')),
             'audit_events' => $request->user()->isAdmin() ? $this->auditEventsPayload() : [],
         ]);
@@ -545,7 +548,7 @@ class BioimpedanceController extends Controller
             'client' => $this->clientPayload($assessment->client->setRelation('assessments', collect([$assessment]))),
             'assessment' => $this->assessmentPayload($assessment),
             'issuedAt' => $assessment->report_issued_at ?? $assessment->evaluated_at,
-        ], 200, $this->publicReportHeaders());
+        ], 200, $this->reportSharePresenter->publicReportHeaders());
     }
 
     private function validateAssessment(Request $request, bool $requireClient = true): array
@@ -569,6 +572,28 @@ class BioimpedanceController extends Controller
             'body_age' => ['nullable', 'integer', 'between:18,80'],
             'visceral_fat_level' => ['nullable', 'integer', 'between:1,30'],
             'notes' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'bioimpedance_client_id.required' => 'Selecione um cliente antes de salvar a avaliação.',
+            'bioimpedance_client_id.exists' => 'O cliente selecionado não foi encontrado.',
+            'evaluated_at.required' => 'Informe a data e hora da avaliação.',
+            'evaluated_at.date' => 'Informe uma data e hora de avaliação válida.',
+            'evaluated_at.before_or_equal' => 'A avaliação não pode ser registrada no futuro. Confira a data e o horário informados.',
+            'weight_kg.required' => 'Informe o peso exibido pela balança.',
+            'weight_kg.numeric' => 'Informe o peso em kg. Exemplo: 95,2.',
+            'weight_kg.between' => 'O peso deve estar entre 2 kg e 150 kg para a Omron HBF-514C.',
+            'scale_bmi.numeric' => 'Informe o IMC da balança com número válido. Exemplo: 31,4.',
+            'scale_bmi.between' => 'O IMC da balança deve estar entre 7 e 90.',
+            'body_fat_percentage.numeric' => 'Informe a gordura corporal em percentual. Exemplo: 20,5.',
+            'body_fat_percentage.between' => 'A gordura corporal deve estar entre 5% e 60%.',
+            'skeletal_muscle_percentage.numeric' => 'Informe o músculo esquelético em percentual. Exemplo: 37,6.',
+            'skeletal_muscle_percentage.between' => 'O músculo esquelético deve estar entre 5% e 50%.',
+            'resting_metabolism_kcal.integer' => 'Informe o metabolismo basal em kcal, sem casas decimais.',
+            'resting_metabolism_kcal.between' => 'O metabolismo basal deve estar entre 385 e 3999 kcal.',
+            'body_age.integer' => 'Informe a idade corporal em anos, sem casas decimais.',
+            'body_age.between' => 'A idade corporal deve estar entre 18 e 80 anos.',
+            'visceral_fat_level.integer' => 'Informe a gordura visceral como número inteiro, de 1 a 30.',
+            'visceral_fat_level.between' => 'A gordura visceral deve estar entre 1 e 30.',
+            'notes.max' => 'A observação da avaliação pode ter no máximo 2000 caracteres.',
         ]);
     }
 
@@ -963,50 +988,6 @@ class BioimpedanceController extends Controller
         ];
     }
 
-    private function sharePayload(BioimpedanceReportShare $share, ?string $plainToken = null): array
-    {
-        $url = $plainToken ? route('bioimpedance.public-report', $plainToken) : null;
-        $message = $plainToken ? $this->shareMessage($share->assessment, $plainToken) : $share->message;
-
-        return [
-            'id' => $share->id,
-            'bioimpedance_assessment_id' => $share->bioimpedance_assessment_id,
-            'channel' => $share->channel,
-            'recipient' => $share->recipient,
-            'message' => $message,
-            'url' => $url,
-            'whatsapp_url' => $url ? 'https://wa.me/?text='.rawurlencode($message) : null,
-            'expires_at' => $share->expires_at?->toIso8601String(),
-            'revoked_at' => $share->revoked_at?->toIso8601String(),
-            'viewed_at' => $share->viewed_at?->toIso8601String(),
-            'view_count' => $share->view_count,
-            'is_active' => ! $share->revoked_at && ! $share->expires_at->isPast(),
-        ];
-    }
-
-    private function shareMessage(BioimpedanceAssessment $assessment, ?string $plainToken = null): string
-    {
-        $url = $plainToken ? route('bioimpedance.public-report', $plainToken) : '[link temporário enviado somente no momento da geração]';
-
-        return sprintf(
-            'Olá, %s! Sua avaliação de bioimpedância realizada em %s está disponível. Acesse o relatório pelo link: %s',
-            $assessment->client->full_name,
-            $assessment->evaluated_at->format('d/m/Y'),
-            $url
-        );
-    }
-
-    private function publicReportHeaders(): array
-    {
-        return [
-            'Cache-Control' => 'no-store, no-cache, must-revalidate, private',
-            'Pragma' => 'no-cache',
-            'Expires' => '0',
-            'X-Robots-Tag' => 'noindex, nofollow',
-            'Referrer-Policy' => 'no-referrer',
-        ];
-    }
-
     private function revokeClientPublicShares(BioimpedanceClient $client): void
     {
         BioimpedanceReportShare::query()
@@ -1130,7 +1111,7 @@ class BioimpedanceController extends Controller
             'report_issued_at' => $assessment->report_issued_at?->toIso8601String(),
             'report_issue_count' => $assessment->report_issue_count,
             'shares' => $assessment->relationLoaded('shares')
-                ? $assessment->shares->sortByDesc('created_at')->values()->map(fn (BioimpedanceReportShare $share) => $this->sharePayload($share))->all()
+                ? $assessment->shares->sortByDesc('created_at')->values()->map(fn (BioimpedanceReportShare $share) => $this->reportSharePresenter->payload($share))->all()
                 : [],
         ];
     }

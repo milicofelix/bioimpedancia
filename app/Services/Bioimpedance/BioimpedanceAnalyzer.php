@@ -73,7 +73,7 @@ class BioimpedanceAnalyzer
             ? 'Gordura corporal registrada em '.number_format((float) $assessment['body_fat_percentage'], 1, ',', '.').'%, classificada como '.$this->bodyFatClassification((float) $assessment['body_fat_percentage'], $sex, $age)['classification'].'.'
             : 'Gordura corporal nao informada.';
 
-        return "IMC calculado automaticamente com base em peso e altura: {$calculatedBmi} kg/m², classificado como {$bmi['classification']}. {$fat}";
+        return 'IMC calculado automaticamente com base em peso e altura: '.number_format($calculatedBmi, 1, ',', '.')." kg/m², classificado como {$bmi['classification']}. {$fat}";
     }
 
     private function indicators(float $calculatedBmi, array $assessment, int $age, string $sex): array

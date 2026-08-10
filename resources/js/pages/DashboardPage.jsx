@@ -17,7 +17,7 @@ const emptyClient = {
 };
 
 const emptyAssessment = {
-	evaluated_at: new Date().toISOString().slice(0, 16),
+	evaluated_at: localDatetimeNow(),
 	weight_kg: '',
 	scale_bmi: '',
 	body_fat_percentage: '',
@@ -81,6 +81,29 @@ const evolutionPeriods = [
 	{ key: 'all', label: 'Tudo', days: null },
 ];
 
+const observationLoadingSteps = [
+	{
+		title: 'Preparando avaliação',
+		description: 'Organizando dados do cliente, snapshot de idade, sexo e resultados da Omron.',
+	},
+	{
+		title: 'Buscando referências',
+		description: 'Selecionando manual, protocolo e fontes aprovadas para esta avaliação.',
+	},
+	{
+		title: 'Gerando sugestão',
+		description: 'Consultando o assistente configurado e preservando as classificações oficiais.',
+	},
+	{
+		title: 'Validando segurança',
+		description: 'Conferindo fontes, linguagem permitida e possíveis inconsistências.',
+	},
+	{
+		title: 'Montando observação',
+		description: 'Preparando o texto para revisão e aprovação do profissional.',
+	},
+];
+
 function Field({ label, children }) {
 	return (
 		<label className="block">
@@ -92,6 +115,30 @@ function Field({ label, children }) {
 
 function inputClass() {
 	return 'mt-2 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:text-sm';
+}
+
+function localDatetimeNow() {
+	const date = new Date();
+	const timezoneOffset = date.getTimezoneOffset() * 60000;
+
+	return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
+}
+
+function fieldErrors(errors, field) {
+	const messages = errors?.[field];
+
+	return Array.isArray(messages) ? messages : [];
+}
+
+function errorMessages(errors) {
+	return Object.values(errors ?? {}).flat().filter(Boolean);
+}
+
+function FieldError({ errors, field }) {
+	const messages = fieldErrors(errors, field);
+	if (!messages.length) return null;
+
+	return <p className="mt-1 text-xs font-semibold text-rose-700">{messages[0]}</p>;
 }
 
 function formatDate(value) {
@@ -108,7 +155,7 @@ function formatIssueDate(value) {
 }
 
 function toDatetimeLocal(value) {
-	if (!value) return new Date().toISOString().slice(0, 16);
+	if (!value) return localDatetimeNow();
 
 	const date = new Date(value);
 	const timezoneOffset = date.getTimezoneOffset() * 60000;
@@ -407,6 +454,7 @@ export default function DashboardPage({ userName }) {
 	const [sharingAssessment, setSharingAssessment] = useState(false);
 	const [shareResult, setShareResult] = useState(null);
 	const [generatingObservation, setGeneratingObservation] = useState(false);
+	const [observationLoadingStep, setObservationLoadingStep] = useState(0);
 	const [observationAssistant, setObservationAssistant] = useState(null);
 	const [observationDraft, setObservationDraft] = useState('');
 	const [refreshingDashboard, setRefreshingDashboard] = useState(false);
@@ -429,6 +477,19 @@ export default function DashboardPage({ userName }) {
 			setSelectedAssessmentId(data.clients[0]?.assessments?.[0]?.id ?? null);
 		}).finally(() => setLoading(false));
 	}, []);
+
+	useEffect(() => {
+		if (!generatingObservation) {
+			setObservationLoadingStep(0);
+			return undefined;
+		}
+
+		const interval = window.setInterval(() => {
+			setObservationLoadingStep((current) => Math.min(current + 1, observationLoadingSteps.length - 1));
+		}, 1400);
+
+		return () => window.clearInterval(interval);
+	}, [generatingObservation]);
 
 	useEffect(() => {
 		const updateConnectionStatus = () => setIsOnline(navigator.onLine);
@@ -582,7 +643,7 @@ export default function DashboardPage({ userName }) {
 		setObservationDraft('');
 		setAssessmentMode('create');
 		setEditingAssessmentId(null);
-		setAssessmentForm({ ...emptyAssessment, evaluated_at: new Date().toISOString().slice(0, 16) });
+		setAssessmentForm({ ...emptyAssessment, evaluated_at: localDatetimeNow() });
 		setAssessmentChangeReason('');
 		window.setTimeout(() => assessmentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
 	}
@@ -607,7 +668,7 @@ export default function DashboardPage({ userName }) {
 		setShareResult(null);
 		setObservationAssistant(null);
 		setObservationDraft('');
-		setAssessmentForm({ ...emptyAssessment, evaluated_at: new Date().toISOString().slice(0, 16) });
+		setAssessmentForm({ ...emptyAssessment, evaluated_at: localDatetimeNow() });
 		setAssessmentChangeReason('');
 		setAssessmentDraftSavedAt(null);
 		setErrors({});
@@ -618,7 +679,7 @@ export default function DashboardPage({ userName }) {
 		if (key) {
 			window.localStorage.removeItem(key);
 		}
-		setAssessmentForm({ ...emptyAssessment, evaluated_at: new Date().toISOString().slice(0, 16) });
+		setAssessmentForm({ ...emptyAssessment, evaluated_at: localDatetimeNow() });
 		setAssessmentDraftSavedAt(null);
 	}
 
@@ -641,7 +702,7 @@ export default function DashboardPage({ userName }) {
 		setEditingAssessmentId(null);
 		setAssessmentForm({
 			...assessmentFormFromAssessment(assessment),
-			evaluated_at: new Date().toISOString().slice(0, 16),
+			evaluated_at: localDatetimeNow(),
 			notes: '',
 		});
 		setAssessmentChangeReason('');
@@ -878,9 +939,11 @@ export default function DashboardPage({ userName }) {
 	async function generateObservationSuggestion() {
 		if (!selectedAssessment || !canClinicalProfessional || generatingObservation) return;
 
+		setObservationLoadingStep(0);
 		setGeneratingObservation(true);
 		try {
 			const { data } = await window.axios.get(`/bioimpedance/assessments/${selectedAssessment.id}/observation-suggestion`);
+			setObservationLoadingStep(observationLoadingSteps.length - 1);
 			setObservationAssistant(data.assistant);
 			setObservationDraft(data.assistant?.suggestion ?? '');
 		} finally {
@@ -1337,6 +1400,14 @@ export default function DashboardPage({ userName }) {
 													{observationAssistant.validation_errors.map((error) => <li key={error}>{error}</li>)}
 												</ul>
 											) : null}
+											{observationAssistant.blocked_provider_errors?.length ? (
+												<div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+													<p className="font-bold uppercase tracking-wide">Resposta da IA substituída pelo backend</p>
+													<ul className="mt-2 space-y-1">
+														{observationAssistant.blocked_provider_errors.map((error) => <li key={error}>{error}</li>)}
+													</ul>
+												</div>
+											) : null}
 											<p className="mt-3 text-xs text-slate-500">{observationAssistant.notice}</p>
 										</div>
 									) : null}
@@ -1407,32 +1478,41 @@ export default function DashboardPage({ userName }) {
 
 						<form onSubmit={submitAssessment} onKeyDownCapture={focusNextFormField} className="mt-5 grid gap-3 md:grid-cols-4">
 							<Field label="Data da avaliação">
-								<input type="datetime-local" value={assessmentForm.evaluated_at} onChange={(event) => updateAssessment('evaluated_at', event.target.value)} className={inputClass()} />
+								<input type="datetime-local" value={assessmentForm.evaluated_at} max={localDatetimeNow()} onChange={(event) => updateAssessment('evaluated_at', event.target.value)} className={inputClass()} />
+								<FieldError errors={errors} field="evaluated_at" />
 							</Field>
 							<Field label="Peso kg">
 								<input inputMode="decimal" placeholder="90,2" value={assessmentForm.weight_kg} onChange={(event) => updateAssessment('weight_kg', event.target.value)} className={inputClass()} />
+								<FieldError errors={errors} field="weight_kg" />
 							</Field>
 							<Field label="IMC da balança">
 								<input inputMode="decimal" placeholder="29,8" value={assessmentForm.scale_bmi} onChange={(event) => updateAssessment('scale_bmi', event.target.value)} className={inputClass()} />
+								<FieldError errors={errors} field="scale_bmi" />
 							</Field>
 							<Field label="Gordura %">
 								<input inputMode="decimal" placeholder="28,4" value={assessmentForm.body_fat_percentage} onChange={(event) => updateAssessment('body_fat_percentage', event.target.value)} className={inputClass()} />
+								<FieldError errors={errors} field="body_fat_percentage" />
 							</Field>
 							<Field label="Músculo %">
 								<input inputMode="decimal" placeholder="31,2" value={assessmentForm.skeletal_muscle_percentage} onChange={(event) => updateAssessment('skeletal_muscle_percentage', event.target.value)} className={inputClass()} />
+								<FieldError errors={errors} field="skeletal_muscle_percentage" />
 							</Field>
 							<Field label="RM kcal">
 								<input inputMode="numeric" placeholder="1780" value={assessmentForm.resting_metabolism_kcal} onChange={(event) => updateAssessment('resting_metabolism_kcal', event.target.value)} className={inputClass()} />
+								<FieldError errors={errors} field="resting_metabolism_kcal" />
 							</Field>
 							<Field label="Idade corporal">
 								<input inputMode="numeric" placeholder="47" value={assessmentForm.body_age} onChange={(event) => updateAssessment('body_age', event.target.value)} className={inputClass()} />
+								<FieldError errors={errors} field="body_age" />
 							</Field>
 							<Field label="Gordura visceral">
 								<input inputMode="decimal" placeholder="12" value={assessmentForm.visceral_fat_level} onChange={(event) => updateAssessment('visceral_fat_level', event.target.value)} className={inputClass()} />
+								<FieldError errors={errors} field="visceral_fat_level" />
 							</Field>
 							<div className="md:col-span-4">
 								<Field label="Observação da avaliação">
 									<textarea value={assessmentForm.notes} onChange={(event) => updateAssessment('notes', event.target.value)} rows="3" className={inputClass()} />
+									<FieldError errors={errors} field="notes" />
 								</Field>
 							</div>
 							{assessmentMode === 'edit' ? (
@@ -1444,7 +1524,10 @@ export default function DashboardPage({ userName }) {
 							) : null}
 							{Object.keys(errors).length ? (
 								<div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 md:col-span-4">
-									Confira os campos obrigatórios e valores digitados.
+									<p className="font-bold">Não foi possível salvar a avaliação.</p>
+									<ul className="mt-2 list-disc space-y-1 pl-5">
+										{errorMessages(errors).map((message) => <li key={message}>{message}</li>)}
+									</ul>
 								</div>
 							) : null}
 						<button type="submit" disabled={(assessmentMode === 'edit' ? !canClinicalProfessional : !canCreateClinicalRecords) || !selectedClient || !selectedClient.is_active || savingAssessment} className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-4">
@@ -1458,6 +1541,43 @@ export default function DashboardPage({ userName }) {
 					</div>
 				</section>
 			</div>
+			{generatingObservation ? (
+				<div className="no-print fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="assistant-loading-title">
+					<div className="w-full max-w-xl rounded-2xl border border-white/70 bg-white p-6 shadow-2xl">
+						<div className="flex items-start gap-4">
+							<div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-100">
+								<div className="h-6 w-6 animate-spin rounded-full border-2 border-violet-200 border-t-violet-700"></div>
+							</div>
+							<div>
+								<p className="text-xs font-bold uppercase tracking-wide text-violet-700">Assistente inteligente</p>
+								<h2 id="assistant-loading-title" className="mt-1 text-lg font-bold text-slate-950">{observationLoadingSteps[observationLoadingStep]?.title}</h2>
+								<p className="mt-2 text-sm leading-6 text-slate-600">{observationLoadingSteps[observationLoadingStep]?.description}</p>
+							</div>
+						</div>
+
+						<div className="mt-5 space-y-3">
+							{observationLoadingSteps.map((step, index) => {
+								const isDone = index < observationLoadingStep;
+								const isCurrent = index === observationLoadingStep;
+
+								return (
+									<div key={step.title} className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isCurrent ? 'border-violet-200 bg-violet-50' : 'border-slate-100 bg-slate-50'}`}>
+										<span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${isDone ? 'bg-emerald-500 text-white' : isCurrent ? 'bg-violet-600 text-white' : 'bg-white text-slate-400'}`}>
+											{isDone ? '✓' : index + 1}
+										</span>
+										<div>
+											<p className={`text-sm font-semibold ${isCurrent ? 'text-violet-900' : 'text-slate-700'}`}>{step.title}</p>
+											<p className="text-xs text-slate-500">{step.description}</p>
+										</div>
+									</div>
+								);
+							})}
+						</div>
+
+						<p className="mt-5 text-xs leading-5 text-slate-500">A sugestão será entregue para revisão. As classificações oficiais da HBF-514C continuam sendo calculadas somente pelo backend.</p>
+					</div>
+				</div>
+			) : null}
 		</main>
 	);
 }

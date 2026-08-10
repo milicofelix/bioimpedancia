@@ -1,0 +1,51 @@
+<?php
+
+return [
+    'accepted' => 'O campo :attribute deve ser aceito.',
+    'after_or_equal' => 'O campo :attribute deve ser uma data igual ou posterior a :date.',
+    'before' => 'O campo :attribute deve ser uma data anterior a :date.',
+    'before_or_equal' => 'O campo :attribute deve ser uma data igual ou anterior a :date.',
+    'between' => [
+        'numeric' => 'O campo :attribute deve estar entre :min e :max.',
+        'string' => 'O campo :attribute deve ter entre :min e :max caracteres.',
+    ],
+    'date' => 'O campo :attribute deve ser uma data válida.',
+    'email' => 'O campo :attribute deve ser um e-mail válido.',
+    'exists' => 'O :attribute selecionado é inválido.',
+    'integer' => 'O campo :attribute deve ser um número inteiro.',
+    'max' => [
+        'string' => 'O campo :attribute não pode ter mais que :max caracteres.',
+    ],
+    'numeric' => 'O campo :attribute deve ser um número válido.',
+    'required' => 'O campo :attribute é obrigatório.',
+    'size' => [
+        'string' => 'O campo :attribute deve ter :size caracteres.',
+    ],
+    'unique' => 'O campo :attribute já está em uso.',
+
+    'attributes' => [
+        'bioimpedance_client_id' => 'cliente',
+        'evaluated_at' => 'data da avaliação',
+        'weight_kg' => 'peso',
+        'scale_bmi' => 'IMC da balança',
+        'body_fat_percentage' => 'gordura corporal',
+        'skeletal_muscle_percentage' => 'músculo esquelético',
+        'resting_metabolism_kcal' => 'metabolismo basal',
+        'body_age' => 'idade corporal',
+        'visceral_fat_level' => 'gordura visceral',
+        'notes' => 'observações',
+        'full_name' => 'nome completo',
+        'birth_date' => 'data de nascimento',
+        'biological_sex' => 'sexo biológico',
+        'height_cm' => 'altura',
+        'phone' => 'telefone',
+        'phone_digits' => 'telefone',
+        'email' => 'e-mail',
+        'cpf' => 'CPF',
+        'address' => 'endereço',
+        'emergency_contact_name' => 'contato de emergência',
+        'emergency_contact_phone' => 'telefone de emergência',
+        'consent_accepted_at' => 'consentimento',
+        'next_assessment_at' => 'próxima avaliação',
+    ],
+];
