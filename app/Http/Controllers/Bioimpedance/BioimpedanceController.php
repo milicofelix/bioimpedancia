@@ -726,7 +726,7 @@ class BioimpedanceController extends Controller
             'body_type' => ['nullable', 'string', 'max:100'],
             'resting_metabolism_kcal' => ['nullable', 'integer', $isRelaxmedic ? 'between:100,10000' : 'between:385,3999'],
             'body_age' => ['nullable', 'integer', $isRelaxmedic ? 'between:1,120' : 'between:18,80'],
-            'visceral_fat_level' => ['nullable', 'integer', $isRelaxmedic ? 'between:0,100' : 'between:1,30'],
+            'visceral_fat_level' => ['nullable', $isRelaxmedic ? 'numeric' : 'integer', $isRelaxmedic ? 'between:0,100' : 'between:1,30'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ], [
             'bioimpedance_client_id.required' => 'Selecione um cliente antes de salvar a avaliação.',
@@ -747,7 +747,8 @@ class BioimpedanceController extends Controller
             'resting_metabolism_kcal.between' => $isRelaxmedic ? 'O metabolismo basal deve estar entre 100 e 10000 kcal.' : 'O metabolismo basal deve estar entre 385 e 3999 kcal.',
             'body_age.integer' => 'Informe a idade corporal em anos, sem casas decimais.',
             'body_age.between' => $isRelaxmedic ? 'A idade corporal deve estar entre 1 e 120 anos.' : 'A idade corporal deve estar entre 18 e 80 anos.',
-            'visceral_fat_level.integer' => 'Informe a gordura visceral como número inteiro, de 1 a 30.',
+            'visceral_fat_level.numeric' => 'Informe a gordura visceral como número válido. Exemplo: 8,6.',
+            'visceral_fat_level.integer' => 'Informe a gordura visceral da Omron como número inteiro, de 1 a 30.',
             'visceral_fat_level.between' => $isRelaxmedic ? 'A gordura visceral deve estar entre 0 e 100.' : 'A gordura visceral deve estar entre 1 e 30.',
             'notes.max' => 'A observação da avaliação pode ter no máximo 2000 caracteres.',
         ]);

@@ -518,7 +518,11 @@ function assessmentFormFromAssessment(assessment) {
 		body_type: assessment.body_type ?? '',
 		resting_metabolism_kcal: assessment.resting_metabolism_kcal ?? '',
 		body_age: assessment.body_age ?? '',
-		visceral_fat_level: assessment.visceral_fat_level == null ? '' : String(Math.trunc(assessment.visceral_fat_level)),
+		visceral_fat_level: assessment.visceral_fat_level == null
+			? ''
+			: assessment.device_model === 'Relaxmedic'
+				? numberBr(assessment.visceral_fat_level, 1)
+				: String(Math.trunc(assessment.visceral_fat_level)),
 		notes: assessment.notes ?? '',
 	};
 }
@@ -951,7 +955,9 @@ export default function DashboardPage({ userName }) {
 	}
 
 	function updateAssessment(field, value) {
-		const integerFields = ['resting_metabolism_kcal', 'body_age', 'visceral_fat_level'];
+		const acceptsDecimalVisceralFat = isRelaxmedicAssessment
+			|| (assessmentMode === 'edit' && selectedAssessment?.device_model === 'Relaxmedic');
+		const integerFields = ['resting_metabolism_kcal', 'body_age', ...(!acceptsDecimalVisceralFat ? ['visceral_fat_level'] : [])];
 		const decimalFields = [
 			'weight_kg',
 			'scale_bmi',
@@ -968,6 +974,7 @@ export default function DashboardPage({ userName }) {
 			'water_weight_kg',
 			'protein_mass_kg',
 			'ideal_body_weight_kg',
+			...(acceptsDecimalVisceralFat ? ['visceral_fat_level'] : []),
 		];
 		const maskedValue = integerFields.includes(field)
 			? normalizeInteger(value).slice(0, 4)

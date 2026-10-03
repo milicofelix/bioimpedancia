@@ -219,7 +219,7 @@
                 <td class="box" style="width: 50%;">@include('bioimpedance.partials.pdf-scale', ['title' => 'Músculo esquelético', 'value' => $br($assessment['skeletal_muscle_percentage']).' %', 'indicator' => $muscle])</td>
             </tr>
             <tr>
-                <td class="box">@include('bioimpedance.partials.pdf-scale', ['title' => 'Gordura visceral', 'value' => $br($assessment['visceral_fat_level'], 0).' nível', 'indicator' => $visceral])</td>
+                <td class="box">@include('bioimpedance.partials.pdf-scale', ['title' => 'Gordura visceral', 'value' => $br($assessment['visceral_fat_level'], $isRelaxmedic ? 1 : 0).' nível', 'indicator' => $visceral])</td>
                 <td class="box">
                     <div class="label">Metabolismo basal</div>
                     <div class="metric-value">{{ $assessment['resting_metabolism_kcal'] ? number_format($assessment['resting_metabolism_kcal'], 0, ',', '.') : '-' }} <span class="metric-unit">kcal/dia</span></div>
