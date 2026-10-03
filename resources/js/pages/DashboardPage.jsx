@@ -85,6 +85,22 @@ const relaxmedicMetricLabels = {
 	body_type: 'Tipo de corpo',
 };
 
+const relaxmedicAdditionalMetricFields = [
+	'muscle_rate_percentage',
+	'lean_body_mass_kg',
+	'subcutaneous_fat_percentage',
+	'body_water_percentage',
+	'muscle_mass_kg',
+	'bone_mass_kg',
+	'protein_percentage',
+	'fat_mass_kg',
+	'water_weight_kg',
+	'protein_mass_kg',
+	'ideal_body_weight_kg',
+	'obesity_level',
+	'body_type',
+];
+
 const emptyUserForm = {
 	name: '',
 	email: '',
@@ -1111,6 +1127,7 @@ export default function DashboardPage({ userName }) {
 			skeletal_muscle_percentage: normalizeDecimal(assessmentForm.skeletal_muscle_percentage),
 			visceral_fat_level: normalizeDecimal(assessmentForm.visceral_fat_level),
 			relaxmedic_review_confirmed: isRelaxmedicAssessment && relaxmedicReviewConfirmed,
+			source_metadata: isRelaxmedicAssessment ? relaxmedicExtraction?.image : undefined,
 		};
 
 		if (assessmentMode === 'edit') {
@@ -1400,7 +1417,7 @@ export default function DashboardPage({ userName }) {
 								</select>
 							</Field>
 							<p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
-								A configuração específica do modelo selecionado será adicionada posteriormente.
+								O modelo selecionado define o fluxo de entrada, as métricas e o relatório das novas avaliações.
 							</p>
 							<Field label="Nome comercial">
 								<input value={clinicForm.display_name} onChange={(event) => updateClinic('display_name', event.target.value)} className={inputClass()} />
@@ -1573,6 +1590,7 @@ export default function DashboardPage({ userName }) {
 											{assessment.is_canceled ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] uppercase text-rose-700">Cancelada</span> : null}
 										</span>
 										<span className="mt-2 block text-xs text-slate-500">Peso {numberBr(assessment.weight_kg, 1)} kg • IMC {numberBr(assessment.calculated_bmi, 1)}</span>
+										<span className="mt-1 block text-xs font-semibold text-sky-700">{assessment.device_model ?? 'Modelo não informado'}</span>
 										<span className="mt-1 block text-xs text-slate-400">{assessment.correction_count ? `${assessment.correction_count} correção(ões)` : 'Sem correções'}</span>
 									</button>
 								))}
@@ -1600,6 +1618,7 @@ export default function DashboardPage({ userName }) {
 									) : null}
 								</div>
 							) : null}
+							<AssessmentDetails assessment={selectedAssessment} />
 							{selectedAssessment && !selectedAssessment.is_canceled ? (
 								<div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 p-4">
 									<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -2040,6 +2059,57 @@ function ReminderList({ title, clients, emptyText, onSelectClient }) {
 	);
 }
 
+function relaxmedicMetricValue(field, value) {
+	if (value === null || value === undefined || value === '') return '-';
+	if (['obesity_level', 'body_type'].includes(field)) return value;
+	if (['resting_metabolism_kcal', 'body_age'].includes(field)) return new Intl.NumberFormat('pt-BR').format(value);
+
+	return numberBr(value, 1);
+}
+
+function AssessmentDetails({ assessment }) {
+	if (!assessment) return null;
+
+	const isRelaxmedic = assessment.device_model === 'Relaxmedic';
+	const metrics = isRelaxmedic
+		? relaxmedicAdditionalMetricFields.filter((field) => assessment[field] !== null && assessment[field] !== undefined && assessment[field] !== '')
+		: [];
+
+	return (
+		<div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+			<div className="flex flex-wrap items-center justify-between gap-2">
+				<div>
+					<p className="text-xs font-bold uppercase tracking-wide text-slate-500">Detalhes da avaliação</p>
+					<p className="mt-1 text-sm font-semibold text-slate-900">Modelo: {assessment.device_model ?? 'Não informado'}</p>
+				</div>
+				<span className={`rounded-full px-3 py-1 text-xs font-bold ${isRelaxmedic ? 'bg-sky-100 text-sky-700' : 'bg-slate-200 text-slate-700'}`}>
+					{isRelaxmedic ? 'Importada de imagem' : 'Entrada manual'}
+				</span>
+			</div>
+
+			{metrics.length ? (
+				<div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+					{metrics.map((field) => (
+						<div key={field} className="rounded-xl border border-slate-200 bg-white p-3">
+							<p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{relaxmedicMetricLabels[field]}</p>
+							<p className="mt-1 text-base font-semibold text-slate-950">{relaxmedicMetricValue(field, assessment[field])}</p>
+						</div>
+					))}
+				</div>
+			) : null}
+
+			{isRelaxmedic && assessment.source_metadata ? (
+				<div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-900">
+					<p className="font-bold uppercase tracking-wide">Origem auditável</p>
+					<p className="mt-1">Arquivo: {assessment.source_metadata.image_name} • imagem não armazenada</p>
+					<p className="break-all">SHA-256: {assessment.source_metadata.image_sha256}</p>
+					<p>Processada em {formatDate(assessment.source_metadata.processed_at)} • conferida em {formatDate(assessment.source_metadata.review_confirmed_at)}</p>
+				</div>
+			) : null}
+		</div>
+	);
+}
+
 function Report({ clinic, client, assessment, professional }) {
 	if (!client) {
 		return (
@@ -2062,6 +2132,10 @@ function Report({ clinic, client, assessment, professional }) {
 	const validationTitle = warnings.length ? 'Dados com alertas' : 'Dados validados';
 	const validationText = warnings.length ? warnings[0] : 'Nenhum alerta automático identificado.';
 	const formattedProfessional = professionalName(professional);
+	const isRelaxmedic = assessment?.device_model === 'Relaxmedic';
+	const additionalMetrics = isRelaxmedic
+		? relaxmedicAdditionalMetricFields.filter((field) => assessment?.[field] !== null && assessment?.[field] !== undefined && assessment?.[field] !== '')
+		: [];
 
 	return (
 		<article className="report overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm print:border-0 print:shadow-none">
@@ -2178,6 +2252,20 @@ function Report({ clinic, client, assessment, professional }) {
 							</div>
 						</section>
 
+						{additionalMetrics.length ? (
+							<section className="mt-6 rounded-2xl border border-sky-100 bg-sky-50/40 p-5">
+								<h3 className="text-base font-bold uppercase tracking-wide text-sky-800">Indicadores Relaxmedic</h3>
+								<div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+									{additionalMetrics.map((field) => (
+										<div key={field} className="rounded-xl border border-sky-100 bg-white p-4">
+											<p className="text-xs font-bold uppercase tracking-wide text-slate-500">{relaxmedicMetricLabels[field]}</p>
+											<p className="mt-2 text-2xl font-bold text-slate-950">{relaxmedicMetricValue(field, assessment[field])}</p>
+										</div>
+									))}
+								</div>
+							</section>
+						) : null}
+
 						<section className="mt-6 rounded-2xl border border-rose-100 bg-white p-5">
 							<h3 className="text-base font-bold uppercase tracking-wide text-[#b96f7d]">Síntese da avaliação</h3>
 							<div className="mt-4 space-y-2 text-sm leading-6 text-slate-700">
@@ -2197,9 +2285,19 @@ function Report({ clinic, client, assessment, professional }) {
 							</div>
 							<div className="rounded-2xl bg-stone-100 p-5">
 								<h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Protocolo de medição</h3>
-								<p className="mt-4 text-sm leading-6 text-slate-600">Equipamento Omron | Entrada manual | Conferência automática de IMC</p>
+								<p className="mt-4 text-sm leading-6 text-slate-600">
+									{isRelaxmedic ? 'Equipamento Relaxmedic/RelaxFit | Importação de imagem | Conferência humana obrigatória' : 'Equipamento Omron | Entrada manual | Conferência automática de IMC'}
+								</p>
 							</div>
 						</section>
+
+						{isRelaxmedic && assessment.source_metadata ? (
+							<section className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-600">
+								<p className="font-bold uppercase tracking-wide text-slate-800">Rastreabilidade da origem</p>
+								<p className="mt-2">Imagem {assessment.source_metadata.image_name} processada em {formatDate(assessment.source_metadata.processed_at)}. O arquivo original não foi armazenado.</p>
+								<p className="break-all">SHA-256: {assessment.source_metadata.image_sha256}</p>
+							</section>
+						) : null}
 					</>
 				) : (
 					<div className="py-10 text-center text-slate-500">Cadastre a primeira avaliação para gerar o relatório profissional.</div>

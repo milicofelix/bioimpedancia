@@ -36,6 +36,8 @@
         .muted { color: #667085; }
         .body { padding: 16px 20px 14px; background: #fffafa; }
         .client-grid, .hero-grid, .composition-grid, .protocol-grid { width: 100%; border-collapse: separate; border-spacing: 8px; }
+        .extra-grid { width: 100%; border-collapse: separate; border-spacing: 6px; }
+        .extra-grid td { width: 33.33%; }
         .box {
             background: #ffffff;
             border: 1px solid #f2d6dc;
@@ -138,6 +140,23 @@
     $br = fn ($value, $decimals = 1) => $value === null || $value === '' ? '-' : number_format((float) $value, $decimals, ',', '.');
     $primaryColor = $clinic['primary_color'] ?? '#d88b9a';
     $secondaryColor = $clinic['secondary_color'] ?? '#4a4a4a';
+    $isRelaxmedic = ($assessment['device_model'] ?? null) === 'Relaxmedic';
+    $sourceMetadata = $assessment['source_metadata'] ?? [];
+    $relaxmedicMetrics = array_filter([
+        'Taxa muscular' => isset($assessment['muscle_rate_percentage']) ? $br($assessment['muscle_rate_percentage']).' %' : null,
+        'Massa corporal magra' => isset($assessment['lean_body_mass_kg']) ? $br($assessment['lean_body_mass_kg']).' kg' : null,
+        'Gordura subcutânea' => isset($assessment['subcutaneous_fat_percentage']) ? $br($assessment['subcutaneous_fat_percentage']).' %' : null,
+        'Água corporal' => isset($assessment['body_water_percentage']) ? $br($assessment['body_water_percentage']).' %' : null,
+        'Massa muscular' => isset($assessment['muscle_mass_kg']) ? $br($assessment['muscle_mass_kg']).' kg' : null,
+        'Massa óssea' => isset($assessment['bone_mass_kg']) ? $br($assessment['bone_mass_kg']).' kg' : null,
+        'Proteína' => isset($assessment['protein_percentage']) ? $br($assessment['protein_percentage']).' %' : null,
+        'Massa gorda' => isset($assessment['fat_mass_kg']) ? $br($assessment['fat_mass_kg']).' kg' : null,
+        'Peso da água' => isset($assessment['water_weight_kg']) ? $br($assessment['water_weight_kg']).' kg' : null,
+        'Massa de proteína' => isset($assessment['protein_mass_kg']) ? $br($assessment['protein_mass_kg']).' kg' : null,
+        'Peso corporal ideal' => isset($assessment['ideal_body_weight_kg']) ? $br($assessment['ideal_body_weight_kg']).' kg' : null,
+        'Nível de obesidade' => $assessment['obesity_level'] ?? null,
+        'Tipo de corpo' => $assessment['body_type'] ?? null,
+    ], fn ($value) => $value !== null && $value !== '');
 @endphp
 <div class="page">
     <div class="header" style="border-bottom-color: {{ $primaryColor }};">
@@ -209,13 +228,35 @@
             </tr>
         </table>
 
+        @if($isRelaxmedic && count($relaxmedicMetrics))
+            <div class="section-title" style="color: {{ $secondaryColor }};">Indicadores Relaxmedic</div>
+            <table class="extra-grid">
+                @foreach(array_chunk($relaxmedicMetrics, 3, true) as $row)
+                    <tr>
+                        @foreach($row as $label => $value)
+                            <td class="box">
+                                <div class="label">{{ $label }}</div>
+                                <div style="margin-top: 5px; font-size: 14px; font-weight: 700;">{{ $value }}</div>
+                            </td>
+                        @endforeach
+                        @for($i = count($row); $i < 3; $i++)
+                            <td></td>
+                        @endfor
+                    </tr>
+                @endforeach
+            </table>
+        @endif
+
         <div class="summary">
             <div class="section-title" style="margin-top: 0; color: {{ $primaryColor }};">Síntese da avaliação</div>
             <p>{{ $assessment['analysis']['summary'] ?? 'Síntese indisponível.' }}</p>
             @if($assessment['notes'])
                 <p><strong>Observações:</strong> {{ $assessment['notes'] }}</p>
             @endif
-            <p class="muted">Equipamento {{ $reference['manufacturer'] ?? 'Omron' }} {{ $assessment['device_model'] ?? ($reference['model'] ?? 'HBF-514C') }} | Versão {{ $assessment['reference_version'] ?? ($reference['classification_version'] ?? '1.0.0') }} | Entrada manual</p>
+            <p class="muted">Equipamento {{ $reference['manufacturer'] ?? 'Omron' }} {{ $assessment['device_model'] ?? ($reference['model'] ?? 'HBF-514C') }} | Versão {{ $assessment['reference_version'] ?? ($reference['classification_version'] ?? '1.0.0') }} | {{ $isRelaxmedic ? 'Importação de imagem com conferência humana' : 'Entrada manual' }}</p>
+            @if($isRelaxmedic && $sourceMetadata)
+                <p class="muted"><strong>Origem auditável:</strong> {{ $sourceMetadata['image_name'] ?? 'Imagem Relaxmedic' }} | SHA-256 {{ $sourceMetadata['image_sha256'] ?? '-' }} | Imagem original não armazenada.</p>
+            @endif
         </div>
     </div>
     <div class="footer">

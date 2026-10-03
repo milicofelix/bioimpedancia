@@ -46,6 +46,7 @@ class BioimpedanceAssessment extends Model
         'body_age',
         'visceral_fat_level',
         'analysis',
+        'source_metadata',
         'notes',
         'canceled_at',
         'canceled_by_user_id',
@@ -80,6 +81,7 @@ class BioimpedanceAssessment extends Model
             'ideal_body_weight_kg' => 'decimal:1',
             'visceral_fat_level' => 'decimal:1',
             'analysis' => 'array',
+            'source_metadata' => 'array',
         ];
     }
 

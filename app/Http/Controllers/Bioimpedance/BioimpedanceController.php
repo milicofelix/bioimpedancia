@@ -266,17 +266,47 @@ class BioimpedanceController extends Controller
         ]);
     }
 
-    public function storeAssessment(Request $request, BioimpedanceAnalyzer $analyzer): JsonResponse
+    public function storeAssessment(Request $request, BioimpedanceAnalyzer $analyzer, RelaxmedicImageProcessor $imageProcessor): JsonResponse
     {
         $this->authorizeCreateClinicalRecords($request);
+        $sourceMetadata = null;
 
         if (BioimpedanceClinicSetting::current()->scale_model === BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDIC) {
             $this->authorizeClinicalProfessional($request);
-            $request->validate([
+            $source = $request->validate([
                 'relaxmedic_review_confirmed' => ['accepted'],
+                'source_metadata' => ['required', 'array'],
+                'source_metadata.name' => ['required', 'string', 'max:255'],
+                'source_metadata.size_bytes' => ['required', 'integer', 'between:1,10485760'],
+                'source_metadata.mime_type' => ['required', Rule::in(['image/jpeg'])],
+                'source_metadata.stored' => ['required', 'declined'],
+                'source_metadata.sha256' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/'],
+                'source_metadata.processed_at' => ['required', 'date'],
+                'source_metadata.processor_model' => ['required', 'string', 'max:100'],
+                'source_metadata.signature' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/'],
             ], [
                 'relaxmedic_review_confirmed.accepted' => 'Confirme que os dados foram conferidos com a imagem antes de salvar.',
+                'source_metadata.required' => 'Processe novamente a imagem antes de salvar a avaliação.',
             ]);
+
+            if (! $imageProcessor->verifyMetadata($source['source_metadata'])) {
+                throw ValidationException::withMessages([
+                    'source_metadata' => 'A origem da extração não pôde ser validada. Processe novamente a imagem.',
+                ]);
+            }
+
+            $sourceMetadata = [
+                'type' => 'relaxmedic_image_extraction',
+                'image_name' => $source['source_metadata']['name'],
+                'image_size_bytes' => $source['source_metadata']['size_bytes'],
+                'image_mime_type' => $source['source_metadata']['mime_type'],
+                'image_sha256' => $source['source_metadata']['sha256'],
+                'image_stored' => false,
+                'processed_at' => $source['source_metadata']['processed_at'],
+                'processor_model' => $source['source_metadata']['processor_model'],
+                'review_confirmed_at' => now()->toIso8601String(),
+                'reviewed_by_user_id' => $request->user()->id,
+            ];
         }
 
         $validated = $this->validateAssessment($request);
@@ -301,6 +331,7 @@ class BioimpedanceController extends Controller
             'calculated_bmi' => $analysis['calculated_bmi'],
             'bmi_difference' => $analysis['bmi_difference'],
             'analysis' => $analysis,
+            'source_metadata' => $sourceMetadata,
         ]);
 
         return response()->json([
@@ -801,6 +832,7 @@ class BioimpedanceController extends Controller
             'body_age',
             'visceral_fat_level',
             'analysis',
+            'source_metadata',
             'notes',
             'correction_count',
             'canceled_at',
@@ -1221,6 +1253,7 @@ class BioimpedanceController extends Controller
             'body_age' => $assessment->body_age,
             'visceral_fat_level' => $assessment->visceral_fat_level === null ? null : (float) $assessment->visceral_fat_level,
             'analysis' => $analysis,
+            'source_metadata' => $assessment->source_metadata,
             'notes' => $assessment->notes,
             'correction_count' => $assessment->correction_count,
             'canceled_at' => $assessment->canceled_at?->toIso8601String(),

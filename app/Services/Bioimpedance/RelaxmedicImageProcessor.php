@@ -127,7 +127,44 @@ class RelaxmedicImageProcessor
             throw new RuntimeException('O serviço de leitura retornou uma resposta inválida.');
         }
 
-        return $this->normalize($payload, $image);
+        $result = $this->normalize($payload, $image);
+        $imageMetadata = [
+            ...$result['image'],
+            'sha256' => hash('sha256', $contents),
+            'processed_at' => now()->toIso8601String(),
+            'processor_model' => (string) config('services.openai.vision_model', config('services.openai.model', 'gpt-5.1')),
+        ];
+        $result['image'] = [
+            ...$imageMetadata,
+            'signature' => $this->signMetadata($imageMetadata),
+        ];
+
+        return $result;
+    }
+
+    public function verifyMetadata(array $metadata): bool
+    {
+        $signature = $metadata['signature'] ?? null;
+        if (! is_string($signature) || ! preg_match('/^[a-f0-9]{64}$/', $signature)) {
+            return false;
+        }
+
+        return hash_equals($this->signMetadata($metadata), $signature);
+    }
+
+    private function signMetadata(array $metadata): string
+    {
+        $payload = collect([
+            'name',
+            'size_bytes',
+            'mime_type',
+            'stored',
+            'sha256',
+            'processed_at',
+            'processor_model',
+        ])->mapWithKeys(fn (string $key) => [$key => $metadata[$key] ?? null])->all();
+
+        return hash_hmac('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), (string) config('app.key'));
     }
 
     private function normalize(array $payload, UploadedFile $image): array
