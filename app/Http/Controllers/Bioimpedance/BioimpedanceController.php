@@ -15,8 +15,11 @@ use App\Services\Bioimpedance\BioimpedanceAnalyzer;
 use App\Services\Bioimpedance\BioimpedanceObservationAssistant;
 use App\Services\Bioimpedance\BioimpedanceReportSharePresenter;
 use App\Services\Bioimpedance\LegacyBioimpedanceAnalysisRefresher;
+use App\Services\Bioimpedance\RelaxmedicImageProcessor;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -294,6 +297,53 @@ class BioimpedanceController extends Controller
             'client' => $this->clientPayload($this->loadClientAssessments($client->refresh())),
             'assessment' => $this->assessmentPayload($assessment),
         ], 201);
+    }
+
+    public function processRelaxmedicImage(Request $request, RelaxmedicImageProcessor $processor): JsonResponse
+    {
+        $this->authorizeCreateClinicalRecords($request);
+
+        if (BioimpedanceClinicSetting::current()->scale_model !== BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDIC) {
+            throw ValidationException::withMessages([
+                'image' => 'Selecione a balança Relaxmedic nas configurações antes de processar a imagem.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'image' => [
+                'required',
+                'file',
+                'image',
+                'mimes:jpg,jpeg',
+                'mimetypes:image/jpeg',
+                'max:10240',
+                'dimensions:min_width=200,min_height=400,max_width=10000,max_height=20000',
+            ],
+        ], [
+            'image.required' => 'Selecione uma imagem JPEG ou JPG.',
+            'image.image' => 'O arquivo enviado não é uma imagem válida.',
+            'image.mimes' => 'A imagem deve estar no formato JPEG ou JPG.',
+            'image.mimetypes' => 'A imagem deve estar no formato JPEG ou JPG.',
+            'image.max' => 'A imagem deve ter no máximo 10 MB.',
+            'image.dimensions' => 'A imagem possui dimensões incompatíveis com o relatório.',
+        ]);
+
+        try {
+            $extraction = $processor->process($validated['image']);
+        } catch (ConnectionException|RequestException $exception) {
+            return response()->json([
+                'message' => 'Não foi possível acessar o serviço de leitura da imagem. Tente novamente.',
+            ], 502);
+        } catch (\RuntimeException $exception) {
+            return response()->json([
+                'message' => $exception->getMessage(),
+                'errors' => ['image' => [$exception->getMessage()]],
+            ], 422);
+        }
+
+        return response()->json([
+            'extraction' => $extraction,
+        ]);
     }
 
     public function updateAssessment(Request $request, BioimpedanceAssessment $assessment, BioimpedanceAnalyzer $analyzer): JsonResponse

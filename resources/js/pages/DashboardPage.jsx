@@ -49,6 +49,29 @@ const defaultClinic = {
 
 const relaxmedicMaxImageBytes = 10 * 1024 * 1024;
 
+const relaxmedicMetricLabels = {
+	weight_kg: 'Peso (kg)',
+	scale_bmi: 'IMC',
+	body_fat_percentage: 'Gordura corporal (%)',
+	muscle_rate_percentage: 'Taxa muscular (%)',
+	lean_body_mass_kg: 'Massa corporal magra (kg)',
+	subcutaneous_fat_percentage: 'Gordura subcutânea (%)',
+	visceral_fat_level: 'Gordura visceral',
+	body_water_percentage: 'Água corporal (%)',
+	skeletal_muscle_percentage: 'Músculo esquelético (%)',
+	muscle_mass_kg: 'Massa muscular (kg)',
+	bone_mass_kg: 'Massa óssea (kg)',
+	protein_percentage: 'Proteína (%)',
+	resting_metabolism_kcal: 'TMB (kcal)',
+	body_age: 'Idade do corpo',
+	fat_mass_kg: 'Massa gorda (kg)',
+	water_weight_kg: 'Peso da água (kg)',
+	protein_mass_kg: 'Massa de proteína (kg)',
+	ideal_body_weight_kg: 'Peso corporal ideal (kg)',
+	obesity_level: 'Nível de obesidade',
+	body_type: 'Tipo de corpo',
+};
+
 const emptyUserForm = {
 	name: '',
 	email: '',
@@ -470,6 +493,8 @@ export default function DashboardPage({ userName }) {
 	const [relaxmedicImage, setRelaxmedicImage] = useState(null);
 	const [relaxmedicImagePreview, setRelaxmedicImagePreview] = useState(null);
 	const [relaxmedicImageError, setRelaxmedicImageError] = useState('');
+	const [processingRelaxmedicImage, setProcessingRelaxmedicImage] = useState(false);
+	const [relaxmedicExtraction, setRelaxmedicExtraction] = useState(null);
 
 	useEffect(() => {
 		window.axios.get('/bioimpedance').then(({ data }) => {
@@ -527,6 +552,7 @@ export default function DashboardPage({ userName }) {
 
 		setRelaxmedicImage(null);
 		setRelaxmedicImageError('');
+		setRelaxmedicExtraction(null);
 		if (relaxmedicImageInputRef.current) {
 			relaxmedicImageInputRef.current.value = '';
 		}
@@ -709,6 +735,7 @@ export default function DashboardPage({ userName }) {
 	function clearRelaxmedicImage() {
 		setRelaxmedicImage(null);
 		setRelaxmedicImageError('');
+		setRelaxmedicExtraction(null);
 		if (relaxmedicImageInputRef.current) {
 			relaxmedicImageInputRef.current.value = '';
 		}
@@ -718,6 +745,7 @@ export default function DashboardPage({ userName }) {
 		const file = event.target.files?.[0] ?? null;
 		setRelaxmedicImage(null);
 		setRelaxmedicImageError('');
+		setRelaxmedicExtraction(null);
 
 		if (!file) return;
 
@@ -735,6 +763,27 @@ export default function DashboardPage({ userName }) {
 		}
 
 		setRelaxmedicImage(file);
+	}
+
+	async function processRelaxmedicImage() {
+		if (!relaxmedicImage || processingRelaxmedicImage) return;
+
+		setProcessingRelaxmedicImage(true);
+		setRelaxmedicImageError('');
+		setRelaxmedicExtraction(null);
+
+		const payload = new FormData();
+		payload.append('image', relaxmedicImage);
+
+		try {
+			const { data } = await window.axios.post('/bioimpedance/relaxmedic/process-image', payload);
+			setRelaxmedicExtraction(data.extraction);
+		} catch (error) {
+			const imageError = error.response?.data?.errors?.image?.[0];
+			setRelaxmedicImageError(imageError ?? error.response?.data?.message ?? 'Não foi possível processar a imagem. Tente novamente.');
+		} finally {
+			setProcessingRelaxmedicImage(false);
+		}
 	}
 
 	function clearAssessmentDraft() {
@@ -1586,13 +1635,59 @@ export default function DashboardPage({ userName }) {
 												<p className="mt-2 break-all text-sm text-slate-600">{relaxmedicImage.name}</p>
 												<p className="mt-1 text-xs text-slate-500">{(relaxmedicImage.size / 1024 / 1024).toFixed(2)} MB</p>
 												<p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-													A imagem ainda não foi enviada nem processada. Nenhuma avaliação será salva nesta etapa.
+													A leitura não salva a avaliação nem mantém uma cópia da imagem no banco ou no armazenamento desta aplicação.
 												</p>
-												<button type="button" onClick={clearRelaxmedicImage} className="mt-4 rounded-xl border border-rose-200 px-4 py-2 text-sm font-bold text-rose-700 transition hover:bg-rose-50">
-													Remover imagem
-												</button>
+												<div className="mt-4 flex flex-wrap gap-2">
+													<button type="button" onClick={processRelaxmedicImage} disabled={processingRelaxmedicImage} className="rounded-xl bg-sky-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-60">
+														{processingRelaxmedicImage ? 'Lendo imagem...' : relaxmedicExtraction ? 'Processar novamente' : 'Ler informações da imagem'}
+													</button>
+													<button type="button" onClick={clearRelaxmedicImage} disabled={processingRelaxmedicImage} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-bold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60">
+														Remover imagem
+													</button>
+												</div>
 											</div>
 										</div>
+									</div>
+								) : null}
+
+								{relaxmedicExtraction ? (
+									<div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+										<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+											<div>
+												<p className="text-sm font-bold text-emerald-900">Leitura concluída</p>
+												<p className="mt-1 text-xs text-emerald-800">Relatório reconhecido como {relaxmedicExtraction.report_type}.</p>
+											</div>
+											<p className="text-sm font-semibold text-slate-700">Medição: {relaxmedicExtraction.measured_at ? formatDate(relaxmedicExtraction.measured_at) : 'não encontrada'}</p>
+										</div>
+
+										<div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+											{Object.entries(relaxmedicExtraction.metrics ?? {}).filter(([, value]) => value !== null && value !== '').map(([field, value]) => (
+												<div key={field} className="rounded-xl border border-emerald-100 bg-white p-3">
+													<p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{relaxmedicMetricLabels[field] ?? field}</p>
+													<p className="mt-1 text-lg font-semibold text-slate-950">{String(value).replace('.', ',')}</p>
+												</div>
+											))}
+										</div>
+
+										{relaxmedicExtraction.missing_fields?.length ? (
+											<div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+												<p className="font-bold">Campos não encontrados</p>
+												<p className="mt-1">{relaxmedicExtraction.missing_fields.map((field) => relaxmedicMetricLabels[field] ?? field).join(', ')}</p>
+											</div>
+										) : null}
+
+										{relaxmedicExtraction.suspicious_values?.length ? (
+											<div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+												<p className="font-bold">Valores que precisam de conferência</p>
+												<ul className="mt-2 list-disc space-y-1 pl-5">
+													{relaxmedicExtraction.suspicious_values.map((item, index) => (
+														<li key={`${item.field}-${index}`}><strong>{relaxmedicMetricLabels[item.field] ?? item.field}:</strong> {item.reason}</li>
+													))}
+												</ul>
+											</div>
+										) : null}
+
+										<p className="mt-4 text-xs text-slate-500">Confira os valores com a imagem. Nenhuma avaliação foi salva.</p>
 									</div>
 								) : null}
 							</div>
