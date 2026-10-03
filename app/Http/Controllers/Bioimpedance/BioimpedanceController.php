@@ -196,6 +196,7 @@ class BioimpedanceController extends Controller
             'contact' => ['nullable', 'string', 'max:180'],
             'footer_text' => ['nullable', 'string', 'max:500'],
             'technical_notice' => ['nullable', 'string', 'max:1000'],
+            'scale_model' => ['required', Rule::in(BioimpedanceClinicSetting::SCALE_MODELS)],
         ]);
 
         $settings = BioimpedanceClinicSetting::current();

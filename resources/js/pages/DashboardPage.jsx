@@ -44,6 +44,7 @@ const defaultClinic = {
 	contact: 'Avaliação corporal e acompanhamento estético',
 	footer_text: 'Ricosty Emagrecimento e Estética - Avaliação corporal e acompanhamento estético',
 	technical_notice: 'Os resultados de bioimpedância são estimativas e podem variar conforme hidratação, alimentação, ciclo hormonal, medicamentos e condições de medição. Este documento não substitui avaliação médica ou nutricional.',
+	scale_model: 'omron_hbf_514c',
 };
 
 const emptyUserForm = {
@@ -1149,6 +1150,15 @@ export default function DashboardPage({ userName }) {
 							</div>
 						</div>
 						<form onSubmit={submitClinic} className="mt-4 space-y-3">
+							<Field label="Modelo da balança">
+								<select value={clinicForm.scale_model} onChange={(event) => updateClinic('scale_model', event.target.value)} className={inputClass()}>
+									<option value="omron_hbf_514c">Omron HBF-514C (atual)</option>
+									<option value="relaxmedic">Relaxmedic</option>
+								</select>
+							</Field>
+							<p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
+								A configuração específica do modelo selecionado será adicionada posteriormente.
+							</p>
 							<Field label="Nome comercial">
 								<input value={clinicForm.display_name} onChange={(event) => updateClinic('display_name', event.target.value)} className={inputClass()} />
 							</Field>

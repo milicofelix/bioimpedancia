@@ -3,6 +3,7 @@
 use App\Models\Bioimpedance\BioimpedanceClinicSetting;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -29,7 +30,9 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        BioimpedanceClinicSetting::query()->create(BioimpedanceClinicSetting::DEFAULTS);
+        BioimpedanceClinicSetting::query()->create(
+            Arr::except(BioimpedanceClinicSetting::DEFAULTS, ['scale_model'])
+        );
     }
 
     public function down(): void

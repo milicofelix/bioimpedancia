@@ -6,6 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class BioimpedanceClinicSetting extends Model
 {
+    public const SCALE_MODEL_OMRON_HBF_514C = 'omron_hbf_514c';
+
+    public const SCALE_MODEL_RELAXMEDIC = 'relaxmedic';
+
+    public const SCALE_MODELS = [
+        self::SCALE_MODEL_OMRON_HBF_514C,
+        self::SCALE_MODEL_RELAXMEDIC,
+    ];
+
     public const DEFAULTS = [
         'display_name' => 'Ricosty Emagrecimento e Estética',
         'legal_name' => 'Ricosty Emagrecimento e Estética',
@@ -22,6 +31,7 @@ class BioimpedanceClinicSetting extends Model
         'contact' => 'Avaliação corporal e acompanhamento estético',
         'footer_text' => 'Ricosty Emagrecimento e Estética - Avaliação corporal e acompanhamento estético',
         'technical_notice' => 'Os resultados de bioimpedância são estimativas e podem variar conforme hidratação, alimentação, ciclo hormonal, medicamentos e condições de medição. Este documento não substitui avaliação médica ou nutricional.',
+        'scale_model' => self::SCALE_MODEL_OMRON_HBF_514C,
     ];
 
     protected $fillable = [
@@ -40,6 +50,7 @@ class BioimpedanceClinicSetting extends Model
         'contact',
         'footer_text',
         'technical_notice',
+        'scale_model',
     ];
 
     public static function current(): self
