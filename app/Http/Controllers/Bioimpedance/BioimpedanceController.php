@@ -15,12 +15,16 @@ use App\Services\Bioimpedance\BioimpedanceAnalyzer;
 use App\Services\Bioimpedance\BioimpedanceObservationAssistant;
 use App\Services\Bioimpedance\BioimpedanceReportSharePresenter;
 use App\Services\Bioimpedance\LegacyBioimpedanceAnalysisRefresher;
+use App\Services\Bioimpedance\RelaxmedicImageProcessor;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -196,6 +200,7 @@ class BioimpedanceController extends Controller
             'contact' => ['nullable', 'string', 'max:180'],
             'footer_text' => ['nullable', 'string', 'max:500'],
             'technical_notice' => ['nullable', 'string', 'max:1000'],
+            'scale_model' => ['required', Rule::in(BioimpedanceClinicSetting::SCALE_MODELS)],
         ]);
 
         $settings = BioimpedanceClinicSetting::current();
@@ -262,9 +267,49 @@ class BioimpedanceController extends Controller
         ]);
     }
 
-    public function storeAssessment(Request $request, BioimpedanceAnalyzer $analyzer): JsonResponse
+    public function storeAssessment(Request $request, BioimpedanceAnalyzer $analyzer, RelaxmedicImageProcessor $imageProcessor): JsonResponse
     {
         $this->authorizeCreateClinicalRecords($request);
+        $sourceMetadata = null;
+
+        if (BioimpedanceClinicSetting::current()->scale_model === BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDIC) {
+            $this->authorizeClinicalProfessional($request);
+            $source = $request->validate([
+                'relaxmedic_review_confirmed' => ['accepted'],
+                'source_metadata' => ['required', 'array'],
+                'source_metadata.name' => ['required', 'string', 'max:255'],
+                'source_metadata.size_bytes' => ['required', 'integer', 'between:1,10485760'],
+                'source_metadata.mime_type' => ['required', Rule::in(['image/jpeg'])],
+                'source_metadata.stored' => ['required', 'declined'],
+                'source_metadata.sha256' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/'],
+                'source_metadata.processed_at' => ['required', 'date'],
+                'source_metadata.processor_model' => ['required', 'string', 'max:100'],
+                'source_metadata.signature' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/'],
+            ], [
+                'relaxmedic_review_confirmed.accepted' => 'Confirme que os dados foram conferidos com a imagem antes de salvar.',
+                'source_metadata.required' => 'Processe novamente a imagem antes de salvar a avaliação.',
+            ]);
+
+            if (! $imageProcessor->verifyMetadata($source['source_metadata'])) {
+                throw ValidationException::withMessages([
+                    'source_metadata' => 'A origem da extração não pôde ser validada. Processe novamente a imagem.',
+                ]);
+            }
+
+            $sourceMetadata = [
+                'type' => 'relaxmedic_image_extraction',
+                'image_name' => $source['source_metadata']['name'],
+                'image_size_bytes' => $source['source_metadata']['size_bytes'],
+                'image_mime_type' => $source['source_metadata']['mime_type'],
+                'image_sha256' => $source['source_metadata']['sha256'],
+                'image_stored' => false,
+                'processed_at' => $source['source_metadata']['processed_at'],
+                'processor_model' => $source['source_metadata']['processor_model'],
+                'review_confirmed_at' => now()->toIso8601String(),
+                'reviewed_by_user_id' => $request->user()->id,
+            ];
+        }
+
         $validated = $this->validateAssessment($request);
 
         $client = BioimpedanceClient::query()->findOrFail($validated['bioimpedance_client_id']);
@@ -280,19 +325,91 @@ class BioimpedanceController extends Controller
         $snapshot = $this->assessmentSnapshot($client, $validated['evaluated_at']);
         $analysis = $analyzer->analyze($client->toArray(), [...$validated, ...$snapshot]);
 
-        $assessment = BioimpedanceAssessment::query()->create([
-            ...$validated,
-            ...$snapshot,
-            'user_id' => $request->user()->id,
-            'calculated_bmi' => $analysis['calculated_bmi'],
-            'bmi_difference' => $analysis['bmi_difference'],
-            'analysis' => $analysis,
-        ]);
+        $assessment = DB::transaction(function () use ($validated, $snapshot, $request, $analysis, $sourceMetadata): BioimpedanceAssessment {
+            $assessment = BioimpedanceAssessment::query()->create([
+                ...$validated,
+                ...$snapshot,
+                'user_id' => $request->user()->id,
+                'calculated_bmi' => $analysis['calculated_bmi'],
+                'bmi_difference' => $analysis['bmi_difference'],
+                'analysis' => $analysis,
+                'source_metadata' => $sourceMetadata,
+            ]);
+
+            $this->auditAssessment(
+                $assessment,
+                $request,
+                'created',
+                'Avaliação criada',
+                [],
+                $this->assessmentAuditValues($assessment),
+            );
+            $this->audit(
+                $request,
+                'bioimpedance_assessment.created',
+                $assessment,
+                'Avaliação de bioimpedância criada',
+                null,
+                $this->assessmentAuditValues($assessment),
+            );
+
+            return $assessment;
+        });
 
         return response()->json([
             'client' => $this->clientPayload($this->loadClientAssessments($client->refresh())),
             'assessment' => $this->assessmentPayload($assessment),
+            'audit_events' => $request->user()->isAdmin() ? $this->auditEventsPayload() : [],
         ], 201);
+    }
+
+    public function processRelaxmedicImage(Request $request, RelaxmedicImageProcessor $processor): JsonResponse
+    {
+        $this->authorizeClinicalProfessional($request);
+
+        if (BioimpedanceClinicSetting::current()->scale_model !== BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDIC) {
+            throw ValidationException::withMessages([
+                'image' => 'Selecione a balança Relaxmedic nas configurações antes de processar a imagem.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'image' => [
+                'required',
+                'file',
+                'image',
+                'mimes:jpg,jpeg',
+                'extensions:jpg,jpeg',
+                'mimetypes:image/jpeg',
+                'max:10240',
+                'dimensions:min_width=200,min_height=400,max_width=10000,max_height=20000',
+            ],
+        ], [
+            'image.required' => 'Selecione uma imagem JPEG ou JPG.',
+            'image.image' => 'O arquivo enviado não é uma imagem válida.',
+            'image.mimes' => 'A imagem deve estar no formato JPEG ou JPG.',
+            'image.extensions' => 'A extensão do arquivo deve ser JPEG ou JPG.',
+            'image.mimetypes' => 'A imagem deve estar no formato JPEG ou JPG.',
+            'image.max' => 'A imagem deve ter no máximo 10 MB.',
+            'image.dimensions' => 'A imagem possui dimensões incompatíveis com o relatório.',
+        ]);
+
+        try {
+            $extraction = $processor->process($validated['image']);
+        } catch (ConnectionException|RequestException $exception) {
+            return response()->json([
+                'message' => 'Não foi possível acessar o serviço de leitura da imagem. Tente novamente.',
+            ], 502);
+        } catch (\RuntimeException $exception) {
+            return response()->json([
+                'message' => $exception->getMessage(),
+                'errors' => ['image' => [$exception->getMessage()]],
+            ], 422);
+        }
+
+        return response()->json([
+            'extraction' => $extraction,
+        ]);
     }
 
     public function updateAssessment(Request $request, BioimpedanceAssessment $assessment, BioimpedanceAnalyzer $analyzer): JsonResponse
@@ -304,7 +421,7 @@ class BioimpedanceController extends Controller
             ]);
         }
 
-        $validated = $this->validateAssessment($request, requireClient: false);
+        $validated = $this->validateAssessment($request, requireClient: false, deviceModel: $assessment->device_model);
         unset($validated['bioimpedance_client_id']);
 
         $changeReason = $request->validate([
@@ -318,21 +435,32 @@ class BioimpedanceController extends Controller
         $analysis = $analyzer->analyze($client->toArray(), [...$validated, ...$snapshot]);
         $oldValues = $this->assessmentAuditValues($assessment);
 
-        $assessment->update([
-            ...$validated,
-            ...$snapshot,
-            'corrected_by_user_id' => $request->user()->id,
-            'correction_count' => $assessment->correction_count + 1,
-            'calculated_bmi' => $analysis['calculated_bmi'],
-            'bmi_difference' => $analysis['bmi_difference'],
-            'analysis' => $analysis,
-        ]);
+        DB::transaction(function () use ($assessment, $validated, $snapshot, $request, $analysis, $changeReason, $oldValues): void {
+            $assessment->update([
+                ...$validated,
+                ...$snapshot,
+                'corrected_by_user_id' => $request->user()->id,
+                'correction_count' => $assessment->correction_count + 1,
+                'calculated_bmi' => $analysis['calculated_bmi'],
+                'bmi_difference' => $analysis['bmi_difference'],
+                'analysis' => $analysis,
+            ]);
 
-        $this->auditAssessment($assessment->refresh(), $request, 'corrected', $changeReason, $oldValues, $this->assessmentAuditValues($assessment));
+            $this->auditAssessment($assessment->refresh(), $request, 'corrected', $changeReason, $oldValues, $this->assessmentAuditValues($assessment));
+            $this->audit(
+                $request,
+                'bioimpedance_assessment.corrected',
+                $assessment,
+                'Avaliação de bioimpedância corrigida: '.$changeReason,
+                $oldValues,
+                $this->assessmentAuditValues($assessment),
+            );
+        });
 
         return response()->json([
             'client' => $this->clientPayload($this->loadClientAssessments($client->refresh())),
             'assessment' => $this->assessmentPayload($assessment),
+            'audit_events' => $request->user()->isAdmin() ? $this->auditEventsPayload() : [],
         ]);
     }
 
@@ -551,26 +679,54 @@ class BioimpedanceController extends Controller
         ], 200, $this->reportSharePresenter->publicReportHeaders());
     }
 
-    private function validateAssessment(Request $request, bool $requireClient = true): array
+    private function validateAssessment(Request $request, bool $requireClient = true, ?string $deviceModel = null): array
     {
+        $isRelaxmedic = $deviceModel !== null
+            ? $deviceModel === BioimpedanceClinicSetting::SCALE_MODEL_NAMES[BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDIC]
+            : BioimpedanceClinicSetting::current()->scale_model === BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDIC;
+
         $request->merge([
             'weight_kg' => $this->normalizeDecimal($request->input('weight_kg')),
             'scale_bmi' => $this->normalizeDecimal($request->input('scale_bmi')),
             'body_fat_percentage' => $this->normalizeDecimal($request->input('body_fat_percentage')),
             'skeletal_muscle_percentage' => $this->normalizeDecimal($request->input('skeletal_muscle_percentage')),
+            'muscle_rate_percentage' => $this->normalizeDecimal($request->input('muscle_rate_percentage')),
+            'lean_body_mass_kg' => $this->normalizeDecimal($request->input('lean_body_mass_kg')),
+            'subcutaneous_fat_percentage' => $this->normalizeDecimal($request->input('subcutaneous_fat_percentage')),
+            'body_water_percentage' => $this->normalizeDecimal($request->input('body_water_percentage')),
+            'muscle_mass_kg' => $this->normalizeDecimal($request->input('muscle_mass_kg')),
+            'bone_mass_kg' => $this->normalizeDecimal($request->input('bone_mass_kg')),
+            'protein_percentage' => $this->normalizeDecimal($request->input('protein_percentage')),
+            'fat_mass_kg' => $this->normalizeDecimal($request->input('fat_mass_kg')),
+            'water_weight_kg' => $this->normalizeDecimal($request->input('water_weight_kg')),
+            'protein_mass_kg' => $this->normalizeDecimal($request->input('protein_mass_kg')),
+            'ideal_body_weight_kg' => $this->normalizeDecimal($request->input('ideal_body_weight_kg')),
             'visceral_fat_level' => $this->normalizeDecimal($request->input('visceral_fat_level')),
         ]);
 
         return $request->validate([
             'bioimpedance_client_id' => [$requireClient ? 'required' : 'sometimes', 'exists:bioimpedance_clients,id'],
             'evaluated_at' => ['required', 'date', 'before_or_equal:now'],
-            'weight_kg' => ['required', 'numeric', 'between:2,150'],
+            'weight_kg' => ['required', 'numeric', $isRelaxmedic ? 'between:2,300' : 'between:2,150'],
             'scale_bmi' => ['nullable', 'numeric', 'between:7,90'],
-            'body_fat_percentage' => ['nullable', 'numeric', 'between:5,60'],
-            'skeletal_muscle_percentage' => ['nullable', 'numeric', 'between:5,50'],
-            'resting_metabolism_kcal' => ['nullable', 'integer', 'between:385,3999'],
-            'body_age' => ['nullable', 'integer', 'between:18,80'],
-            'visceral_fat_level' => ['nullable', 'integer', 'between:1,30'],
+            'body_fat_percentage' => ['nullable', 'numeric', $isRelaxmedic ? 'between:0,100' : 'between:5,60'],
+            'skeletal_muscle_percentage' => ['nullable', 'numeric', $isRelaxmedic ? 'between:0,100' : 'between:5,50'],
+            'muscle_rate_percentage' => ['nullable', 'numeric', 'between:0,100'],
+            'lean_body_mass_kg' => ['nullable', 'numeric', 'between:0,300'],
+            'subcutaneous_fat_percentage' => ['nullable', 'numeric', 'between:0,100'],
+            'body_water_percentage' => ['nullable', 'numeric', 'between:0,100'],
+            'muscle_mass_kg' => ['nullable', 'numeric', 'between:0,300'],
+            'bone_mass_kg' => ['nullable', 'numeric', 'between:0,50'],
+            'protein_percentage' => ['nullable', 'numeric', 'between:0,100'],
+            'fat_mass_kg' => ['nullable', 'numeric', 'between:0,300'],
+            'water_weight_kg' => ['nullable', 'numeric', 'between:0,300'],
+            'protein_mass_kg' => ['nullable', 'numeric', 'between:0,300'],
+            'ideal_body_weight_kg' => ['nullable', 'numeric', 'between:2,300'],
+            'obesity_level' => ['nullable', 'string', 'max:100'],
+            'body_type' => ['nullable', 'string', 'max:100'],
+            'resting_metabolism_kcal' => ['nullable', 'integer', $isRelaxmedic ? 'between:100,10000' : 'between:385,3999'],
+            'body_age' => ['nullable', 'integer', $isRelaxmedic ? 'between:1,120' : 'between:18,80'],
+            'visceral_fat_level' => ['nullable', $isRelaxmedic ? 'numeric' : 'integer', $isRelaxmedic ? 'between:0,100' : 'between:1,30'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ], [
             'bioimpedance_client_id.required' => 'Selecione um cliente antes de salvar a avaliação.',
@@ -580,19 +736,20 @@ class BioimpedanceController extends Controller
             'evaluated_at.before_or_equal' => 'A avaliação não pode ser registrada no futuro. Confira a data e o horário informados.',
             'weight_kg.required' => 'Informe o peso exibido pela balança.',
             'weight_kg.numeric' => 'Informe o peso em kg. Exemplo: 95,2.',
-            'weight_kg.between' => 'O peso deve estar entre 2 kg e 150 kg para a Omron HBF-514C.',
+            'weight_kg.between' => $isRelaxmedic ? 'O peso deve estar entre 2 kg e 300 kg.' : 'O peso deve estar entre 2 kg e 150 kg para a Omron HBF-514C.',
             'scale_bmi.numeric' => 'Informe o IMC da balança com número válido. Exemplo: 31,4.',
             'scale_bmi.between' => 'O IMC da balança deve estar entre 7 e 90.',
             'body_fat_percentage.numeric' => 'Informe a gordura corporal em percentual. Exemplo: 20,5.',
-            'body_fat_percentage.between' => 'A gordura corporal deve estar entre 5% e 60%.',
+            'body_fat_percentage.between' => $isRelaxmedic ? 'A gordura corporal deve estar entre 0% e 100%.' : 'A gordura corporal deve estar entre 5% e 60%.',
             'skeletal_muscle_percentage.numeric' => 'Informe o músculo esquelético em percentual. Exemplo: 37,6.',
-            'skeletal_muscle_percentage.between' => 'O músculo esquelético deve estar entre 5% e 50%.',
+            'skeletal_muscle_percentage.between' => $isRelaxmedic ? 'O músculo esquelético deve estar entre 0% e 100%.' : 'O músculo esquelético deve estar entre 5% e 50%.',
             'resting_metabolism_kcal.integer' => 'Informe o metabolismo basal em kcal, sem casas decimais.',
-            'resting_metabolism_kcal.between' => 'O metabolismo basal deve estar entre 385 e 3999 kcal.',
+            'resting_metabolism_kcal.between' => $isRelaxmedic ? 'O metabolismo basal deve estar entre 100 e 10000 kcal.' : 'O metabolismo basal deve estar entre 385 e 3999 kcal.',
             'body_age.integer' => 'Informe a idade corporal em anos, sem casas decimais.',
-            'body_age.between' => 'A idade corporal deve estar entre 18 e 80 anos.',
-            'visceral_fat_level.integer' => 'Informe a gordura visceral como número inteiro, de 1 a 30.',
-            'visceral_fat_level.between' => 'A gordura visceral deve estar entre 1 e 30.',
+            'body_age.between' => $isRelaxmedic ? 'A idade corporal deve estar entre 1 e 120 anos.' : 'A idade corporal deve estar entre 18 e 80 anos.',
+            'visceral_fat_level.numeric' => 'Informe a gordura visceral como número válido. Exemplo: 8,6.',
+            'visceral_fat_level.integer' => 'Informe a gordura visceral da Omron como número inteiro, de 1 a 30.',
+            'visceral_fat_level.between' => $isRelaxmedic ? 'A gordura visceral deve estar entre 0 e 100.' : 'A gordura visceral deve estar entre 1 e 30.',
             'notes.max' => 'A observação da avaliação pode ter no máximo 2000 caracteres.',
         ]);
     }
@@ -662,11 +819,13 @@ class BioimpedanceController extends Controller
 
     private function assessmentSnapshot(BioimpedanceClient $client, string $evaluatedAt): array
     {
+        $settings = BioimpedanceClinicSetting::current();
+
         return [
             'age_at_assessment' => (int) $client->birth_date->diffInYears(Carbon::parse($evaluatedAt)),
             'height_cm_at_assessment' => (float) $client->height_cm,
             'biological_sex_at_assessment' => $client->biological_sex,
-            'device_model' => BioimpedanceAnalyzer::DEVICE_MODEL,
+            'device_model' => $settings->scaleModelName(),
             'reference_version' => BioimpedanceAnalyzer::REFERENCE_VERSION,
         ];
     }
@@ -686,16 +845,31 @@ class BioimpedanceController extends Controller
     {
         return collect($assessment->only([
             'evaluated_at',
+            'device_model',
             'weight_kg',
             'scale_bmi',
             'calculated_bmi',
             'bmi_difference',
             'body_fat_percentage',
             'skeletal_muscle_percentage',
+            'muscle_rate_percentage',
+            'lean_body_mass_kg',
+            'subcutaneous_fat_percentage',
+            'body_water_percentage',
+            'muscle_mass_kg',
+            'bone_mass_kg',
+            'protein_percentage',
+            'fat_mass_kg',
+            'water_weight_kg',
+            'protein_mass_kg',
+            'ideal_body_weight_kg',
+            'obesity_level',
+            'body_type',
             'resting_metabolism_kcal',
             'body_age',
             'visceral_fat_level',
             'analysis',
+            'source_metadata',
             'notes',
             'correction_count',
             'canceled_at',
@@ -1099,10 +1273,24 @@ class BioimpedanceController extends Controller
             'bmi_difference' => $assessment->bmi_difference === null ? null : (float) $assessment->bmi_difference,
             'body_fat_percentage' => $assessment->body_fat_percentage === null ? null : (float) $assessment->body_fat_percentage,
             'skeletal_muscle_percentage' => $assessment->skeletal_muscle_percentage === null ? null : (float) $assessment->skeletal_muscle_percentage,
+            'muscle_rate_percentage' => $assessment->muscle_rate_percentage === null ? null : (float) $assessment->muscle_rate_percentage,
+            'lean_body_mass_kg' => $assessment->lean_body_mass_kg === null ? null : (float) $assessment->lean_body_mass_kg,
+            'subcutaneous_fat_percentage' => $assessment->subcutaneous_fat_percentage === null ? null : (float) $assessment->subcutaneous_fat_percentage,
+            'body_water_percentage' => $assessment->body_water_percentage === null ? null : (float) $assessment->body_water_percentage,
+            'muscle_mass_kg' => $assessment->muscle_mass_kg === null ? null : (float) $assessment->muscle_mass_kg,
+            'bone_mass_kg' => $assessment->bone_mass_kg === null ? null : (float) $assessment->bone_mass_kg,
+            'protein_percentage' => $assessment->protein_percentage === null ? null : (float) $assessment->protein_percentage,
+            'fat_mass_kg' => $assessment->fat_mass_kg === null ? null : (float) $assessment->fat_mass_kg,
+            'water_weight_kg' => $assessment->water_weight_kg === null ? null : (float) $assessment->water_weight_kg,
+            'protein_mass_kg' => $assessment->protein_mass_kg === null ? null : (float) $assessment->protein_mass_kg,
+            'ideal_body_weight_kg' => $assessment->ideal_body_weight_kg === null ? null : (float) $assessment->ideal_body_weight_kg,
+            'obesity_level' => $assessment->obesity_level,
+            'body_type' => $assessment->body_type,
             'resting_metabolism_kcal' => $assessment->resting_metabolism_kcal,
             'body_age' => $assessment->body_age,
             'visceral_fat_level' => $assessment->visceral_fat_level === null ? null : (float) $assessment->visceral_fat_level,
             'analysis' => $analysis,
+            'source_metadata' => $assessment->source_metadata,
             'notes' => $assessment->notes,
             'correction_count' => $assessment->correction_count,
             'canceled_at' => $assessment->canceled_at?->toIso8601String(),

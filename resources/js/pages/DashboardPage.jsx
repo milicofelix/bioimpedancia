@@ -22,6 +22,19 @@ const emptyAssessment = {
 	scale_bmi: '',
 	body_fat_percentage: '',
 	skeletal_muscle_percentage: '',
+	muscle_rate_percentage: '',
+	lean_body_mass_kg: '',
+	subcutaneous_fat_percentage: '',
+	body_water_percentage: '',
+	muscle_mass_kg: '',
+	bone_mass_kg: '',
+	protein_percentage: '',
+	fat_mass_kg: '',
+	water_weight_kg: '',
+	protein_mass_kg: '',
+	ideal_body_weight_kg: '',
+	obesity_level: '',
+	body_type: '',
 	resting_metabolism_kcal: '',
 	body_age: '',
 	visceral_fat_level: '',
@@ -44,7 +57,49 @@ const defaultClinic = {
 	contact: 'Avaliação corporal e acompanhamento estético',
 	footer_text: 'Ricosty Emagrecimento e Estética - Avaliação corporal e acompanhamento estético',
 	technical_notice: 'Os resultados de bioimpedância são estimativas e podem variar conforme hidratação, alimentação, ciclo hormonal, medicamentos e condições de medição. Este documento não substitui avaliação médica ou nutricional.',
+	scale_model: 'omron_hbf_514c',
 };
+
+const relaxmedicMaxImageBytes = 10 * 1024 * 1024;
+
+const relaxmedicMetricLabels = {
+	weight_kg: 'Peso (kg)',
+	scale_bmi: 'IMC',
+	body_fat_percentage: 'Gordura corporal (%)',
+	muscle_rate_percentage: 'Taxa muscular (%)',
+	lean_body_mass_kg: 'Massa corporal magra (kg)',
+	subcutaneous_fat_percentage: 'Gordura subcutânea (%)',
+	visceral_fat_level: 'Gordura visceral',
+	body_water_percentage: 'Água corporal (%)',
+	skeletal_muscle_percentage: 'Músculo esquelético (%)',
+	muscle_mass_kg: 'Massa muscular (kg)',
+	bone_mass_kg: 'Massa óssea (kg)',
+	protein_percentage: 'Proteína (%)',
+	resting_metabolism_kcal: 'TMB (kcal)',
+	body_age: 'Idade do corpo',
+	fat_mass_kg: 'Massa gorda (kg)',
+	water_weight_kg: 'Peso da água (kg)',
+	protein_mass_kg: 'Massa de proteína (kg)',
+	ideal_body_weight_kg: 'Peso corporal ideal (kg)',
+	obesity_level: 'Nível de obesidade',
+	body_type: 'Tipo de corpo',
+};
+
+const relaxmedicAdditionalMetricFields = [
+	'muscle_rate_percentage',
+	'lean_body_mass_kg',
+	'subcutaneous_fat_percentage',
+	'body_water_percentage',
+	'muscle_mass_kg',
+	'bone_mass_kg',
+	'protein_percentage',
+	'fat_mass_kg',
+	'water_weight_kg',
+	'protein_mass_kg',
+	'ideal_body_weight_kg',
+	'obesity_level',
+	'body_type',
+];
 
 const emptyUserForm = {
 	name: '',
@@ -139,6 +194,75 @@ function FieldError({ errors, field }) {
 	if (!messages.length) return null;
 
 	return <p className="mt-1 text-xs font-semibold text-rose-700">{messages[0]}</p>;
+}
+
+function RelaxmedicReview({ extraction, imagePreview, form, errors, flaggedFields, confirmed, onConfirmedChange, onUpdate, onSubmit, saving, canSave }) {
+	return (
+		<form onSubmit={onSubmit} className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+			<div>
+				<p className="text-sm font-bold text-emerald-900">Conferência obrigatória</p>
+				<p className="mt-1 text-xs text-emerald-800">Compare cada campo com a imagem antes de salvar. Relatório reconhecido como {extraction.report_type}.</p>
+			</div>
+
+			<div className="mt-4 grid gap-5 lg:grid-cols-[minmax(280px,360px)_1fr]">
+				<div>
+					<div className="lg:sticky lg:top-20">
+						<img src={imagePreview} alt="Imagem original para conferência" className="max-h-[760px] w-full rounded-xl border border-slate-200 bg-white object-contain" />
+						<p className="mt-2 text-center text-xs text-slate-500">Imagem original para comparação</p>
+					</div>
+				</div>
+
+				<div className="space-y-4">
+					<div className={`rounded-xl border p-3 ${flaggedFields.has('measured_at') || !extraction.measured_at ? 'border-amber-300 bg-amber-50' : 'border-emerald-100 bg-white'}`}>
+						<Field label="Data e hora da medição">
+							<input type="datetime-local" value={form.evaluated_at} max={localDatetimeNow()} onChange={(event) => onUpdate('evaluated_at', event.target.value)} className={inputClass()} />
+							<FieldError errors={errors} field="evaluated_at" />
+						</Field>
+						{!extraction.measured_at ? <p className="mt-2 text-xs font-semibold text-amber-700">Data não encontrada. Preencha manualmente.</p> : null}
+					</div>
+
+					<div className="grid gap-3 sm:grid-cols-2">
+						{Object.entries(relaxmedicMetricLabels).map(([field, label]) => {
+							const isFlagged = flaggedFields.has(field);
+							const warning = (extraction.suspicious_values ?? []).find((item) => item.field === field)?.reason;
+							const isText = ['obesity_level', 'body_type'].includes(field);
+
+							return (
+								<div key={field} className={`rounded-xl border p-3 ${isFlagged ? 'border-amber-300 bg-amber-50' : 'border-emerald-100 bg-white'}`}>
+									<Field label={label}>
+										<input inputMode={isText ? undefined : 'decimal'} value={form[field] ?? ''} onChange={(event) => onUpdate(field, event.target.value)} className={inputClass()} />
+										<FieldError errors={errors} field={field} />
+									</Field>
+									{isFlagged ? <p className="mt-2 text-xs font-semibold text-amber-700">{warning ?? 'Não encontrado na imagem. Preencha se estiver visível.'}</p> : null}
+								</div>
+							);
+						})}
+					</div>
+
+					<Field label="Observação da avaliação">
+						<textarea value={form.notes} onChange={(event) => onUpdate('notes', event.target.value)} rows="3" className={inputClass()} />
+						<FieldError errors={errors} field="notes" />
+					</Field>
+
+					<label className={`flex items-start gap-3 rounded-xl border p-4 ${confirmed ? 'border-emerald-300 bg-emerald-50' : 'border-slate-300 bg-white'}`}>
+						<input type="checkbox" checked={confirmed} onChange={(event) => onConfirmedChange(event.target.checked)} className="mt-0.5 h-5 w-5 rounded border-slate-300 text-emerald-600" />
+						<span className="text-sm leading-6 text-slate-700"><strong>Confirmo que conferi todos os dados com a imagem original</strong> e corrigi valores, unidades e casas decimais quando necessário.</span>
+					</label>
+
+					{Object.keys(errors).length ? (
+						<div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+							<p className="font-bold">Não foi possível salvar a avaliação.</p>
+							<ul className="mt-2 list-disc space-y-1 pl-5">{errorMessages(errors).map((message) => <li key={message}>{message}</li>)}</ul>
+						</div>
+					) : null}
+
+					<button type="submit" disabled={!confirmed || !canSave || saving} className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">
+						{saving ? 'Salvando avaliação...' : 'Confirmar dados e salvar avaliação'}
+					</button>
+				</div>
+			</div>
+		</form>
+	);
 }
 
 function formatDate(value) {
@@ -379,9 +503,26 @@ function assessmentFormFromAssessment(assessment) {
 		scale_bmi: assessment.scale_bmi == null ? '' : numberBr(assessment.scale_bmi, 1),
 		body_fat_percentage: assessment.body_fat_percentage == null ? '' : numberBr(assessment.body_fat_percentage, 1),
 		skeletal_muscle_percentage: assessment.skeletal_muscle_percentage == null ? '' : numberBr(assessment.skeletal_muscle_percentage, 1),
+		muscle_rate_percentage: assessment.muscle_rate_percentage == null ? '' : numberBr(assessment.muscle_rate_percentage, 1),
+		lean_body_mass_kg: assessment.lean_body_mass_kg == null ? '' : numberBr(assessment.lean_body_mass_kg, 1),
+		subcutaneous_fat_percentage: assessment.subcutaneous_fat_percentage == null ? '' : numberBr(assessment.subcutaneous_fat_percentage, 1),
+		body_water_percentage: assessment.body_water_percentage == null ? '' : numberBr(assessment.body_water_percentage, 1),
+		muscle_mass_kg: assessment.muscle_mass_kg == null ? '' : numberBr(assessment.muscle_mass_kg, 1),
+		bone_mass_kg: assessment.bone_mass_kg == null ? '' : numberBr(assessment.bone_mass_kg, 1),
+		protein_percentage: assessment.protein_percentage == null ? '' : numberBr(assessment.protein_percentage, 1),
+		fat_mass_kg: assessment.fat_mass_kg == null ? '' : numberBr(assessment.fat_mass_kg, 1),
+		water_weight_kg: assessment.water_weight_kg == null ? '' : numberBr(assessment.water_weight_kg, 1),
+		protein_mass_kg: assessment.protein_mass_kg == null ? '' : numberBr(assessment.protein_mass_kg, 1),
+		ideal_body_weight_kg: assessment.ideal_body_weight_kg == null ? '' : numberBr(assessment.ideal_body_weight_kg, 1),
+		obesity_level: assessment.obesity_level ?? '',
+		body_type: assessment.body_type ?? '',
 		resting_metabolism_kcal: assessment.resting_metabolism_kcal ?? '',
 		body_age: assessment.body_age ?? '',
-		visceral_fat_level: assessment.visceral_fat_level == null ? '' : String(Math.trunc(assessment.visceral_fat_level)),
+		visceral_fat_level: assessment.visceral_fat_level == null
+			? ''
+			: assessment.device_model === 'Relaxmedic'
+				? numberBr(assessment.visceral_fat_level, 1)
+				: String(Math.trunc(assessment.visceral_fat_level)),
 		notes: assessment.notes ?? '',
 	};
 }
@@ -427,6 +568,7 @@ function clinicFormFromClinic(clinic) {
 
 export default function DashboardPage({ userName }) {
 	const assessmentSectionRef = useRef(null);
+	const relaxmedicImageInputRef = useRef(null);
 	const [clients, setClients] = useState([]);
 	const [clinic, setClinic] = useState(defaultClinic);
 	const [clinicForm, setClinicForm] = useState(defaultClinic);
@@ -463,6 +605,12 @@ export default function DashboardPage({ userName }) {
 	const [errors, setErrors] = useState({});
 	const [clinicErrors, setClinicErrors] = useState({});
 	const [userErrors, setUserErrors] = useState({});
+	const [relaxmedicImage, setRelaxmedicImage] = useState(null);
+	const [relaxmedicImagePreview, setRelaxmedicImagePreview] = useState(null);
+	const [relaxmedicImageError, setRelaxmedicImageError] = useState('');
+	const [processingRelaxmedicImage, setProcessingRelaxmedicImage] = useState(false);
+	const [relaxmedicExtraction, setRelaxmedicExtraction] = useState(null);
+	const [relaxmedicReviewConfirmed, setRelaxmedicReviewConfirmed] = useState(false);
 
 	useEffect(() => {
 		window.axios.get('/bioimpedance').then(({ data }) => {
@@ -504,7 +652,31 @@ export default function DashboardPage({ userName }) {
 	}, []);
 
 	useEffect(() => {
-		if (!selectedClientId || assessmentMode !== 'create') return;
+		if (!relaxmedicImage) {
+			setRelaxmedicImagePreview(null);
+			return undefined;
+		}
+
+		const previewUrl = window.URL.createObjectURL(relaxmedicImage);
+		setRelaxmedicImagePreview(previewUrl);
+
+		return () => window.URL.revokeObjectURL(previewUrl);
+	}, [relaxmedicImage]);
+
+	useEffect(() => {
+		if (clinic.scale_model === 'relaxmedic') return;
+
+		setRelaxmedicImage(null);
+		setRelaxmedicImageError('');
+		setRelaxmedicExtraction(null);
+		setRelaxmedicReviewConfirmed(false);
+		if (relaxmedicImageInputRef.current) {
+			relaxmedicImageInputRef.current.value = '';
+		}
+	}, [clinic.scale_model]);
+
+	useEffect(() => {
+		if (!selectedClientId || assessmentMode !== 'create' || clinic.scale_model === 'relaxmedic') return;
 
 		const key = assessmentDraftKey(selectedClientId);
 		const storedDraft = key ? window.localStorage.getItem(key) : null;
@@ -523,10 +695,10 @@ export default function DashboardPage({ userName }) {
 			window.localStorage.removeItem(key);
 			setAssessmentDraftSavedAt(null);
 		}
-	}, [assessmentMode, selectedClientId]);
+	}, [assessmentMode, clinic.scale_model, selectedClientId]);
 
 	useEffect(() => {
-		if (!selectedClientId || assessmentMode !== 'create') return;
+		if (!selectedClientId || assessmentMode !== 'create' || clinic.scale_model === 'relaxmedic') return;
 
 		const key = assessmentDraftKey(selectedClientId);
 		if (!key) return;
@@ -544,11 +716,11 @@ export default function DashboardPage({ userName }) {
 		}, 500);
 
 		return () => window.clearTimeout(timeout);
-	}, [assessmentForm, assessmentMode, selectedClientId]);
+	}, [assessmentForm, assessmentMode, clinic.scale_model, selectedClientId]);
 
 	useEffect(() => {
 		const warnBeforeExit = (event) => {
-			if (assessmentMode !== 'create' || !hasAssessmentDraftData(assessmentForm)) return;
+			if (assessmentMode !== 'create' || clinic.scale_model === 'relaxmedic' || !hasAssessmentDraftData(assessmentForm)) return;
 
 			event.preventDefault();
 			event.returnValue = '';
@@ -557,12 +729,17 @@ export default function DashboardPage({ userName }) {
 		window.addEventListener('beforeunload', warnBeforeExit);
 
 		return () => window.removeEventListener('beforeunload', warnBeforeExit);
-	}, [assessmentForm, assessmentMode]);
+	}, [assessmentForm, assessmentMode, clinic.scale_model]);
 
 	const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null;
 	const selectedAssessment = selectedClient?.assessments?.find((assessment) => assessment.id === selectedAssessmentId)
 		?? selectedClient?.assessments?.[0]
 		?? null;
+	const isRelaxmedicAssessment = clinic.scale_model === 'relaxmedic' && assessmentMode === 'create';
+	const relaxmedicFlaggedFields = new Set([
+		...(relaxmedicExtraction?.missing_fields ?? []),
+		...(relaxmedicExtraction?.suspicious_values ?? []).map((item) => item.field),
+	]);
 
 	const filteredClients = useMemo(() => {
 		const term = query.trim().toLowerCase();
@@ -589,6 +766,7 @@ export default function DashboardPage({ userName }) {
 	const canAdmin = Boolean(currentUser?.is_admin);
 	const canCreateClinicalRecords = ['admin', 'professional', 'reception'].includes(currentUser?.role);
 	const canClinicalProfessional = ['admin', 'professional'].includes(currentUser?.role);
+	const canCreateCurrentAssessment = clinic.scale_model === 'relaxmedic' ? canClinicalProfessional : canCreateClinicalRecords;
 
 	async function handleLogout() {
 		await window.axios.post('/logout', {}, { headers: { Accept: 'application/json' } });
@@ -645,6 +823,7 @@ export default function DashboardPage({ userName }) {
 		setEditingAssessmentId(null);
 		setAssessmentForm({ ...emptyAssessment, evaluated_at: localDatetimeNow() });
 		setAssessmentChangeReason('');
+		clearRelaxmedicImage();
 		window.setTimeout(() => assessmentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
 	}
 
@@ -672,6 +851,70 @@ export default function DashboardPage({ userName }) {
 		setAssessmentChangeReason('');
 		setAssessmentDraftSavedAt(null);
 		setErrors({});
+		clearRelaxmedicImage();
+	}
+
+	function clearRelaxmedicImage() {
+		setRelaxmedicImage(null);
+		setRelaxmedicImageError('');
+		setRelaxmedicExtraction(null);
+		setRelaxmedicReviewConfirmed(false);
+		if (relaxmedicImageInputRef.current) {
+			relaxmedicImageInputRef.current.value = '';
+		}
+	}
+
+	function selectRelaxmedicImage(event) {
+		const file = event.target.files?.[0] ?? null;
+		setRelaxmedicImage(null);
+		setRelaxmedicImageError('');
+		setRelaxmedicExtraction(null);
+		setRelaxmedicReviewConfirmed(false);
+
+		if (!file) return;
+
+		const hasJpegExtension = /\.jpe?g$/i.test(file.name);
+		if (file.type !== 'image/jpeg' || !hasJpegExtension) {
+			setRelaxmedicImageError('Selecione uma imagem no formato JPEG ou JPG.');
+			event.target.value = '';
+			return;
+		}
+
+		if (file.size > relaxmedicMaxImageBytes) {
+			setRelaxmedicImageError('A imagem deve ter no máximo 10 MB.');
+			event.target.value = '';
+			return;
+		}
+
+		setRelaxmedicImage(file);
+	}
+
+	async function processRelaxmedicImage() {
+		if (!relaxmedicImage || processingRelaxmedicImage) return;
+
+		setProcessingRelaxmedicImage(true);
+		setRelaxmedicImageError('');
+		setRelaxmedicExtraction(null);
+
+		const payload = new FormData();
+		payload.append('image', relaxmedicImage);
+
+		try {
+			const { data } = await window.axios.post('/bioimpedance/relaxmedic/process-image', payload);
+			setRelaxmedicExtraction(data.extraction);
+			setAssessmentForm({
+				...emptyAssessment,
+				evaluated_at: data.extraction.measured_at ?? localDatetimeNow(),
+				...Object.fromEntries(Object.entries(data.extraction.metrics ?? {}).map(([field, value]) => [field, value ?? ''])),
+			});
+			setRelaxmedicReviewConfirmed(false);
+			setErrors({});
+		} catch (error) {
+			const imageError = error.response?.data?.errors?.image?.[0];
+			setRelaxmedicImageError(imageError ?? error.response?.data?.message ?? 'Não foi possível processar a imagem. Tente novamente.');
+		} finally {
+			setProcessingRelaxmedicImage(false);
+		}
 	}
 
 	function clearAssessmentDraft() {
@@ -693,12 +936,14 @@ export default function DashboardPage({ userName }) {
 		setAssessmentForm(assessmentFormFromAssessment(assessment));
 		setAssessmentChangeReason('');
 		setErrors({});
+		clearRelaxmedicImage();
 	}
 
 	function duplicateAssessment(assessment) {
 		if (!assessment) return;
 
 		setAssessmentMode('create');
+		clearRelaxmedicImage();
 		setEditingAssessmentId(null);
 		setAssessmentForm({
 			...assessmentFormFromAssessment(assessment),
@@ -710,8 +955,27 @@ export default function DashboardPage({ userName }) {
 	}
 
 	function updateAssessment(field, value) {
-		const integerFields = ['resting_metabolism_kcal', 'body_age', 'visceral_fat_level'];
-		const decimalFields = ['weight_kg', 'scale_bmi', 'body_fat_percentage', 'skeletal_muscle_percentage'];
+		const acceptsDecimalVisceralFat = isRelaxmedicAssessment
+			|| (assessmentMode === 'edit' && selectedAssessment?.device_model === 'Relaxmedic');
+		const integerFields = ['resting_metabolism_kcal', 'body_age', ...(!acceptsDecimalVisceralFat ? ['visceral_fat_level'] : [])];
+		const decimalFields = [
+			'weight_kg',
+			'scale_bmi',
+			'body_fat_percentage',
+			'skeletal_muscle_percentage',
+			'muscle_rate_percentage',
+			'lean_body_mass_kg',
+			'subcutaneous_fat_percentage',
+			'body_water_percentage',
+			'muscle_mass_kg',
+			'bone_mass_kg',
+			'protein_percentage',
+			'fat_mass_kg',
+			'water_weight_kg',
+			'protein_mass_kg',
+			'ideal_body_weight_kg',
+			...(acceptsDecimalVisceralFat ? ['visceral_fat_level'] : []),
+		];
 		const maskedValue = integerFields.includes(field)
 			? normalizeInteger(value).slice(0, 4)
 			: decimalFields.includes(field)
@@ -719,6 +983,9 @@ export default function DashboardPage({ userName }) {
 				: value;
 
 		setAssessmentForm((current) => ({ ...current, [field]: maskedValue }));
+		if (relaxmedicExtraction) {
+			setRelaxmedicReviewConfirmed(false);
+		}
 	}
 
 	function updateClinic(field, value) {
@@ -854,7 +1121,7 @@ export default function DashboardPage({ userName }) {
 	async function submitAssessment(event) {
 		event.preventDefault();
 		if (!selectedClient) return;
-		if (assessmentMode === 'edit' ? !canClinicalProfessional : !canCreateClinicalRecords) return;
+		if (assessmentMode === 'edit' ? !canClinicalProfessional : !canCreateCurrentAssessment) return;
 
 		setSavingAssessment(true);
 		setErrors({});
@@ -867,6 +1134,8 @@ export default function DashboardPage({ userName }) {
 			body_fat_percentage: normalizeDecimal(assessmentForm.body_fat_percentage),
 			skeletal_muscle_percentage: normalizeDecimal(assessmentForm.skeletal_muscle_percentage),
 			visceral_fat_level: normalizeDecimal(assessmentForm.visceral_fat_level),
+			relaxmedic_review_confirmed: isRelaxmedicAssessment && relaxmedicReviewConfirmed,
+			source_metadata: isRelaxmedicAssessment ? relaxmedicExtraction?.image : undefined,
 		};
 
 		if (assessmentMode === 'edit') {
@@ -878,6 +1147,7 @@ export default function DashboardPage({ userName }) {
 				? await window.axios.put(`/bioimpedance/assessments/${editingAssessmentId}`, payload)
 				: await window.axios.post('/bioimpedance/assessments', payload);
 			setClients((current) => current.map((client) => (client.id === data.client.id ? data.client : client)));
+			setAuditEvents(data.audit_events ?? auditEvents);
 			setSelectedAssessmentId(data.assessment.id);
 			const key = assessmentDraftKey(selectedClient.id);
 			if (key) {
@@ -1149,6 +1419,15 @@ export default function DashboardPage({ userName }) {
 							</div>
 						</div>
 						<form onSubmit={submitClinic} className="mt-4 space-y-3">
+							<Field label="Modelo da balança">
+								<select value={clinicForm.scale_model} onChange={(event) => updateClinic('scale_model', event.target.value)} className={inputClass()}>
+									<option value="omron_hbf_514c">Omron HBF-514C (atual)</option>
+									<option value="relaxmedic">Relaxmedic</option>
+								</select>
+							</Field>
+							<p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
+								O modelo selecionado define o fluxo de entrada, as métricas e o relatório das novas avaliações.
+							</p>
 							<Field label="Nome comercial">
 								<input value={clinicForm.display_name} onChange={(event) => updateClinic('display_name', event.target.value)} className={inputClass()} />
 							</Field>
@@ -1303,7 +1582,7 @@ export default function DashboardPage({ userName }) {
 									<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Histórico de avaliações</p>
 									<h2 className="mt-1 text-lg font-semibold text-slate-950">{selectedClient.assessments?.length ?? 0} registro(s)</h2>
 								</div>
-								<button type="button" disabled={!canCreateClinicalRecords} onClick={startNewAssessment} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
+								<button type="button" disabled={!canCreateCurrentAssessment} onClick={startNewAssessment} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
 									Nova avaliação
 								</button>
 							</div>
@@ -1320,6 +1599,7 @@ export default function DashboardPage({ userName }) {
 											{assessment.is_canceled ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] uppercase text-rose-700">Cancelada</span> : null}
 										</span>
 										<span className="mt-2 block text-xs text-slate-500">Peso {numberBr(assessment.weight_kg, 1)} kg • IMC {numberBr(assessment.calculated_bmi, 1)}</span>
+										<span className="mt-1 block text-xs font-semibold text-sky-700">{assessment.device_model ?? 'Modelo não informado'}</span>
 										<span className="mt-1 block text-xs text-slate-400">{assessment.correction_count ? `${assessment.correction_count} correção(ões)` : 'Sem correções'}</span>
 									</button>
 								))}
@@ -1347,6 +1627,7 @@ export default function DashboardPage({ userName }) {
 									) : null}
 								</div>
 							) : null}
+							<AssessmentDetails assessment={selectedAssessment} />
 							{selectedAssessment && !selectedAssessment.is_canceled ? (
 								<div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 p-4">
 									<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1461,13 +1742,19 @@ export default function DashboardPage({ userName }) {
 								<div>
 									<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">{assessmentMode === 'edit' ? 'Corrigir avaliação' : 'Registrar nova avaliação'}</p>
 									<h1 className="mt-1 text-2xl font-semibold text-slate-950">{selectedClient?.full_name ?? 'Selecione um cliente'}</h1>
-									<p className="mt-1 text-sm text-slate-500">{assessmentMode === 'edit' ? 'A correção exige justificativa e gera auditoria.' : 'Digite os valores exibidos na balança Omron antiga após a pesagem.'}</p>
+									<p className="mt-1 text-sm text-slate-500">
+										{assessmentMode === 'edit'
+											? 'A correção exige justificativa e gera auditoria.'
+											: isRelaxmedicAssessment
+												? 'Envie a imagem de resultados gerada pelo aplicativo da balança Relaxmedic.'
+												: 'Digite os valores exibidos na balança Omron antiga após a pesagem.'}
+									</p>
 								</div>
 								<div className="flex flex-col gap-2 sm:items-end">
-									<div className="rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-600">
+									{!isRelaxmedicAssessment ? <div className="rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-600">
 										IMC calculado: <strong className="text-slate-950">{calculatedBmi ?? '-'}</strong>
-									</div>
-									{assessmentDraftSavedAt ? (
+									</div> : null}
+									{!isRelaxmedicAssessment && assessmentDraftSavedAt ? (
 										<div className="flex items-center gap-2 text-xs text-slate-500">
 											<span>Rascunho salvo {formatDate(assessmentDraftSavedAt)}</span>
 											<button type="button" onClick={clearAssessmentDraft} className="font-bold text-rose-600">Descartar</button>
@@ -1476,6 +1763,68 @@ export default function DashboardPage({ userName }) {
 								</div>
 							</div>
 
+						{isRelaxmedicAssessment ? (
+							<div className="mt-5 space-y-4">
+								<label className={`block rounded-2xl border-2 border-dashed p-5 transition ${relaxmedicImageError ? 'border-rose-300 bg-rose-50' : 'border-sky-200 bg-sky-50/60 hover:border-sky-300'}`}>
+									<span className="block text-sm font-bold text-slate-900">Imagem da avaliação Relaxmedic</span>
+									<span className="mt-1 block text-xs text-slate-500">Formatos aceitos: JPEG ou JPG, com no máximo 10 MB.</span>
+									<input
+										ref={relaxmedicImageInputRef}
+										type="file"
+										accept="image/jpeg,.jpg,.jpeg"
+										onChange={selectRelaxmedicImage}
+										disabled={!canClinicalProfessional || !selectedClient || !selectedClient.is_active}
+										className="mt-4 block w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-sky-700 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white disabled:cursor-not-allowed disabled:opacity-50"
+									/>
+								</label>
+
+								{relaxmedicImageError ? (
+									<div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
+										{relaxmedicImageError}
+									</div>
+								) : null}
+
+								{relaxmedicImage && relaxmedicImagePreview ? (
+									<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+										<div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+											<img src={relaxmedicImagePreview} alt="Prévia da avaliação Relaxmedic" className="max-h-[620px] w-full rounded-xl border border-slate-200 bg-white object-contain lg:w-80" />
+											<div className="flex-1">
+												<p className="text-sm font-bold text-slate-900">Imagem pronta para a próxima etapa</p>
+												<p className="mt-2 break-all text-sm text-slate-600">{relaxmedicImage.name}</p>
+												<p className="mt-1 text-xs text-slate-500">{(relaxmedicImage.size / 1024 / 1024).toFixed(2)} MB</p>
+												<p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+													A leitura não salva a avaliação nem mantém uma cópia da imagem no banco ou no armazenamento desta aplicação.
+												</p>
+												<div className="mt-4 flex flex-wrap gap-2">
+													<button type="button" onClick={processRelaxmedicImage} disabled={processingRelaxmedicImage} className="rounded-xl bg-sky-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-60">
+														{processingRelaxmedicImage ? 'Lendo imagem...' : relaxmedicExtraction ? 'Processar novamente' : 'Ler informações da imagem'}
+													</button>
+													<button type="button" onClick={clearRelaxmedicImage} disabled={processingRelaxmedicImage} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-bold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60">
+														Remover imagem
+													</button>
+												</div>
+											</div>
+										</div>
+									</div>
+								) : null}
+
+								{relaxmedicExtraction ? (
+									<RelaxmedicReview
+										extraction={relaxmedicExtraction}
+										imagePreview={relaxmedicImagePreview}
+										form={assessmentForm}
+										errors={errors}
+										flaggedFields={relaxmedicFlaggedFields}
+										confirmed={relaxmedicReviewConfirmed}
+										onConfirmedChange={setRelaxmedicReviewConfirmed}
+										onUpdate={updateAssessment}
+										onSubmit={submitAssessment}
+										saving={savingAssessment}
+										canSave={canClinicalProfessional && Boolean(selectedClient?.is_active)}
+									/>
+								) : null}
+							</div>
+						) : (
 						<form onSubmit={submitAssessment} onKeyDownCapture={focusNextFormField} className="mt-5 grid gap-3 md:grid-cols-4">
 							<Field label="Data da avaliação">
 								<input type="datetime-local" value={assessmentForm.evaluated_at} max={localDatetimeNow()} onChange={(event) => updateAssessment('evaluated_at', event.target.value)} className={inputClass()} />
@@ -1530,10 +1879,11 @@ export default function DashboardPage({ userName }) {
 									</ul>
 								</div>
 							) : null}
-						<button type="submit" disabled={(assessmentMode === 'edit' ? !canClinicalProfessional : !canCreateClinicalRecords) || !selectedClient || !selectedClient.is_active || savingAssessment} className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-4">
+						<button type="submit" disabled={(assessmentMode === 'edit' ? !canClinicalProfessional : !canCreateCurrentAssessment) || !selectedClient || !selectedClient.is_active || savingAssessment} className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-4">
 							{savingAssessment ? 'Salvando...' : assessmentMode === 'edit' ? 'Salvar correção e gerar relatório' : 'Salvar avaliação e gerar relatório'}
 						</button>
 						</form>
+						)}
 					</div>
 
 					<div id="relatorio" className="scroll-mt-20">
@@ -1718,6 +2068,57 @@ function ReminderList({ title, clients, emptyText, onSelectClient }) {
 	);
 }
 
+function relaxmedicMetricValue(field, value) {
+	if (value === null || value === undefined || value === '') return '-';
+	if (['obesity_level', 'body_type'].includes(field)) return value;
+	if (['resting_metabolism_kcal', 'body_age'].includes(field)) return new Intl.NumberFormat('pt-BR').format(value);
+
+	return numberBr(value, 1);
+}
+
+function AssessmentDetails({ assessment }) {
+	if (!assessment) return null;
+
+	const isRelaxmedic = assessment.device_model === 'Relaxmedic';
+	const metrics = isRelaxmedic
+		? relaxmedicAdditionalMetricFields.filter((field) => assessment[field] !== null && assessment[field] !== undefined && assessment[field] !== '')
+		: [];
+
+	return (
+		<div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+			<div className="flex flex-wrap items-center justify-between gap-2">
+				<div>
+					<p className="text-xs font-bold uppercase tracking-wide text-slate-500">Detalhes da avaliação</p>
+					<p className="mt-1 text-sm font-semibold text-slate-900">Modelo: {assessment.device_model ?? 'Não informado'}</p>
+				</div>
+				<span className={`rounded-full px-3 py-1 text-xs font-bold ${isRelaxmedic ? 'bg-sky-100 text-sky-700' : 'bg-slate-200 text-slate-700'}`}>
+					{isRelaxmedic ? 'Importada de imagem' : 'Entrada manual'}
+				</span>
+			</div>
+
+			{metrics.length ? (
+				<div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+					{metrics.map((field) => (
+						<div key={field} className="rounded-xl border border-slate-200 bg-white p-3">
+							<p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{relaxmedicMetricLabels[field]}</p>
+							<p className="mt-1 text-base font-semibold text-slate-950">{relaxmedicMetricValue(field, assessment[field])}</p>
+						</div>
+					))}
+				</div>
+			) : null}
+
+			{isRelaxmedic && assessment.source_metadata ? (
+				<div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-900">
+					<p className="font-bold uppercase tracking-wide">Origem auditável</p>
+					<p className="mt-1">Arquivo: {assessment.source_metadata.image_name} • imagem não armazenada</p>
+					<p className="break-all">SHA-256: {assessment.source_metadata.image_sha256}</p>
+					<p>Processada em {formatDate(assessment.source_metadata.processed_at)} • conferida em {formatDate(assessment.source_metadata.review_confirmed_at)}</p>
+				</div>
+			) : null}
+		</div>
+	);
+}
+
 function Report({ clinic, client, assessment, professional }) {
 	if (!client) {
 		return (
@@ -1740,6 +2141,10 @@ function Report({ clinic, client, assessment, professional }) {
 	const validationTitle = warnings.length ? 'Dados com alertas' : 'Dados validados';
 	const validationText = warnings.length ? warnings[0] : 'Nenhum alerta automático identificado.';
 	const formattedProfessional = professionalName(professional);
+	const isRelaxmedic = assessment?.device_model === 'Relaxmedic';
+	const additionalMetrics = isRelaxmedic
+		? relaxmedicAdditionalMetricFields.filter((field) => assessment?.[field] !== null && assessment?.[field] !== undefined && assessment?.[field] !== '')
+		: [];
 
 	return (
 		<article className="report overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm print:border-0 print:shadow-none">
@@ -1856,6 +2261,20 @@ function Report({ clinic, client, assessment, professional }) {
 							</div>
 						</section>
 
+						{additionalMetrics.length ? (
+							<section className="mt-6 rounded-2xl border border-sky-100 bg-sky-50/40 p-5">
+								<h3 className="text-base font-bold uppercase tracking-wide text-sky-800">Indicadores Relaxmedic</h3>
+								<div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+									{additionalMetrics.map((field) => (
+										<div key={field} className="rounded-xl border border-sky-100 bg-white p-4">
+											<p className="text-xs font-bold uppercase tracking-wide text-slate-500">{relaxmedicMetricLabels[field]}</p>
+											<p className="mt-2 text-2xl font-bold text-slate-950">{relaxmedicMetricValue(field, assessment[field])}</p>
+										</div>
+									))}
+								</div>
+							</section>
+						) : null}
+
 						<section className="mt-6 rounded-2xl border border-rose-100 bg-white p-5">
 							<h3 className="text-base font-bold uppercase tracking-wide text-[#b96f7d]">Síntese da avaliação</h3>
 							<div className="mt-4 space-y-2 text-sm leading-6 text-slate-700">
@@ -1875,9 +2294,19 @@ function Report({ clinic, client, assessment, professional }) {
 							</div>
 							<div className="rounded-2xl bg-stone-100 p-5">
 								<h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Protocolo de medição</h3>
-								<p className="mt-4 text-sm leading-6 text-slate-600">Equipamento Omron | Entrada manual | Conferência automática de IMC</p>
+								<p className="mt-4 text-sm leading-6 text-slate-600">
+									{isRelaxmedic ? 'Equipamento Relaxmedic/RelaxFit | Importação de imagem | Conferência humana obrigatória' : 'Equipamento Omron | Entrada manual | Conferência automática de IMC'}
+								</p>
 							</div>
 						</section>
+
+						{isRelaxmedic && assessment.source_metadata ? (
+							<section className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-600">
+								<p className="font-bold uppercase tracking-wide text-slate-800">Rastreabilidade da origem</p>
+								<p className="mt-2">Imagem {assessment.source_metadata.image_name} processada em {formatDate(assessment.source_metadata.processed_at)}. O arquivo original não foi armazenado.</p>
+								<p className="break-all">SHA-256: {assessment.source_metadata.image_sha256}</p>
+							</section>
+						) : null}
 					</>
 				) : (
 					<div className="py-10 text-center text-slate-500">Cadastre a primeira avaliação para gerar o relatório profissional.</div>
