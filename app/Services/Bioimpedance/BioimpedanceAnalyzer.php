@@ -46,23 +46,27 @@ class BioimpedanceAnalyzer
         $bmiDifference = $scaleBmi === null ? null : round($scaleBmi - $calculatedBmi, 2);
         $age = $this->ageAtAssessment($client, $assessment);
         $sex = $assessment['biological_sex_at_assessment'] ?? $client['biological_sex'];
+        $deviceModel = $assessment['device_model'] ?? self::DEVICE_MODEL;
+        $isRelaxmedic = $deviceModel === 'Relaxmedic';
 
         return [
-            'source' => 'Omron HBF-514C',
-            'reference' => $this->reference(),
+            'source' => $isRelaxmedic ? 'Relaxmedic/RelaxFit' : 'Omron HBF-514C',
+            'reference' => $isRelaxmedic ? $this->relaxmedicReference() : $this->reference(),
             'age' => $age,
             'snapshot' => [
                 'age_at_assessment' => $age,
                 'height_cm_at_assessment' => $heightCm,
                 'biological_sex_at_assessment' => $sex,
-                'device_model' => self::DEVICE_MODEL,
+                'device_model' => $deviceModel,
                 'reference_version' => self::REFERENCE_VERSION,
             ],
             'calculated_bmi' => $calculatedBmi,
             'bmi_difference' => $bmiDifference,
             'summary' => $this->summary($calculatedBmi, $assessment, $age, $sex),
             'indicators' => $this->indicators($calculatedBmi, $assessment, $age, $sex),
-            'warnings' => $this->warnings($client, $assessment, $calculatedBmi, $bmiDifference),
+            'warnings' => $isRelaxmedic
+                ? $this->relaxmedicWarnings($calculatedBmi, $bmiDifference)
+                : $this->warnings($client, $assessment, $calculatedBmi, $bmiDifference),
         ];
     }
 
@@ -295,6 +299,32 @@ class BioimpedanceAnalyzer
             'version' => 'LA IM SP r2',
             'classification_version' => self::REFERENCE_VERSION,
         ];
+    }
+
+    private function relaxmedicReference(): array
+    {
+        return [
+            'manufacturer' => 'Relaxmedic',
+            'model' => 'Relaxmedic/RelaxFit',
+            'manual_code' => null,
+            'version' => 'Dados importados do aplicativo',
+            'classification_version' => self::REFERENCE_VERSION,
+        ];
+    }
+
+    private function relaxmedicWarnings(float $calculatedBmi, ?float $bmiDifference): array
+    {
+        $warnings = [];
+
+        if ($calculatedBmi < 7 || $calculatedBmi > 90) {
+            $warnings[] = 'IMC calculado muito fora do esperado. Verifique peso e altura.';
+        }
+
+        if ($bmiDifference !== null && abs($bmiDifference) >= 0.5) {
+            $warnings[] = 'O IMC importado difere do IMC calculado em '.number_format(abs($bmiDifference), 1, ',', '.').' ponto(s). Confira a imagem original.';
+        }
+
+        return $warnings;
     }
 
     private function warnings(array $client, array $assessment, float $calculatedBmi, ?float $bmiDifference): array

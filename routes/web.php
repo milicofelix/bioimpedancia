@@ -29,6 +29,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/bioimpedance/clients/{client}/privacy-export', [BioimpedanceController::class, 'exportClientPrivacyData'])->name('bioimpedance.clients.privacy-export');
     Route::patch('/bioimpedance/clients/{client}/anonymize', [BioimpedanceController::class, 'anonymizeClient'])->name('bioimpedance.clients.anonymize');
     Route::post('/bioimpedance/assessments', [BioimpedanceController::class, 'storeAssessment'])->name('bioimpedance.assessments.store');
+    Route::post('/bioimpedance/relaxmedic/process-image', [BioimpedanceController::class, 'processRelaxmedicImage'])
+        ->middleware('throttle:10,1')
+        ->name('bioimpedance.relaxmedic.process-image');
     Route::get('/bioimpedance/assessments/{assessment}/pdf', [BioimpedanceController::class, 'downloadAssessmentPdf'])->name('bioimpedance.assessments.pdf');
     Route::get('/bioimpedance/assessments/{assessment}/observation-suggestion', [BioimpedanceController::class, 'suggestAssessmentObservation'])->name('bioimpedance.assessments.observation-suggestion');
     Route::patch('/bioimpedance/assessments/{assessment}/observation', [BioimpedanceController::class, 'approveAssessmentObservation'])->name('bioimpedance.assessments.observation.approve');

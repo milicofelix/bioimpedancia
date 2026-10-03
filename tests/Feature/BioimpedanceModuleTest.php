@@ -8,6 +8,7 @@ use App\Models\Bioimpedance\BioimpedanceAiAnalysisRequest;
 use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceAssessmentAudit;
 use App\Models\Bioimpedance\BioimpedanceClient;
+use App\Models\Bioimpedance\BioimpedanceClinicSetting;
 use App\Models\Bioimpedance\BioimpedanceReportShare;
 use App\Models\User;
 use App\Services\Bioimpedance\BioimpedanceObservationAssistant;
@@ -232,15 +233,18 @@ class BioimpedanceModuleTest extends TestCase
             'contact' => 'Emagrecimento e estética avançada',
             'footer_text' => 'Rodapé personalizado da clínica',
             'technical_notice' => 'Aviso técnico personalizado.',
+            'scale_model' => BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDI,
         ])->assertOk()
             ->assertJsonPath('clinic.legal_name', 'Ricosty Clinica LTDA')
             ->assertJsonPath('clinic.primary_color', '#cc7a8a')
-            ->assertJsonPath('clinic.footer_text', 'Rodapé personalizado da clínica');
+            ->assertJsonPath('clinic.footer_text', 'Rodapé personalizado da clínica')
+            ->assertJsonPath('clinic.scale_model', BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDI);
 
         $this->actingAs($user)->getJson(route('bioimpedance.index'))
             ->assertOk()
             ->assertJsonPath('clinic.contact', 'Emagrecimento e estética avançada')
-            ->assertJsonPath('clinic.technical_notice', 'Aviso técnico personalizado.');
+            ->assertJsonPath('clinic.technical_notice', 'Aviso técnico personalizado.')
+            ->assertJsonPath('clinic.scale_model', BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDI);
     }
 
     public function test_only_admin_can_manage_clinic_settings_and_users(): void
