@@ -762,6 +762,7 @@ export default function DashboardPage({ userName }) {
 	const canAdmin = Boolean(currentUser?.is_admin);
 	const canCreateClinicalRecords = ['admin', 'professional', 'reception'].includes(currentUser?.role);
 	const canClinicalProfessional = ['admin', 'professional'].includes(currentUser?.role);
+	const canCreateCurrentAssessment = clinic.scale_model === 'relaxmedic' ? canClinicalProfessional : canCreateClinicalRecords;
 
 	async function handleLogout() {
 		await window.axios.post('/logout', {}, { headers: { Accept: 'application/json' } });
@@ -1113,7 +1114,7 @@ export default function DashboardPage({ userName }) {
 	async function submitAssessment(event) {
 		event.preventDefault();
 		if (!selectedClient) return;
-		if (assessmentMode === 'edit' ? !canClinicalProfessional : !canCreateClinicalRecords) return;
+		if (assessmentMode === 'edit' ? !canClinicalProfessional : !canCreateCurrentAssessment) return;
 
 		setSavingAssessment(true);
 		setErrors({});
@@ -1139,6 +1140,7 @@ export default function DashboardPage({ userName }) {
 				? await window.axios.put(`/bioimpedance/assessments/${editingAssessmentId}`, payload)
 				: await window.axios.post('/bioimpedance/assessments', payload);
 			setClients((current) => current.map((client) => (client.id === data.client.id ? data.client : client)));
+			setAuditEvents(data.audit_events ?? auditEvents);
 			setSelectedAssessmentId(data.assessment.id);
 			const key = assessmentDraftKey(selectedClient.id);
 			if (key) {
@@ -1573,7 +1575,7 @@ export default function DashboardPage({ userName }) {
 									<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Histórico de avaliações</p>
 									<h2 className="mt-1 text-lg font-semibold text-slate-950">{selectedClient.assessments?.length ?? 0} registro(s)</h2>
 								</div>
-								<button type="button" disabled={!canCreateClinicalRecords} onClick={startNewAssessment} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
+								<button type="button" disabled={!canCreateCurrentAssessment} onClick={startNewAssessment} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
 									Nova avaliação
 								</button>
 							</div>
@@ -1870,7 +1872,7 @@ export default function DashboardPage({ userName }) {
 									</ul>
 								</div>
 							) : null}
-						<button type="submit" disabled={(assessmentMode === 'edit' ? !canClinicalProfessional : !canCreateClinicalRecords) || !selectedClient || !selectedClient.is_active || savingAssessment} className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-4">
+						<button type="submit" disabled={(assessmentMode === 'edit' ? !canClinicalProfessional : !canCreateCurrentAssessment) || !selectedClient || !selectedClient.is_active || savingAssessment} className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 md:col-span-4">
 							{savingAssessment ? 'Salvando...' : assessmentMode === 'edit' ? 'Salvar correção e gerar relatório' : 'Salvar avaliação e gerar relatório'}
 						</button>
 						</form>

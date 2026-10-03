@@ -88,6 +88,8 @@ class RelaxmedicImageProcessor
             throw new RuntimeException('Não foi possível ler a imagem enviada.');
         }
 
+        $this->assertSafeJpeg($image, $contents);
+
         $response = Http::withToken($apiKey)
             ->acceptJson()
             ->asJson()
@@ -130,6 +132,7 @@ class RelaxmedicImageProcessor
         $result = $this->normalize($payload, $image);
         $imageMetadata = [
             ...$result['image'],
+            'size_bytes' => strlen($contents),
             'sha256' => hash('sha256', $contents),
             'processed_at' => now()->toIso8601String(),
             'processor_model' => (string) config('services.openai.vision_model', config('services.openai.model', 'gpt-5.1')),
@@ -195,8 +198,24 @@ class RelaxmedicImageProcessor
             ->filter(fn (string $field) => $metrics[$field] !== null)
             ->count();
 
-        if (! ($payload['recognized'] ?? false) || $recognizedLabels->count() < 4 || $numericCount < 5 || $metrics['weight_kg'] === null) {
+        if (! ($payload['recognized'] ?? false)) {
             throw new RuntimeException('A imagem não foi reconhecida como um relatório compatível da Relaxmedic/RelaxFit.');
+        }
+
+        $qualityIssues = collect($payload['quality_issues'] ?? [])
+            ->filter(fn ($issue) => is_string($issue) && trim($issue) !== '')
+            ->map(fn (string $issue) => trim($issue))
+            ->values();
+
+        if (! ($payload['is_complete'] ?? false) || $recognizedLabels->count() < 12 || $numericCount < 10) {
+            $detail = $qualityIssues->first();
+            throw new RuntimeException('A imagem está cortada, borrada ou incompleta e não permite uma leitura segura.'.($detail ? ' '.$detail : ''));
+        }
+
+        foreach (['weight_kg', 'scale_bmi', 'body_fat_percentage', 'skeletal_muscle_percentage', 'resting_metabolism_kcal'] as $requiredField) {
+            if ($metrics[$requiredField] === null) {
+                throw new RuntimeException('A imagem não contém todas as métricas essenciais do relatório Relaxmedic/RelaxFit.');
+            }
         }
 
         $missingFields = collect(self::METRIC_FIELDS)
@@ -272,6 +291,51 @@ class RelaxmedicImageProcessor
         return is_numeric($normalized) ? round((float) $normalized, 2) : null;
     }
 
+    private function assertSafeJpeg(UploadedFile $image, string $contents): void
+    {
+        $actualSize = strlen($contents);
+        if ($actualSize < 1 || $actualSize > 10 * 1024 * 1024) {
+            throw new RuntimeException('O tamanho real da imagem deve ser de no máximo 10 MB.');
+        }
+
+        if (! in_array(mb_strtolower($image->getClientOriginalExtension()), ['jpg', 'jpeg'], true)) {
+            throw new RuntimeException('A extensão do arquivo deve ser JPEG ou JPG.');
+        }
+
+        $detectedMime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($contents);
+        $dimensions = @getimagesizefromstring($contents);
+        if ($detectedMime !== 'image/jpeg' || ! is_array($dimensions) || ($dimensions[2] ?? null) !== IMAGETYPE_JPEG) {
+            throw new RuntimeException('O conteúdo do arquivo não corresponde a uma imagem JPEG válida.');
+        }
+
+        [$width, $height] = $dimensions;
+        if ($width < 200 || $height < 400 || $width > 10000 || $height > 20000) {
+            throw new RuntimeException('As dimensões reais da imagem são incompatíveis com o relatório.');
+        }
+
+        if (! str_starts_with($contents, "\xFF\xD8")) {
+            throw new RuntimeException('A assinatura interna do arquivo JPEG é inválida.');
+        }
+
+        $endMarker = strrpos($contents, "\xFF\xD9");
+        if ($endMarker === false || trim(substr($contents, $endMarker + 2), "\x00\x09\x0A\x0D\x20") !== '') {
+            throw new RuntimeException('O arquivo contém conteúdo adicional incompatível após a imagem JPEG.');
+        }
+
+        $lowerContents = strtolower($contents);
+        foreach (['<?php', '<?=', '<script', '#!/bin/'] as $executableMarker) {
+            if (str_contains($lowerContents, $executableMarker)) {
+                throw new RuntimeException('O arquivo contém conteúdo executável e foi rejeitado por segurança.');
+            }
+        }
+
+        $binarySignatures = ["\x7FELF", "PK\x03\x04", '%PDF-', "\xCA\xFE\xBA\xBE"];
+        if (collect($binarySignatures)->contains(fn (string $signature) => str_contains($contents, $signature))
+            || (str_contains($contents, 'MZ') && str_contains($contents, "PE\x00\x00"))) {
+            throw new RuntimeException('O arquivo contém uma assinatura binária incompatível e foi rejeitado por segurança.');
+        }
+    }
+
     private function normalizeText(mixed $value): ?string
     {
         if (! is_string($value) || trim($value) === '') {
@@ -318,7 +382,9 @@ Não calcule, estime, deduza ou complete valores ausentes. Use null quando um r�
 Converta peso e massas para kg, percentuais para números sem o sinal %, TMB para kcal e gordura visceral/idade para valores numéricos.
 Converta a data e hora exibidas para ISO 8601 local no formato YYYY-MM-DDTHH:MM:SS, sem inventar fuso horário.
 Em detected_labels, copie apenas os nomes de métricas realmente visíveis.
-Marque recognized=false se a imagem não for um relatório compatível, estiver ilegível ou não contiver rótulos suficientes.
+Marque recognized=false se a imagem for de outro aplicativo ou não for um relatório RelaxFit/Relaxmedic.
+Marque is_complete=false se qualquer parte do relatório estiver cortada, borrada, ilegível ou se não for possível conferir com segurança ao menos as métricas essenciais.
+Liste em quality_issues, em português, os problemas visuais encontrados. Use uma lista vazia apenas quando a imagem estiver nítida e completa.
 Em suspicious_values, informe ambiguidades visuais, valores cortados, unidades inesperadas ou qualquer leitura de baixa confiança.
 PROMPT;
     }
@@ -338,9 +404,11 @@ PROMPT;
         return [
             'type' => 'object',
             'additionalProperties' => false,
-            'required' => ['recognized', 'report_type', 'measured_at', 'detected_labels', 'metrics', 'suspicious_values'],
+            'required' => ['recognized', 'is_complete', 'quality_issues', 'report_type', 'measured_at', 'detected_labels', 'metrics', 'suspicious_values'],
             'properties' => [
                 'recognized' => ['type' => 'boolean'],
+                'is_complete' => ['type' => 'boolean'],
+                'quality_issues' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'report_type' => $nullableString,
                 'measured_at' => $nullableString,
                 'detected_labels' => ['type' => 'array', 'items' => ['type' => 'string']],

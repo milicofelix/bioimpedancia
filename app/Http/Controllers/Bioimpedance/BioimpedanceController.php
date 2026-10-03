@@ -24,6 +24,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -324,19 +325,41 @@ class BioimpedanceController extends Controller
         $snapshot = $this->assessmentSnapshot($client, $validated['evaluated_at']);
         $analysis = $analyzer->analyze($client->toArray(), [...$validated, ...$snapshot]);
 
-        $assessment = BioimpedanceAssessment::query()->create([
-            ...$validated,
-            ...$snapshot,
-            'user_id' => $request->user()->id,
-            'calculated_bmi' => $analysis['calculated_bmi'],
-            'bmi_difference' => $analysis['bmi_difference'],
-            'analysis' => $analysis,
-            'source_metadata' => $sourceMetadata,
-        ]);
+        $assessment = DB::transaction(function () use ($validated, $snapshot, $request, $analysis, $sourceMetadata): BioimpedanceAssessment {
+            $assessment = BioimpedanceAssessment::query()->create([
+                ...$validated,
+                ...$snapshot,
+                'user_id' => $request->user()->id,
+                'calculated_bmi' => $analysis['calculated_bmi'],
+                'bmi_difference' => $analysis['bmi_difference'],
+                'analysis' => $analysis,
+                'source_metadata' => $sourceMetadata,
+            ]);
+
+            $this->auditAssessment(
+                $assessment,
+                $request,
+                'created',
+                'Avaliação criada',
+                [],
+                $this->assessmentAuditValues($assessment),
+            );
+            $this->audit(
+                $request,
+                'bioimpedance_assessment.created',
+                $assessment,
+                'Avaliação de bioimpedância criada',
+                null,
+                $this->assessmentAuditValues($assessment),
+            );
+
+            return $assessment;
+        });
 
         return response()->json([
             'client' => $this->clientPayload($this->loadClientAssessments($client->refresh())),
             'assessment' => $this->assessmentPayload($assessment),
+            'audit_events' => $request->user()->isAdmin() ? $this->auditEventsPayload() : [],
         ], 201);
     }
 
@@ -356,6 +379,7 @@ class BioimpedanceController extends Controller
                 'file',
                 'image',
                 'mimes:jpg,jpeg',
+                'extensions:jpg,jpeg',
                 'mimetypes:image/jpeg',
                 'max:10240',
                 'dimensions:min_width=200,min_height=400,max_width=10000,max_height=20000',
@@ -364,6 +388,7 @@ class BioimpedanceController extends Controller
             'image.required' => 'Selecione uma imagem JPEG ou JPG.',
             'image.image' => 'O arquivo enviado não é uma imagem válida.',
             'image.mimes' => 'A imagem deve estar no formato JPEG ou JPG.',
+            'image.extensions' => 'A extensão do arquivo deve ser JPEG ou JPG.',
             'image.mimetypes' => 'A imagem deve estar no formato JPEG ou JPG.',
             'image.max' => 'A imagem deve ter no máximo 10 MB.',
             'image.dimensions' => 'A imagem possui dimensões incompatíveis com o relatório.',
@@ -410,21 +435,32 @@ class BioimpedanceController extends Controller
         $analysis = $analyzer->analyze($client->toArray(), [...$validated, ...$snapshot]);
         $oldValues = $this->assessmentAuditValues($assessment);
 
-        $assessment->update([
-            ...$validated,
-            ...$snapshot,
-            'corrected_by_user_id' => $request->user()->id,
-            'correction_count' => $assessment->correction_count + 1,
-            'calculated_bmi' => $analysis['calculated_bmi'],
-            'bmi_difference' => $analysis['bmi_difference'],
-            'analysis' => $analysis,
-        ]);
+        DB::transaction(function () use ($assessment, $validated, $snapshot, $request, $analysis, $changeReason, $oldValues): void {
+            $assessment->update([
+                ...$validated,
+                ...$snapshot,
+                'corrected_by_user_id' => $request->user()->id,
+                'correction_count' => $assessment->correction_count + 1,
+                'calculated_bmi' => $analysis['calculated_bmi'],
+                'bmi_difference' => $analysis['bmi_difference'],
+                'analysis' => $analysis,
+            ]);
 
-        $this->auditAssessment($assessment->refresh(), $request, 'corrected', $changeReason, $oldValues, $this->assessmentAuditValues($assessment));
+            $this->auditAssessment($assessment->refresh(), $request, 'corrected', $changeReason, $oldValues, $this->assessmentAuditValues($assessment));
+            $this->audit(
+                $request,
+                'bioimpedance_assessment.corrected',
+                $assessment,
+                'Avaliação de bioimpedância corrigida: '.$changeReason,
+                $oldValues,
+                $this->assessmentAuditValues($assessment),
+            );
+        });
 
         return response()->json([
             'client' => $this->clientPayload($this->loadClientAssessments($client->refresh())),
             'assessment' => $this->assessmentPayload($assessment),
+            'audit_events' => $request->user()->isAdmin() ? $this->auditEventsPayload() : [],
         ]);
     }
 
