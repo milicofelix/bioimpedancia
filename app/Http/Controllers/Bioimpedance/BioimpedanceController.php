@@ -269,6 +269,16 @@ class BioimpedanceController extends Controller
     public function storeAssessment(Request $request, BioimpedanceAnalyzer $analyzer): JsonResponse
     {
         $this->authorizeCreateClinicalRecords($request);
+
+        if (BioimpedanceClinicSetting::current()->scale_model === BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDIC) {
+            $this->authorizeClinicalProfessional($request);
+            $request->validate([
+                'relaxmedic_review_confirmed' => ['accepted'],
+            ], [
+                'relaxmedic_review_confirmed.accepted' => 'Confirme que os dados foram conferidos com a imagem antes de salvar.',
+            ]);
+        }
+
         $validated = $this->validateAssessment($request);
 
         $client = BioimpedanceClient::query()->findOrFail($validated['bioimpedance_client_id']);
@@ -301,7 +311,7 @@ class BioimpedanceController extends Controller
 
     public function processRelaxmedicImage(Request $request, RelaxmedicImageProcessor $processor): JsonResponse
     {
-        $this->authorizeCreateClinicalRecords($request);
+        $this->authorizeClinicalProfessional($request);
 
         if (BioimpedanceClinicSetting::current()->scale_model !== BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDIC) {
             throw ValidationException::withMessages([
@@ -355,7 +365,7 @@ class BioimpedanceController extends Controller
             ]);
         }
 
-        $validated = $this->validateAssessment($request, requireClient: false);
+        $validated = $this->validateAssessment($request, requireClient: false, deviceModel: $assessment->device_model);
         unset($validated['bioimpedance_client_id']);
 
         $changeReason = $request->validate([
@@ -602,8 +612,12 @@ class BioimpedanceController extends Controller
         ], 200, $this->reportSharePresenter->publicReportHeaders());
     }
 
-    private function validateAssessment(Request $request, bool $requireClient = true): array
+    private function validateAssessment(Request $request, bool $requireClient = true, ?string $deviceModel = null): array
     {
+        $isRelaxmedic = $deviceModel !== null
+            ? $deviceModel === BioimpedanceClinicSetting::SCALE_MODEL_NAMES[BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDIC]
+            : BioimpedanceClinicSetting::current()->scale_model === BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDIC;
+
         $request->merge([
             'weight_kg' => $this->normalizeDecimal($request->input('weight_kg')),
             'scale_bmi' => $this->normalizeDecimal($request->input('scale_bmi')),
@@ -626,10 +640,10 @@ class BioimpedanceController extends Controller
         return $request->validate([
             'bioimpedance_client_id' => [$requireClient ? 'required' : 'sometimes', 'exists:bioimpedance_clients,id'],
             'evaluated_at' => ['required', 'date', 'before_or_equal:now'],
-            'weight_kg' => ['required', 'numeric', 'between:2,150'],
+            'weight_kg' => ['required', 'numeric', $isRelaxmedic ? 'between:2,300' : 'between:2,150'],
             'scale_bmi' => ['nullable', 'numeric', 'between:7,90'],
-            'body_fat_percentage' => ['nullable', 'numeric', 'between:5,60'],
-            'skeletal_muscle_percentage' => ['nullable', 'numeric', 'between:5,50'],
+            'body_fat_percentage' => ['nullable', 'numeric', $isRelaxmedic ? 'between:0,100' : 'between:5,60'],
+            'skeletal_muscle_percentage' => ['nullable', 'numeric', $isRelaxmedic ? 'between:0,100' : 'between:5,50'],
             'muscle_rate_percentage' => ['nullable', 'numeric', 'between:0,100'],
             'lean_body_mass_kg' => ['nullable', 'numeric', 'between:0,300'],
             'subcutaneous_fat_percentage' => ['nullable', 'numeric', 'between:0,100'],
@@ -643,9 +657,9 @@ class BioimpedanceController extends Controller
             'ideal_body_weight_kg' => ['nullable', 'numeric', 'between:2,300'],
             'obesity_level' => ['nullable', 'string', 'max:100'],
             'body_type' => ['nullable', 'string', 'max:100'],
-            'resting_metabolism_kcal' => ['nullable', 'integer', 'between:385,3999'],
-            'body_age' => ['nullable', 'integer', 'between:18,80'],
-            'visceral_fat_level' => ['nullable', 'integer', 'between:1,30'],
+            'resting_metabolism_kcal' => ['nullable', 'integer', $isRelaxmedic ? 'between:100,10000' : 'between:385,3999'],
+            'body_age' => ['nullable', 'integer', $isRelaxmedic ? 'between:1,120' : 'between:18,80'],
+            'visceral_fat_level' => ['nullable', 'integer', $isRelaxmedic ? 'between:0,100' : 'between:1,30'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ], [
             'bioimpedance_client_id.required' => 'Selecione um cliente antes de salvar a avaliação.',
@@ -655,19 +669,19 @@ class BioimpedanceController extends Controller
             'evaluated_at.before_or_equal' => 'A avaliação não pode ser registrada no futuro. Confira a data e o horário informados.',
             'weight_kg.required' => 'Informe o peso exibido pela balança.',
             'weight_kg.numeric' => 'Informe o peso em kg. Exemplo: 95,2.',
-            'weight_kg.between' => 'O peso deve estar entre 2 kg e 150 kg para a Omron HBF-514C.',
+            'weight_kg.between' => $isRelaxmedic ? 'O peso deve estar entre 2 kg e 300 kg.' : 'O peso deve estar entre 2 kg e 150 kg para a Omron HBF-514C.',
             'scale_bmi.numeric' => 'Informe o IMC da balança com número válido. Exemplo: 31,4.',
             'scale_bmi.between' => 'O IMC da balança deve estar entre 7 e 90.',
             'body_fat_percentage.numeric' => 'Informe a gordura corporal em percentual. Exemplo: 20,5.',
-            'body_fat_percentage.between' => 'A gordura corporal deve estar entre 5% e 60%.',
+            'body_fat_percentage.between' => $isRelaxmedic ? 'A gordura corporal deve estar entre 0% e 100%.' : 'A gordura corporal deve estar entre 5% e 60%.',
             'skeletal_muscle_percentage.numeric' => 'Informe o músculo esquelético em percentual. Exemplo: 37,6.',
-            'skeletal_muscle_percentage.between' => 'O músculo esquelético deve estar entre 5% e 50%.',
+            'skeletal_muscle_percentage.between' => $isRelaxmedic ? 'O músculo esquelético deve estar entre 0% e 100%.' : 'O músculo esquelético deve estar entre 5% e 50%.',
             'resting_metabolism_kcal.integer' => 'Informe o metabolismo basal em kcal, sem casas decimais.',
-            'resting_metabolism_kcal.between' => 'O metabolismo basal deve estar entre 385 e 3999 kcal.',
+            'resting_metabolism_kcal.between' => $isRelaxmedic ? 'O metabolismo basal deve estar entre 100 e 10000 kcal.' : 'O metabolismo basal deve estar entre 385 e 3999 kcal.',
             'body_age.integer' => 'Informe a idade corporal em anos, sem casas decimais.',
-            'body_age.between' => 'A idade corporal deve estar entre 18 e 80 anos.',
+            'body_age.between' => $isRelaxmedic ? 'A idade corporal deve estar entre 1 e 120 anos.' : 'A idade corporal deve estar entre 18 e 80 anos.',
             'visceral_fat_level.integer' => 'Informe a gordura visceral como número inteiro, de 1 a 30.',
-            'visceral_fat_level.between' => 'A gordura visceral deve estar entre 1 e 30.',
+            'visceral_fat_level.between' => $isRelaxmedic ? 'A gordura visceral deve estar entre 0 e 100.' : 'A gordura visceral deve estar entre 1 e 30.',
             'notes.max' => 'A observação da avaliação pode ter no máximo 2000 caracteres.',
         ]);
     }

@@ -22,6 +22,19 @@ const emptyAssessment = {
 	scale_bmi: '',
 	body_fat_percentage: '',
 	skeletal_muscle_percentage: '',
+	muscle_rate_percentage: '',
+	lean_body_mass_kg: '',
+	subcutaneous_fat_percentage: '',
+	body_water_percentage: '',
+	muscle_mass_kg: '',
+	bone_mass_kg: '',
+	protein_percentage: '',
+	fat_mass_kg: '',
+	water_weight_kg: '',
+	protein_mass_kg: '',
+	ideal_body_weight_kg: '',
+	obesity_level: '',
+	body_type: '',
 	resting_metabolism_kcal: '',
 	body_age: '',
 	visceral_fat_level: '',
@@ -165,6 +178,75 @@ function FieldError({ errors, field }) {
 	if (!messages.length) return null;
 
 	return <p className="mt-1 text-xs font-semibold text-rose-700">{messages[0]}</p>;
+}
+
+function RelaxmedicReview({ extraction, imagePreview, form, errors, flaggedFields, confirmed, onConfirmedChange, onUpdate, onSubmit, saving, canSave }) {
+	return (
+		<form onSubmit={onSubmit} className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+			<div>
+				<p className="text-sm font-bold text-emerald-900">Conferência obrigatória</p>
+				<p className="mt-1 text-xs text-emerald-800">Compare cada campo com a imagem antes de salvar. Relatório reconhecido como {extraction.report_type}.</p>
+			</div>
+
+			<div className="mt-4 grid gap-5 lg:grid-cols-[minmax(280px,360px)_1fr]">
+				<div>
+					<div className="lg:sticky lg:top-20">
+						<img src={imagePreview} alt="Imagem original para conferência" className="max-h-[760px] w-full rounded-xl border border-slate-200 bg-white object-contain" />
+						<p className="mt-2 text-center text-xs text-slate-500">Imagem original para comparação</p>
+					</div>
+				</div>
+
+				<div className="space-y-4">
+					<div className={`rounded-xl border p-3 ${flaggedFields.has('measured_at') || !extraction.measured_at ? 'border-amber-300 bg-amber-50' : 'border-emerald-100 bg-white'}`}>
+						<Field label="Data e hora da medição">
+							<input type="datetime-local" value={form.evaluated_at} max={localDatetimeNow()} onChange={(event) => onUpdate('evaluated_at', event.target.value)} className={inputClass()} />
+							<FieldError errors={errors} field="evaluated_at" />
+						</Field>
+						{!extraction.measured_at ? <p className="mt-2 text-xs font-semibold text-amber-700">Data não encontrada. Preencha manualmente.</p> : null}
+					</div>
+
+					<div className="grid gap-3 sm:grid-cols-2">
+						{Object.entries(relaxmedicMetricLabels).map(([field, label]) => {
+							const isFlagged = flaggedFields.has(field);
+							const warning = (extraction.suspicious_values ?? []).find((item) => item.field === field)?.reason;
+							const isText = ['obesity_level', 'body_type'].includes(field);
+
+							return (
+								<div key={field} className={`rounded-xl border p-3 ${isFlagged ? 'border-amber-300 bg-amber-50' : 'border-emerald-100 bg-white'}`}>
+									<Field label={label}>
+										<input inputMode={isText ? undefined : 'decimal'} value={form[field] ?? ''} onChange={(event) => onUpdate(field, event.target.value)} className={inputClass()} />
+										<FieldError errors={errors} field={field} />
+									</Field>
+									{isFlagged ? <p className="mt-2 text-xs font-semibold text-amber-700">{warning ?? 'Não encontrado na imagem. Preencha se estiver visível.'}</p> : null}
+								</div>
+							);
+						})}
+					</div>
+
+					<Field label="Observação da avaliação">
+						<textarea value={form.notes} onChange={(event) => onUpdate('notes', event.target.value)} rows="3" className={inputClass()} />
+						<FieldError errors={errors} field="notes" />
+					</Field>
+
+					<label className={`flex items-start gap-3 rounded-xl border p-4 ${confirmed ? 'border-emerald-300 bg-emerald-50' : 'border-slate-300 bg-white'}`}>
+						<input type="checkbox" checked={confirmed} onChange={(event) => onConfirmedChange(event.target.checked)} className="mt-0.5 h-5 w-5 rounded border-slate-300 text-emerald-600" />
+						<span className="text-sm leading-6 text-slate-700"><strong>Confirmo que conferi todos os dados com a imagem original</strong> e corrigi valores, unidades e casas decimais quando necessário.</span>
+					</label>
+
+					{Object.keys(errors).length ? (
+						<div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+							<p className="font-bold">Não foi possível salvar a avaliação.</p>
+							<ul className="mt-2 list-disc space-y-1 pl-5">{errorMessages(errors).map((message) => <li key={message}>{message}</li>)}</ul>
+						</div>
+					) : null}
+
+					<button type="submit" disabled={!confirmed || !canSave || saving} className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">
+						{saving ? 'Salvando avaliação...' : 'Confirmar dados e salvar avaliação'}
+					</button>
+				</div>
+			</div>
+		</form>
+	);
 }
 
 function formatDate(value) {
@@ -405,6 +487,19 @@ function assessmentFormFromAssessment(assessment) {
 		scale_bmi: assessment.scale_bmi == null ? '' : numberBr(assessment.scale_bmi, 1),
 		body_fat_percentage: assessment.body_fat_percentage == null ? '' : numberBr(assessment.body_fat_percentage, 1),
 		skeletal_muscle_percentage: assessment.skeletal_muscle_percentage == null ? '' : numberBr(assessment.skeletal_muscle_percentage, 1),
+		muscle_rate_percentage: assessment.muscle_rate_percentage == null ? '' : numberBr(assessment.muscle_rate_percentage, 1),
+		lean_body_mass_kg: assessment.lean_body_mass_kg == null ? '' : numberBr(assessment.lean_body_mass_kg, 1),
+		subcutaneous_fat_percentage: assessment.subcutaneous_fat_percentage == null ? '' : numberBr(assessment.subcutaneous_fat_percentage, 1),
+		body_water_percentage: assessment.body_water_percentage == null ? '' : numberBr(assessment.body_water_percentage, 1),
+		muscle_mass_kg: assessment.muscle_mass_kg == null ? '' : numberBr(assessment.muscle_mass_kg, 1),
+		bone_mass_kg: assessment.bone_mass_kg == null ? '' : numberBr(assessment.bone_mass_kg, 1),
+		protein_percentage: assessment.protein_percentage == null ? '' : numberBr(assessment.protein_percentage, 1),
+		fat_mass_kg: assessment.fat_mass_kg == null ? '' : numberBr(assessment.fat_mass_kg, 1),
+		water_weight_kg: assessment.water_weight_kg == null ? '' : numberBr(assessment.water_weight_kg, 1),
+		protein_mass_kg: assessment.protein_mass_kg == null ? '' : numberBr(assessment.protein_mass_kg, 1),
+		ideal_body_weight_kg: assessment.ideal_body_weight_kg == null ? '' : numberBr(assessment.ideal_body_weight_kg, 1),
+		obesity_level: assessment.obesity_level ?? '',
+		body_type: assessment.body_type ?? '',
 		resting_metabolism_kcal: assessment.resting_metabolism_kcal ?? '',
 		body_age: assessment.body_age ?? '',
 		visceral_fat_level: assessment.visceral_fat_level == null ? '' : String(Math.trunc(assessment.visceral_fat_level)),
@@ -495,6 +590,7 @@ export default function DashboardPage({ userName }) {
 	const [relaxmedicImageError, setRelaxmedicImageError] = useState('');
 	const [processingRelaxmedicImage, setProcessingRelaxmedicImage] = useState(false);
 	const [relaxmedicExtraction, setRelaxmedicExtraction] = useState(null);
+	const [relaxmedicReviewConfirmed, setRelaxmedicReviewConfirmed] = useState(false);
 
 	useEffect(() => {
 		window.axios.get('/bioimpedance').then(({ data }) => {
@@ -553,6 +649,7 @@ export default function DashboardPage({ userName }) {
 		setRelaxmedicImage(null);
 		setRelaxmedicImageError('');
 		setRelaxmedicExtraction(null);
+		setRelaxmedicReviewConfirmed(false);
 		if (relaxmedicImageInputRef.current) {
 			relaxmedicImageInputRef.current.value = '';
 		}
@@ -619,6 +716,10 @@ export default function DashboardPage({ userName }) {
 		?? selectedClient?.assessments?.[0]
 		?? null;
 	const isRelaxmedicAssessment = clinic.scale_model === 'relaxmedic' && assessmentMode === 'create';
+	const relaxmedicFlaggedFields = new Set([
+		...(relaxmedicExtraction?.missing_fields ?? []),
+		...(relaxmedicExtraction?.suspicious_values ?? []).map((item) => item.field),
+	]);
 
 	const filteredClients = useMemo(() => {
 		const term = query.trim().toLowerCase();
@@ -736,6 +837,7 @@ export default function DashboardPage({ userName }) {
 		setRelaxmedicImage(null);
 		setRelaxmedicImageError('');
 		setRelaxmedicExtraction(null);
+		setRelaxmedicReviewConfirmed(false);
 		if (relaxmedicImageInputRef.current) {
 			relaxmedicImageInputRef.current.value = '';
 		}
@@ -746,6 +848,7 @@ export default function DashboardPage({ userName }) {
 		setRelaxmedicImage(null);
 		setRelaxmedicImageError('');
 		setRelaxmedicExtraction(null);
+		setRelaxmedicReviewConfirmed(false);
 
 		if (!file) return;
 
@@ -778,6 +881,13 @@ export default function DashboardPage({ userName }) {
 		try {
 			const { data } = await window.axios.post('/bioimpedance/relaxmedic/process-image', payload);
 			setRelaxmedicExtraction(data.extraction);
+			setAssessmentForm({
+				...emptyAssessment,
+				evaluated_at: data.extraction.measured_at ?? localDatetimeNow(),
+				...Object.fromEntries(Object.entries(data.extraction.metrics ?? {}).map(([field, value]) => [field, value ?? ''])),
+			});
+			setRelaxmedicReviewConfirmed(false);
+			setErrors({});
 		} catch (error) {
 			const imageError = error.response?.data?.errors?.image?.[0];
 			setRelaxmedicImageError(imageError ?? error.response?.data?.message ?? 'Não foi possível processar a imagem. Tente novamente.');
@@ -825,7 +935,23 @@ export default function DashboardPage({ userName }) {
 
 	function updateAssessment(field, value) {
 		const integerFields = ['resting_metabolism_kcal', 'body_age', 'visceral_fat_level'];
-		const decimalFields = ['weight_kg', 'scale_bmi', 'body_fat_percentage', 'skeletal_muscle_percentage'];
+		const decimalFields = [
+			'weight_kg',
+			'scale_bmi',
+			'body_fat_percentage',
+			'skeletal_muscle_percentage',
+			'muscle_rate_percentage',
+			'lean_body_mass_kg',
+			'subcutaneous_fat_percentage',
+			'body_water_percentage',
+			'muscle_mass_kg',
+			'bone_mass_kg',
+			'protein_percentage',
+			'fat_mass_kg',
+			'water_weight_kg',
+			'protein_mass_kg',
+			'ideal_body_weight_kg',
+		];
 		const maskedValue = integerFields.includes(field)
 			? normalizeInteger(value).slice(0, 4)
 			: decimalFields.includes(field)
@@ -833,6 +959,9 @@ export default function DashboardPage({ userName }) {
 				: value;
 
 		setAssessmentForm((current) => ({ ...current, [field]: maskedValue }));
+		if (relaxmedicExtraction) {
+			setRelaxmedicReviewConfirmed(false);
+		}
 	}
 
 	function updateClinic(field, value) {
@@ -981,6 +1110,7 @@ export default function DashboardPage({ userName }) {
 			body_fat_percentage: normalizeDecimal(assessmentForm.body_fat_percentage),
 			skeletal_muscle_percentage: normalizeDecimal(assessmentForm.skeletal_muscle_percentage),
 			visceral_fat_level: normalizeDecimal(assessmentForm.visceral_fat_level),
+			relaxmedic_review_confirmed: isRelaxmedicAssessment && relaxmedicReviewConfirmed,
 		};
 
 		if (assessmentMode === 'edit') {
@@ -1615,7 +1745,7 @@ export default function DashboardPage({ userName }) {
 										type="file"
 										accept="image/jpeg,.jpg,.jpeg"
 										onChange={selectRelaxmedicImage}
-										disabled={!canCreateClinicalRecords || !selectedClient || !selectedClient.is_active}
+										disabled={!canClinicalProfessional || !selectedClient || !selectedClient.is_active}
 										className="mt-4 block w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-sky-700 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white disabled:cursor-not-allowed disabled:opacity-50"
 									/>
 								</label>
@@ -1651,44 +1781,19 @@ export default function DashboardPage({ userName }) {
 								) : null}
 
 								{relaxmedicExtraction ? (
-									<div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
-										<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-											<div>
-												<p className="text-sm font-bold text-emerald-900">Leitura concluída</p>
-												<p className="mt-1 text-xs text-emerald-800">Relatório reconhecido como {relaxmedicExtraction.report_type}.</p>
-											</div>
-											<p className="text-sm font-semibold text-slate-700">Medição: {relaxmedicExtraction.measured_at ? formatDate(relaxmedicExtraction.measured_at) : 'não encontrada'}</p>
-										</div>
-
-										<div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-											{Object.entries(relaxmedicExtraction.metrics ?? {}).filter(([, value]) => value !== null && value !== '').map(([field, value]) => (
-												<div key={field} className="rounded-xl border border-emerald-100 bg-white p-3">
-													<p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{relaxmedicMetricLabels[field] ?? field}</p>
-													<p className="mt-1 text-lg font-semibold text-slate-950">{String(value).replace('.', ',')}</p>
-												</div>
-											))}
-										</div>
-
-										{relaxmedicExtraction.missing_fields?.length ? (
-											<div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-												<p className="font-bold">Campos não encontrados</p>
-												<p className="mt-1">{relaxmedicExtraction.missing_fields.map((field) => relaxmedicMetricLabels[field] ?? field).join(', ')}</p>
-											</div>
-										) : null}
-
-										{relaxmedicExtraction.suspicious_values?.length ? (
-											<div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
-												<p className="font-bold">Valores que precisam de conferência</p>
-												<ul className="mt-2 list-disc space-y-1 pl-5">
-													{relaxmedicExtraction.suspicious_values.map((item, index) => (
-														<li key={`${item.field}-${index}`}><strong>{relaxmedicMetricLabels[item.field] ?? item.field}:</strong> {item.reason}</li>
-													))}
-												</ul>
-											</div>
-										) : null}
-
-										<p className="mt-4 text-xs text-slate-500">Confira os valores com a imagem. Nenhuma avaliação foi salva.</p>
-									</div>
+									<RelaxmedicReview
+										extraction={relaxmedicExtraction}
+										imagePreview={relaxmedicImagePreview}
+										form={assessmentForm}
+										errors={errors}
+										flaggedFields={relaxmedicFlaggedFields}
+										confirmed={relaxmedicReviewConfirmed}
+										onConfirmedChange={setRelaxmedicReviewConfirmed}
+										onUpdate={updateAssessment}
+										onSubmit={submitAssessment}
+										saving={savingAssessment}
+										canSave={canClinicalProfessional && Boolean(selectedClient?.is_active)}
+									/>
 								) : null}
 							</div>
 						) : (
