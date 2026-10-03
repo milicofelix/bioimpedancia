@@ -15,6 +15,11 @@ class BioimpedanceClinicSetting extends Model
         self::SCALE_MODEL_RELAXMEDIC,
     ];
 
+    public const SCALE_MODEL_NAMES = [
+        self::SCALE_MODEL_OMRON_HBF_514C => 'HBF-514C',
+        self::SCALE_MODEL_RELAXMEDIC => 'Relaxmedic',
+    ];
+
     public const DEFAULTS = [
         'display_name' => 'Ricosty Emagrecimento e Estética',
         'legal_name' => 'Ricosty Emagrecimento e Estética',
@@ -65,6 +70,12 @@ class BioimpedanceClinicSetting extends Model
             ...$this->only($this->fillable),
             'logo_initials' => $this->initials(),
         ];
+    }
+
+    public function scaleModelName(): string
+    {
+        return self::SCALE_MODEL_NAMES[$this->scale_model]
+            ?? self::SCALE_MODEL_NAMES[self::SCALE_MODEL_OMRON_HBF_514C];
     }
 
     private function initials(): string
