@@ -24,6 +24,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -33,22 +34,19 @@ class BioimpedanceController extends Controller
 {
     public function __construct(private readonly BioimpedanceReportSharePresenter $reportSharePresenter) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $clients = BioimpedanceClient::query()
-            ->with(['assessments' => fn ($query) => $query->with('shares')->latest('evaluated_at')])
-            ->orderBy('full_name')
-            ->get()
-            ->map(fn (BioimpedanceClient $client) => $this->clientPayload($client));
-
         return response()->json([
-            'clients' => $clients,
-            'clinic' => $this->clinicPayload(),
-            'current_user' => $this->userPayload(request()->user()),
-            'users' => request()->user()->isAdmin() ? $this->usersPayload() : [],
-            'audit_events' => request()->user()->isAdmin() ? $this->auditEventsPayload() : [],
-            'admin_dashboard' => request()->user()->isAdmin() ? $this->adminDashboardPayload() : null,
+            ...$this->operationalWorkspacePayload($request),
+            'users' => $request->user()->isAdmin() ? $this->usersPayload() : [],
+            'audit_events' => $request->user()->isAdmin() ? $this->auditEventsPayload() : [],
+            'admin_dashboard' => $request->user()->isAdmin() ? $this->adminDashboardPayload() : null,
         ]);
+    }
+
+    public function operationalIndex(Request $request): JsonResponse
+    {
+        return response()->json($this->operationalWorkspacePayload($request));
     }
 
     public function adminDashboard(Request $request): JsonResponse
@@ -325,36 +323,59 @@ class BioimpedanceController extends Controller
         $snapshot = $this->assessmentSnapshot($client, $validated['evaluated_at']);
         $analysis = $analyzer->analyze($client->toArray(), [...$validated, ...$snapshot]);
 
-        $assessment = DB::transaction(function () use ($validated, $snapshot, $request, $analysis, $sourceMetadata): BioimpedanceAssessment {
-            $assessment = BioimpedanceAssessment::query()->create([
-                ...$validated,
-                ...$snapshot,
-                'user_id' => $request->user()->id,
-                'calculated_bmi' => $analysis['calculated_bmi'],
-                'bmi_difference' => $analysis['bmi_difference'],
-                'analysis' => $analysis,
-                'source_metadata' => $sourceMetadata,
-            ]);
+        $creationLock = null;
+        if ($sourceMetadata) {
+            $creationLock = Cache::lock('bioimpedance-assessment:'.hash('sha256', $client->id.'|'.$sourceMetadata['image_sha256']), 15);
+            if (! $creationLock->get()) {
+                throw ValidationException::withMessages([
+                    'source_metadata' => 'Esta imagem já está sendo usada para criar uma avaliação. Aguarde a conclusão.',
+                ]);
+            }
+        }
 
-            $this->auditAssessment(
-                $assessment,
-                $request,
-                'created',
-                'Avaliação criada',
-                [],
-                $this->assessmentAuditValues($assessment),
-            );
-            $this->audit(
-                $request,
-                'bioimpedance_assessment.created',
-                $assessment,
-                'Avaliação de bioimpedância criada',
-                null,
-                $this->assessmentAuditValues($assessment),
-            );
+        try {
+            if ($sourceMetadata && BioimpedanceAssessment::query()
+                ->where('bioimpedance_client_id', $client->id)
+                ->where('source_metadata->image_sha256', $sourceMetadata['image_sha256'])
+                ->exists()) {
+                throw ValidationException::withMessages([
+                    'source_metadata' => 'Esta imagem já originou uma avaliação para o cliente selecionado.',
+                ]);
+            }
 
-            return $assessment;
-        });
+            $assessment = DB::transaction(function () use ($validated, $snapshot, $request, $analysis, $sourceMetadata): BioimpedanceAssessment {
+                $assessment = BioimpedanceAssessment::query()->create([
+                    ...$validated,
+                    ...$snapshot,
+                    'user_id' => $request->user()->id,
+                    'calculated_bmi' => $analysis['calculated_bmi'],
+                    'bmi_difference' => $analysis['bmi_difference'],
+                    'analysis' => $analysis,
+                    'source_metadata' => $sourceMetadata,
+                ]);
+
+                $this->auditAssessment(
+                    $assessment,
+                    $request,
+                    'created',
+                    'Avaliação criada',
+                    [],
+                    $this->assessmentAuditValues($assessment),
+                );
+                $this->audit(
+                    $request,
+                    'bioimpedance_assessment.created',
+                    $assessment,
+                    'Avaliação de bioimpedância criada',
+                    null,
+                    $this->assessmentAuditValues($assessment),
+                );
+
+                return $assessment;
+            });
+        } finally {
+            $creationLock?->release();
+        }
 
         return response()->json([
             'client' => $this->clientPayload($this->loadClientAssessments($client->refresh())),
@@ -520,7 +541,9 @@ class BioimpedanceController extends Controller
             'issuedAt' => $assessment->report_issued_at,
         ])->setPaper('a4');
 
-        return $pdf->download($this->pdfFileName($assessment));
+        return request()->boolean('inline')
+            ? $pdf->stream($this->pdfFileName($assessment))
+            : $pdf->download($this->pdfFileName($assessment));
     }
 
     public function createAssessmentShare(Request $request, BioimpedanceAssessment $assessment): JsonResponse
@@ -635,7 +658,7 @@ class BioimpedanceController extends Controller
         ]);
     }
 
-    public function publicReport(string $token): Response
+    public function publicReport(Request $request, string $token): Response
     {
         $share = BioimpedanceReportShare::query()
             ->where('token_hash', hash('sha256', $token))
@@ -643,6 +666,15 @@ class BioimpedanceController extends Controller
             ->firstOrFail();
 
         abort_if($share->revoked_at || $share->expires_at->isPast(), 410, 'Link expirado ou revogado.');
+
+        if (! $request->boolean('confirm')) {
+            return response()
+                ->view('bioimpedance.public-report-warning', [
+                    'confirmUrl' => route('bioimpedance.public-report', $token).'?confirm=1',
+                    'expiresAt' => $share->expires_at,
+                ])
+                ->withHeaders($this->reportSharePresenter->publicReportHeaders());
+        }
 
         $viewCount = $share->view_count + 1;
         $share->update([
@@ -1249,6 +1281,21 @@ class BioimpedanceController extends Controller
     private function loadClientAssessments(BioimpedanceClient $client): BioimpedanceClient
     {
         return $client->load(['assessments' => fn ($query) => $query->with('shares')->latest('evaluated_at')]);
+    }
+
+    private function operationalWorkspacePayload(Request $request): array
+    {
+        $clients = BioimpedanceClient::query()
+            ->with(['assessments' => fn ($query) => $query->with('shares')->latest('evaluated_at')])
+            ->orderBy('full_name')
+            ->get()
+            ->map(fn (BioimpedanceClient $client) => $this->clientPayload($client));
+
+        return [
+            'clients' => $clients,
+            'clinic' => $this->clinicPayload(),
+            'current_user' => $this->userPayload($request->user()),
+        ];
     }
 
     private function assessmentPayload(BioimpedanceAssessment $assessment): array

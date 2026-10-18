@@ -1,4 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import AssessmentDetails from '../components/bioimpedance/AssessmentDetails';
+import {
+	relaxmedicAdditionalMetricFields,
+	relaxmedicMaxImageBytes,
+	relaxmedicMetricLabels,
+} from '../domain/bioimpedance/relaxmedic';
+import {
+	assessmentNumber,
+	formatDate,
+	formatIssueDate,
+	localDatetimeNow,
+	numberBr,
+	toDatetimeLocal,
+} from '../shared/formatters';
+import { loadBioimpedanceWorkspace, logout } from '../services/bioimpedanceApi';
+import { cpfMask, heightMask, normalizeInteger, phoneMask } from '../shared/inputMasks';
 
 const emptyClient = {
 	full_name: '',
@@ -59,47 +75,6 @@ const defaultClinic = {
 	technical_notice: 'Os resultados de bioimpedância são estimativas e podem variar conforme hidratação, alimentação, ciclo hormonal, medicamentos e condições de medição. Este documento não substitui avaliação médica ou nutricional.',
 	scale_model: 'omron_hbf_514c',
 };
-
-const relaxmedicMaxImageBytes = 10 * 1024 * 1024;
-
-const relaxmedicMetricLabels = {
-	weight_kg: 'Peso (kg)',
-	scale_bmi: 'IMC',
-	body_fat_percentage: 'Gordura corporal (%)',
-	muscle_rate_percentage: 'Taxa muscular (%)',
-	lean_body_mass_kg: 'Massa corporal magra (kg)',
-	subcutaneous_fat_percentage: 'Gordura subcutânea (%)',
-	visceral_fat_level: 'Gordura visceral',
-	body_water_percentage: 'Água corporal (%)',
-	skeletal_muscle_percentage: 'Músculo esquelético (%)',
-	muscle_mass_kg: 'Massa muscular (kg)',
-	bone_mass_kg: 'Massa óssea (kg)',
-	protein_percentage: 'Proteína (%)',
-	resting_metabolism_kcal: 'TMB (kcal)',
-	body_age: 'Idade do corpo',
-	fat_mass_kg: 'Massa gorda (kg)',
-	water_weight_kg: 'Peso da água (kg)',
-	protein_mass_kg: 'Massa de proteína (kg)',
-	ideal_body_weight_kg: 'Peso corporal ideal (kg)',
-	obesity_level: 'Nível de obesidade',
-	body_type: 'Tipo de corpo',
-};
-
-const relaxmedicAdditionalMetricFields = [
-	'muscle_rate_percentage',
-	'lean_body_mass_kg',
-	'subcutaneous_fat_percentage',
-	'body_water_percentage',
-	'muscle_mass_kg',
-	'bone_mass_kg',
-	'protein_percentage',
-	'fat_mass_kg',
-	'water_weight_kg',
-	'protein_mass_kg',
-	'ideal_body_weight_kg',
-	'obesity_level',
-	'body_type',
-];
 
 const emptyUserForm = {
 	name: '',
@@ -170,13 +145,6 @@ function Field({ label, children }) {
 
 function inputClass() {
 	return 'mt-2 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:text-sm';
-}
-
-function localDatetimeNow() {
-	const date = new Date();
-	const timezoneOffset = date.getTimezoneOffset() * 60000;
-
-	return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
 }
 
 function fieldErrors(errors, field) {
@@ -263,41 +231,6 @@ function RelaxmedicReview({ extraction, imagePreview, form, errors, flaggedField
 			</div>
 		</form>
 	);
-}
-
-function formatDate(value) {
-	if (!value) return '-';
-	return new Intl.DateTimeFormat('pt-BR', {
-		dateStyle: 'short',
-		timeStyle: 'short',
-	}).format(new Date(value));
-}
-
-function formatIssueDate(value) {
-	if (!value) return '-';
-	return new Intl.DateTimeFormat('pt-BR').format(new Date(value));
-}
-
-function toDatetimeLocal(value) {
-	if (!value) return localDatetimeNow();
-
-	const date = new Date(value);
-	const timezoneOffset = date.getTimezoneOffset() * 60000;
-
-	return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
-}
-
-function numberBr(value, decimals = 1) {
-	if (value === null || value === undefined || value === '') return '-';
-
-	return new Intl.NumberFormat('pt-BR', {
-		minimumFractionDigits: decimals,
-		maximumFractionDigits: decimals,
-	}).format(Number(value));
-}
-
-function assessmentNumber(id) {
-	return String(id ?? 1).padStart(4, '0');
 }
 
 function professionalName(name) {
@@ -422,10 +355,6 @@ function normalizeDecimal(value) {
 	return String(value).replace(',', '.').replace(/[^\d.]/g, '');
 }
 
-function normalizeInteger(value) {
-	return String(value ?? '').replace(/\D/g, '');
-}
-
 function normalizeHeightToCentimeters(value) {
 	const normalized = Number(normalizeDecimal(value));
 
@@ -442,36 +371,6 @@ function decimalMask(value, precision = 1) {
 	return decimal.length || cleaned.includes(',')
 		? `${integer.slice(0, 4)},${decimal.slice(0, precision)}`
 		: integer.slice(0, 4);
-}
-
-function heightMask(value) {
-	const cleaned = String(value ?? '').replace(/[^\d,.]/g, '').replace('.', ',');
-
-	if (cleaned.includes(',')) {
-		const [meters = '', centimeters = ''] = cleaned.split(',');
-		return `${meters.slice(0, 1)},${centimeters.slice(0, 2)}`;
-	}
-
-	return cleaned.slice(0, 3);
-}
-
-function phoneMask(value) {
-	const digits = normalizeInteger(value).slice(0, 11);
-
-	if (digits.length <= 2) return digits;
-	if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-
-	return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
-}
-
-function cpfMask(value) {
-	const digits = normalizeInteger(value).slice(0, 11);
-
-	if (digits.length <= 3) return digits;
-	if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
-	if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
-
-	return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
 }
 
 function clientFormFromClient(client) {
@@ -613,7 +512,7 @@ export default function DashboardPage({ userName }) {
 	const [relaxmedicReviewConfirmed, setRelaxmedicReviewConfirmed] = useState(false);
 
 	useEffect(() => {
-		window.axios.get('/bioimpedance').then(({ data }) => {
+		loadBioimpedanceWorkspace().then((data) => {
 			setClients(data.clients);
 			setClinic(data.clinic);
 			setClinicForm(clinicFormFromClinic(data.clinic));
@@ -769,7 +668,7 @@ export default function DashboardPage({ userName }) {
 	const canCreateCurrentAssessment = clinic.scale_model === 'relaxmedic' ? canClinicalProfessional : canCreateClinicalRecords;
 
 	async function handleLogout() {
-		await window.axios.post('/logout', {}, { headers: { Accept: 'application/json' } });
+		await logout();
 		window.location.assign('/login');
 	}
 
@@ -1277,6 +1176,9 @@ export default function DashboardPage({ userName }) {
 							{isOnline ? 'Online' : 'Offline'}
 						</span>
 						<span className="text-sm text-slate-500">Profissional: <strong className="text-slate-800">{userName}</strong></span>
+						<a href="/app" className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700">
+							Área móvel
+						</a>
 						<button type="button" onClick={handleLogout} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
 							Sair
 						</button>
@@ -2074,49 +1976,6 @@ function relaxmedicMetricValue(field, value) {
 	if (['resting_metabolism_kcal', 'body_age'].includes(field)) return new Intl.NumberFormat('pt-BR').format(value);
 
 	return numberBr(value, 1);
-}
-
-function AssessmentDetails({ assessment }) {
-	if (!assessment) return null;
-
-	const isRelaxmedic = assessment.device_model === 'Relaxmedic';
-	const metrics = isRelaxmedic
-		? relaxmedicAdditionalMetricFields.filter((field) => assessment[field] !== null && assessment[field] !== undefined && assessment[field] !== '')
-		: [];
-
-	return (
-		<div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-			<div className="flex flex-wrap items-center justify-between gap-2">
-				<div>
-					<p className="text-xs font-bold uppercase tracking-wide text-slate-500">Detalhes da avaliação</p>
-					<p className="mt-1 text-sm font-semibold text-slate-900">Modelo: {assessment.device_model ?? 'Não informado'}</p>
-				</div>
-				<span className={`rounded-full px-3 py-1 text-xs font-bold ${isRelaxmedic ? 'bg-sky-100 text-sky-700' : 'bg-slate-200 text-slate-700'}`}>
-					{isRelaxmedic ? 'Importada de imagem' : 'Entrada manual'}
-				</span>
-			</div>
-
-			{metrics.length ? (
-				<div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-					{metrics.map((field) => (
-						<div key={field} className="rounded-xl border border-slate-200 bg-white p-3">
-							<p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{relaxmedicMetricLabels[field]}</p>
-							<p className="mt-1 text-base font-semibold text-slate-950">{relaxmedicMetricValue(field, assessment[field])}</p>
-						</div>
-					))}
-				</div>
-			) : null}
-
-			{isRelaxmedic && assessment.source_metadata ? (
-				<div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-900">
-					<p className="font-bold uppercase tracking-wide">Origem auditável</p>
-					<p className="mt-1">Arquivo: {assessment.source_metadata.image_name} • imagem não armazenada</p>
-					<p className="break-all">SHA-256: {assessment.source_metadata.image_sha256}</p>
-					<p>Processada em {formatDate(assessment.source_metadata.processed_at)} • conferida em {formatDate(assessment.source_metadata.review_confirmed_at)}</p>
-				</div>
-			) : null}
-		</div>
-	);
 }
 
 function Report({ clinic, client, assessment, professional }) {

@@ -17,10 +17,10 @@ function normalizeErrors(responseErrors) {
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [remember, setRemember] = useState(true);
+    const [remember, setRemember] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [errors, setErrors] = useState(defaultErrors);
-    const [status, setStatus] = useState('');
+    const [status, setStatus] = useState(() => new URLSearchParams(window.location.search).has('expired') ? 'Sua sessão expirou. Entre novamente para continuar com segurança.' : '');
 
     const canSubmit = useMemo(() => email.trim() !== '' && password.trim() !== '', [email, password]);
 
@@ -142,6 +142,8 @@ export default function LoginPage() {
                                 />
                                 Manter conectado neste dispositivo
                             </label>
+
+							<p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">Em aparelho compartilhado, não marque “Manter conectado” e sempre use o botão “Sair” ao finalizar.</p>
 
                             <PrimaryButton type="submit" disabled={processing || !canSubmit}>
                                 {processing ? 'Entrando...' : 'Entrar'}
