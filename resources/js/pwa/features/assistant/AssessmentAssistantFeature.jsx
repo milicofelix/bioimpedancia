@@ -6,6 +6,9 @@ import AssistantProgress from './AssistantProgress';
 import ObservationSuggestion from './ObservationSuggestion';
 import { assistantProcessingSteps } from './assistantSteps';
 import useOnlineStatus from '../../hooks/useOnlineStatus';
+import PwaButton from '../../components/ui/PwaButton';
+import PwaCard from '../../components/ui/PwaCard';
+import PwaJourneyHeader from '../../components/ui/PwaJourneyHeader';
 
 export default function AssessmentAssistantFeature({ client, assessment, currentUser, onBackToClients, onApproved, onOpenReport }) {
 	const [assistant, setAssistant] = useState(null);
@@ -91,32 +94,31 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 
 	return (
 		<div className="space-y-4">
-			<section className="rounded-2xl bg-slate-950 p-5 text-white shadow-sm">
-				<p className="text-xs font-bold uppercase tracking-wide text-violet-300">Assistente da avaliação</p>
-				<h2 className="mt-2 text-lg font-bold">{client.full_name}</h2>
-				<p className="mt-1 text-sm text-slate-300">{formatDate(assessment.evaluated_at)} · {assessment.device_model} · {numberBr(assessment.weight_kg, 1)} kg</p>
-			</section>
+			<PwaJourneyHeader icon="sparkles" eyebrow="Assistente da avaliação" title={client.full_name} description="Revise a sugestão clínica antes de adicioná-la à avaliação." tone="assistant">
+				<span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">{formatDate(assessment.evaluated_at)}</span>
+				<span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">{assessment.device_model} · {numberBr(assessment.weight_kg, 1)} kg</span>
+			</PwaJourneyHeader>
 			{!isOnline ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">Sem conexão. A geração e a aprovação permanecem bloqueadas até a reconexão.</p> : null}
 
 			{approved ? (
-				<section className="rounded-2xl border border-emerald-200 bg-white p-5 text-center shadow-sm">
+				<PwaCard className="p-5 text-center">
 					<div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-lg font-black text-emerald-700">✓</div>
 					<h2 className="mt-3 text-lg font-bold text-slate-950">Observação adicionada</h2>
 					<p className="mt-2 text-sm leading-6 text-slate-600">A aprovação foi registrada na avaliação e na auditoria. O texto já poderá ser usado no relatório.</p>
-					<div className="mt-4 grid gap-3 sm:grid-cols-2"><button type="button" onClick={() => setApproved(false)} className="rounded-xl border border-violet-200 px-4 py-3 text-sm font-bold text-violet-700">Gerar outra sugestão</button><button type="button" onClick={onOpenReport} className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">Abrir relatório</button></div>
-				</section>
+					<div className="mt-4 grid gap-3 sm:grid-cols-2"><PwaButton type="button" onClick={() => setApproved(false)} variant="secondary" icon="refresh">Gerar outra sugestão</PwaButton><PwaButton type="button" onClick={onOpenReport} icon="fileText">Abrir relatório</PwaButton></div>
+				</PwaCard>
 			) : generating ? (
 				<AssistantProgress currentStep={processingStep} />
 			) : assistant ? (
 				<ObservationSuggestion assistant={assistant} draft={draft} saving={saving} online={isOnline} error={error} onDraftChange={setDraft} onApprove={approve} onDiscard={discard} />
 			) : (
-				<section className="rounded-2xl border border-violet-200 bg-white p-5 shadow-sm">
-					<h2 className="text-lg font-bold text-slate-950">Gerar observação assistida</h2>
+				<PwaCard className="p-5">
+					<div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100 text-xl">✦</span><div><p className="text-xs font-bold uppercase tracking-wide text-violet-700">IA com revisão humana</p><h2 className="text-lg font-bold text-slate-950">Gerar observação assistida</h2></div></div>
 					<p className="mt-2 text-sm leading-6 text-slate-600">O assistente consulta dados da avaliação e fontes aprovadas. Nada será adicionado sem sua revisão e aprovação.</p>
 					{assessment.notes ? <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-600"><strong className="text-slate-800">Observação atual:</strong><p className="mt-1 leading-6">{assessment.notes}</p></div> : null}
 					{error ? <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p> : null}
-					<button type="button" onClick={generate} disabled={!isOnline} className="mt-5 w-full rounded-xl bg-violet-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">Gerar observação</button>
-				</section>
+					<PwaButton type="button" onClick={generate} disabled={!isOnline} icon="sparkles" className="mt-5 w-full">Gerar observação</PwaButton>
+				</PwaCard>
 			)}
 		</div>
 	);
@@ -126,11 +128,11 @@ function AssistantState({ title, description, onBack, tone = 'amber' }) {
 	const colors = tone === 'rose' ? 'border-rose-200 text-rose-700' : 'border-amber-200 text-amber-700';
 
 	return (
-		<section className={`rounded-2xl border bg-white p-6 text-center shadow-sm ${colors}`}>
+		<PwaCard className={`p-6 text-center ${colors}`}>
 			<p className="text-xs font-bold uppercase tracking-wide">Assistente</p>
 			<h2 className="mt-2 text-xl font-bold text-slate-950">{title}</h2>
 			<p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
-			<button type="button" onClick={onBack} className="mt-5 rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">Ir para clientes</button>
-		</section>
+			<PwaButton type="button" onClick={onBack} icon="arrowLeft" className="mt-5">Ir para clientes</PwaButton>
+		</PwaCard>
 	);
 }

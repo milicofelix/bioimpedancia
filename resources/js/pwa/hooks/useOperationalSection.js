@@ -26,7 +26,8 @@ export default function useOperationalSection() {
 		if (!SECTIONS.includes(nextSection)) return;
 		window.location.hash = nextSection;
 		setSection(nextSection);
-		window.scrollTo({ top: 0, behavior: 'smooth' });
+		const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
 	}
 
 	return { section, navigate };

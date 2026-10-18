@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title">
   <title id="title">Ricosty</title>
-  <rect width="512" height="512" fill="#f8e8eb"/>
-  <circle cx="256" cy="256" r="166" fill="#d88b9a"/>
+  <rect width="512" height="512" fill="#fff7f7"/>
+  <circle cx="256" cy="256" r="166" fill="#ad3f5b"/>
   <path d="M190 365V145h83c53 0 88 27 88 72 0 31-18 55-48 66l61 82h-61l-52-73h-18v73h-53Zm53-119h28c23 0 37-11 37-29 0-19-14-29-37-29h-28v58Z" fill="#ffffff"/>
-  <path d="M179 129c20-29 47-43 82-43 33 0 61 12 84 37-25-11-50-14-75-8-28 7-49 25-63 54l-28-40Z" fill="#4a4a4a"/>
+  <path d="M179 129c20-29 47-43 82-43 33 0 61 12 84 37-25-11-50-14-75-8-28 7-49 25-63 54l-28-40Z" fill="#38101d"/>
 </svg>

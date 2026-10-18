@@ -1,16 +1,19 @@
 import React from 'react';
+import PwaButton from '../../components/ui/PwaButton';
+import PwaIcon from '../../components/ui/PwaIcon';
 
 export default function ObservationSuggestion({ assistant, draft, saving, online, error, onDraftChange, onApprove, onDiscard }) {
 	const generated = assistant.status === 'generated' && assistant.validation_status === 'passed';
+	const edited = generated && draft !== assistant.suggestion;
 
 	return (
-		<section className="rounded-2xl border border-violet-200 bg-white p-5 shadow-sm">
+		<section className="pwa-card p-5" aria-busy={saving}>
 			<div className="flex flex-wrap items-center justify-between gap-2">
 				<div>
 					<p className="text-xs font-bold uppercase tracking-wide text-violet-700">Sugestão para revisão</p>
 					<h2 className="mt-1 text-lg font-bold text-slate-950">Revise antes de aprovar</h2>
 				</div>
-				<span className={`rounded-full px-3 py-1 text-xs font-bold ${generated ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>{generated ? 'Validada' : 'Indisponível'}</span>
+				<div className="flex gap-2"><span className={`rounded-full px-3 py-1 text-xs font-bold ${generated ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>{generated ? 'Validada' : 'Indisponível'}</span>{edited ? <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-700">Texto editado</span> : null}</div>
 			</div>
 
 			{generated ? (
@@ -21,8 +24,8 @@ export default function ObservationSuggestion({ assistant, draft, saving, online
 						<span className="mt-1 block text-right text-xs font-normal text-slate-400">{draft.length}/2000</span>
 					</label>
 
-					<div className="mt-4 rounded-xl bg-slate-50 p-4">
-						<p className="text-xs font-bold uppercase tracking-wide text-slate-500">Fontes utilizadas</p>
+					<details className="mt-4 rounded-xl bg-slate-50 p-4" open>
+						<summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500"><PwaIcon name="fileText" size={15} />Fontes utilizadas ({assistant.sources?.length ?? 0})</summary>
 						<ul className="mt-2 space-y-2 text-xs leading-5 text-slate-600">
 							{(assistant.sources ?? []).map((source) => (
 								<li key={source.id} className="border-l-2 border-violet-200 pl-2">
@@ -32,7 +35,7 @@ export default function ObservationSuggestion({ assistant, draft, saving, online
 							))}
 						</ul>
 						{!assistant.sources?.length ? <p className="mt-2 text-xs text-amber-700">Nenhuma fonte recuperada foi informada.</p> : null}
-					</div>
+					</details>
 				</>
 			) : (
 				<div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
@@ -47,8 +50,8 @@ export default function ObservationSuggestion({ assistant, draft, saving, online
 			{error ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p> : null}
 
 			<div className="mt-5 grid gap-3 sm:grid-cols-2">
-				<button type="button" onClick={onDiscard} disabled={saving} className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 disabled:opacity-50">Descartar</button>
-				{generated ? <button type="button" onClick={onApprove} disabled={saving || !online || draft.trim().length < 20} className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'Adicionando...' : 'Aprovar e adicionar'}</button> : null}
+				<PwaButton type="button" onClick={onDiscard} disabled={saving} variant="secondary">Descartar</PwaButton>
+				{generated ? <PwaButton type="button" onClick={onApprove} disabled={saving || !online || draft.trim().length < 20} icon="check">{saving ? 'Adicionando...' : 'Aprovar e adicionar'}</PwaButton> : null}
 			</div>
 		</section>
 	);

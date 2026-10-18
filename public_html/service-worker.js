@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'ricosty-pwa-v1';
+const CACHE_VERSION = 'ricosty-pwa-v2';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const OFFLINE_URL = '/offline.html';
 const PRECACHE_URLS = [

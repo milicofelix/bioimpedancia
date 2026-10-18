@@ -1,7 +1,7 @@
 @extends('layouts.react')
 
 @push('head')
-    <meta name="theme-color" content="#d88b9a">
+    <meta name="theme-color" content="#ad3f5b">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">

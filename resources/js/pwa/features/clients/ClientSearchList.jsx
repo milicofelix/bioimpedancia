@@ -1,5 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { formatIssueDate } from '../../../shared/formatters';
+import PwaButton from '../../components/ui/PwaButton';
+import PwaCard from '../../components/ui/PwaCard';
+import PwaIcon from '../../components/ui/PwaIcon';
 
 function searchable(value) {
 	return String(value ?? '')
@@ -8,16 +11,31 @@ function searchable(value) {
 		.toLowerCase();
 }
 
+function initials(name) {
+	return String(name ?? '?').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+}
+
+function clientStatus(client) {
+	if (client.is_anonymized) return { label: 'Anonimizado', badge: 'bg-amber-100 text-amber-800', avatar: 'from-amber-100 to-amber-200 text-amber-800 ring-amber-200', border: 'border-l-amber-400' };
+	if (!client.is_active) return { label: 'Inativo', badge: 'bg-slate-200 text-slate-700', avatar: 'from-slate-100 to-slate-200 text-slate-600 ring-slate-200', border: 'border-l-slate-400' };
+	return { label: 'Ativo', badge: 'bg-emerald-100 text-emerald-800', avatar: 'from-ricosty-100 to-ricosty-200 text-ricosty-700 ring-ricosty-200', border: 'border-l-emerald-500' };
+}
+
 export default function ClientSearchList({ clients, canCreate, onCreate, onSelect }) {
 	const [query, setQuery] = useState('');
-	const [showUnavailable, setShowUnavailable] = useState(false);
+	const [statusFilter, setStatusFilter] = useState('active');
+	const counts = useMemo(() => ({
+		all: clients.length,
+		active: clients.filter((client) => client.is_active && !client.is_anonymized).length,
+		unavailable: clients.filter((client) => !client.is_active || client.is_anonymized).length,
+	}), [clients]);
 
 	const filteredClients = useMemo(() => {
 		const term = searchable(query.trim());
 		const digits = query.replace(/\D/g, '');
 
 		return [...clients]
-			.filter((client) => showUnavailable || (client.is_active && !client.is_anonymized))
+			.filter((client) => statusFilter === 'all' || (statusFilter === 'active' ? client.is_active && !client.is_anonymized : !client.is_active || client.is_anonymized))
 			.filter((client) => {
 				if (!term) return true;
 
@@ -34,7 +52,7 @@ export default function ClientSearchList({ clients, canCreate, onCreate, onSelec
 
 				return secondDate - firstDate || first.full_name.localeCompare(second.full_name, 'pt-BR');
 			});
-	}, [clients, query, showUnavailable]);
+	}, [clients, query, statusFilter]);
 
 	const visibleClients = query.trim() ? filteredClients : filteredClients.slice(0, 12);
 
@@ -42,50 +60,42 @@ export default function ClientSearchList({ clients, canCreate, onCreate, onSelec
 		<section aria-labelledby="clients-title">
 			<div className="flex items-start justify-between gap-3">
 				<div>
-					<p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Atendimento</p>
-					<h2 id="clients-title" className="mt-1 text-xl font-bold text-slate-950">Clientes</h2>
+					<p className="text-xs font-bold uppercase tracking-[0.16em] text-ricosty-600">Atendimento</p>
+					<h2 id="clients-title" className="mt-1 text-2xl font-bold text-ricosty-950">Clientes</h2>
+					<p className="mt-1 text-sm text-slate-500">Localize rapidamente quem será atendido.</p>
 				</div>
-				{canCreate ? (
-					<button type="button" onClick={onCreate} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm">Cadastrar</button>
-				) : null}
+				{canCreate ? <PwaButton type="button" icon="plus" onClick={onCreate} className="min-h-11 px-3">Cadastrar</PwaButton> : null}
 			</div>
 
-			<label className="mt-4 block">
-				<span className="sr-only">Buscar clientes</span>
-				<input
-					type="search"
-					value={query}
-					onChange={(event) => setQuery(event.target.value)}
-					placeholder="Nome, telefone, e-mail ou CPF"
-					className="min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
-				/>
-			</label>
-
-			<label className="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-600">
-				<input type="checkbox" checked={showUnavailable} onChange={(event) => setShowUnavailable(event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
-				Mostrar clientes inativos ou anonimizados
-			</label>
+			<PwaCard className="mt-5 p-3">
+				<label className="relative block">
+					<span className="sr-only">Buscar clientes</span>
+					<PwaIcon name="search" size={20} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ricosty-500" />
+					<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nome, telefone, e-mail ou CPF" className="pwa-focus min-h-13 w-full rounded-xl border border-ricosty-100 bg-ricosty-cream/50 py-3 pl-12 pr-12 text-base transition placeholder:text-slate-400 focus:border-ricosty-400 focus:bg-white" />
+					{query ? <button type="button" onClick={() => setQuery('')} aria-label="Limpar busca" className="pwa-focus absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-xl text-slate-500 hover:bg-ricosty-50">×</button> : null}
+				</label>
+				<div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1" role="group" aria-label="Filtrar clientes por situação">
+					{[{ key: 'active', label: 'Ativos' }, { key: 'unavailable', label: 'Indisponíveis' }, { key: 'all', label: 'Todos' }].map((filter) => <button type="button" key={filter.key} onClick={() => setStatusFilter(filter.key)} aria-pressed={statusFilter === filter.key} className={`pwa-focus min-h-10 rounded-lg px-1 text-[11px] font-bold transition ${statusFilter === filter.key ? 'bg-white text-ricosty-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{filter.label}<span className="ml-1 opacity-70">{counts[filter.key]}</span></button>)}
+				</div>
+			</PwaCard>
 
 			<div className="mt-5 flex items-center justify-between">
 				<h3 className="text-sm font-bold text-slate-800">{query.trim() ? 'Resultados da busca' : 'Clientes recentes'}</h3>
-				<span className="text-xs text-slate-500">{filteredClients.length} encontrado(s)</span>
+				<span aria-live="polite" className="text-xs text-slate-500">{filteredClients.length} encontrado(s)</span>
 			</div>
 
 			<div className="mt-3 space-y-2">
-				{visibleClients.map((client) => (
-					<button type="button" key={client.id} onClick={() => onSelect(client)} className="block w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/40">
-						<span className="flex items-start justify-between gap-3">
-							<span className="font-bold text-slate-950">{client.full_name}</span>
-							{client.is_anonymized ? (
-								<span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold uppercase text-amber-700">Anonimizado</span>
-							) : !client.is_active ? (
-								<span className="rounded-full bg-slate-200 px-2 py-1 text-[10px] font-bold uppercase text-slate-600">Inativo</span>
-							) : null}
+				{visibleClients.map((client) => {
+					const status = clientStatus(client);
+					return <PwaCard as="button" type="button" key={client.id} onClick={() => onSelect(client)} aria-label={`Abrir cliente ${client.full_name}, ${status.label}`} className={`pwa-focus pwa-pressable block w-full touch-manipulation border-l-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-ricosty-300 hover:shadow-[0_16px_36px_rgba(97,38,55,0.11)] ${status.border}`}>
+						<span className="flex items-center gap-3">
+							<span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-sm font-black ring-1 ${status.avatar}`}>{initials(client.full_name)}</span>
+							<span className="min-w-0 flex-1"><span className="block truncate font-bold text-ricosty-950">{client.full_name}</span><span className="mt-0.5 block truncate text-sm text-slate-600">{client.phone || client.email || 'Sem contato cadastrado'}</span></span>
+							<span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${status.badge}`}>{status.label}</span>
 						</span>
-						<span className="mt-1 block text-sm text-slate-600">{client.phone || client.email || 'Sem contato cadastrado'}</span>
-						<span className="mt-2 block text-xs text-slate-400">Última avaliação: {formatIssueDate(client.last_assessment_at)}</span>
-					</button>
-				))}
+						<span className="mt-3 flex items-center justify-between border-t border-ricosty-100 pt-2 text-xs text-slate-400"><span>Última avaliação: <strong className="font-semibold text-slate-600">{formatIssueDate(client.last_assessment_at)}</strong></span><PwaIcon name="chevronRight" size={17} className="text-ricosty-400" /></span>
+					</PwaCard>;
+				})}
 			</div>
 
 			{!visibleClients.length ? (
