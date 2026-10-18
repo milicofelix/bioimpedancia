@@ -4,6 +4,7 @@ import { cpfMask, heightMask, phoneMask } from '../../../shared/inputMasks';
 import { localDatetimeNow } from '../../../shared/formatters';
 import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
+import useActionLock from '../../../hooks/useActionLock';
 
 const emptyForm = {
 	full_name: '',
@@ -28,6 +29,7 @@ function fieldClass(hasError) {
 }
 
 export default function ClientCreateForm({ onCancel, onCreated }) {
+	const runAction = useActionLock();
 	const [form, setForm] = useState(emptyForm);
 	const [errors, setErrors] = useState({});
 	const [message, setMessage] = useState('');
@@ -48,25 +50,27 @@ export default function ClientCreateForm({ onCancel, onCreated }) {
 
 	async function submit(event) {
 		event.preventDefault();
-		if (saving) return;
+		return runAction('create-client', async () => {
+			if (saving) return;
 
-		setSaving(true);
-		setErrors({});
-		setMessage('');
+			setSaving(true);
+			setErrors({});
+			setMessage('');
 
-		try {
-			const client = await createBioimpedanceClient(form);
-			onCreated(client);
-		} catch (error) {
-			const validationErrors = apiValidationErrors(error);
-			setErrors({
-				...validationErrors,
-				phone: validationErrors.phone ?? validationErrors.phone_digits,
-			});
-			setMessage(apiErrorMessage(error, 'Não foi possível cadastrar o cliente. Confira os campos informados.'));
-		} finally {
-			setSaving(false);
-		}
+			try {
+				const client = await createBioimpedanceClient(form);
+				onCreated(client);
+			} catch (error) {
+				const validationErrors = apiValidationErrors(error);
+				setErrors({
+					...validationErrors,
+					phone: validationErrors.phone ?? validationErrors.phone_digits,
+				});
+				setMessage(apiErrorMessage(error, 'Não foi possível cadastrar o cliente. Confira os campos informados.'));
+			} finally {
+				setSaving(false);
+			}
+		});
 	}
 
 	return (
@@ -131,7 +135,7 @@ export default function ClientCreateForm({ onCancel, onCreated }) {
 
 					{message ? <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{message}</div> : null}
 
-					<PwaButton type="submit" disabled={saving} icon="check" className="w-full">{saving ? 'Cadastrando...' : 'Cadastrar cliente'}</PwaButton>
+					<PwaButton type="submit" disabled={saving} loading={saving} icon="check" className="w-full">{saving ? 'Cadastrando...' : 'Cadastrar cliente'}</PwaButton>
 				</form>
 			</PwaCard>
 		</section>

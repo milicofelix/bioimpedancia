@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import PwaIcon from './ui/PwaIcon';
+import PwaButton from './ui/PwaButton';
+import useActionLock from '../../hooks/useActionLock';
 
 const DISMISSED_KEY = 'ricosty:pwa-install-guide-security-v2-dismissed';
 
@@ -20,6 +22,7 @@ function isIosDevice() {
 }
 
 export default function InstallGuide() {
+	const runAction = useActionLock();
 	const [installPrompt, setInstallPrompt] = useState(null);
 	const [installed, setInstalled] = useState(isStandalone);
 	const [dismissed, setDismissed] = useState(wasDismissed);
@@ -45,12 +48,14 @@ export default function InstallGuide() {
 	}, []);
 
 	async function requestInstall() {
-		if (!installPrompt || !personalDeviceConfirmed) return;
+		return runAction('install-pwa', async () => {
+			if (!installPrompt || !personalDeviceConfirmed) return;
 
-		await installPrompt.prompt();
-		const choice = await installPrompt.userChoice;
-		if (choice.outcome === 'accepted') setInstalled(true);
-		setInstallPrompt(null);
+			await installPrompt.prompt();
+			const choice = await installPrompt.userChoice;
+			if (choice.outcome === 'accepted') setInstalled(true);
+			setInstallPrompt(null);
+		});
 	}
 
 	function dismiss() {
@@ -90,7 +95,7 @@ export default function InstallGuide() {
 			) : installPrompt ? (
 				<>
 					<p className="mt-2 leading-5">Instale a área operacional na tela inicial para abrir em modo aplicativo.</p>
-					<button type="button" onClick={requestInstall} className="pwa-button-primary pwa-focus pwa-pressable mt-3 px-4 py-2">Instalar agora</button>
+					<PwaButton type="button" onClick={requestInstall} className="mt-3">Instalar agora</PwaButton>
 				</>
 			) : ios ? (
 				<ol className="mt-2 list-decimal space-y-1 pl-5 leading-5">

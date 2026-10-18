@@ -8,6 +8,7 @@ import PwaIcon from '../../components/ui/PwaIcon';
 import PwaToast from '../../components/ui/PwaToast';
 import PwaConfirmSheet from '../../components/ui/PwaConfirmSheet';
 import ShareLinkSkeleton from './ShareLinkSkeleton';
+import useActionLock from '../../../hooks/useActionLock';
 
 function shareStatus(share) {
 	if (share.revoked_at) return { label: 'Revogado', icon: 'minus', badge: 'bg-slate-200 text-slate-700', card: 'border-slate-200 bg-slate-50' };
@@ -16,6 +17,7 @@ function shareStatus(share) {
 }
 
 export default function ReportSharing({ assessment, canCreate, canRevoke, onAssessmentUpdated }) {
+	const runAction = useActionLock();
 	const [expiresInDays, setExpiresInDays] = useState('7');
 	const [creating, setCreating] = useState(false);
 	const [revokingId, setRevokingId] = useState(null);
@@ -31,27 +33,29 @@ export default function ReportSharing({ assessment, canCreate, canRevoke, onAsse
 	useEffect(() => () => window.clearTimeout(copyFeedbackTimeout.current), []);
 
 	async function createLink() {
-		if (!canCreate || creating || !isOnline) return;
-		setCreating(true);
-		setError('');
-		setFeedback('');
-		setCopied(false);
-		setShareResult(null);
+		return runAction('create-share-link', async () => {
+			if (!canCreate || creating || !isOnline) return;
+			setCreating(true);
+			setError('');
+			setFeedback('');
+			setCopied(false);
+			setShareResult(null);
 
-		try {
-			const result = await createAssessmentShare(assessment.id, {
-				channel: 'copy',
-				recipient: '',
-				expires_in_days: Number(expiresInDays),
-			});
-			setShareResult(result.share);
-			onAssessmentUpdated(result.assessment);
-			setFeedback(`Link criado. Expira em ${formatDate(result.share.expires_at)}.`);
-		} catch (requestError) {
-			setError(apiErrorMessage(requestError, 'Não foi possível criar o link temporário.'));
-		} finally {
-			setCreating(false);
-		}
+			try {
+				const result = await createAssessmentShare(assessment.id, {
+					channel: 'copy',
+					recipient: '',
+					expires_in_days: Number(expiresInDays),
+				});
+				setShareResult(result.share);
+				onAssessmentUpdated(result.assessment);
+				setFeedback(`Link criado. Expira em ${formatDate(result.share.expires_at)}.`);
+			} catch (requestError) {
+				setError(apiErrorMessage(requestError, 'Não foi possível criar o link temporário.'));
+			} finally {
+				setCreating(false);
+			}
+		});
 	}
 
 	async function copyLink() {
@@ -94,20 +98,22 @@ export default function ReportSharing({ assessment, canCreate, canRevoke, onAsse
 	}
 
 	async function revoke(share) {
-		if (!canRevoke || !share.is_active || revokingId || !isOnline) return;
-		setRevokingId(share.id);
-		setError('');
+		return runAction(`revoke-share-${share.id}`, async () => {
+			if (!canRevoke || !share.is_active || revokingId || !isOnline) return;
+			setRevokingId(share.id);
+			setError('');
 
-		try {
-			const result = await revokeAssessmentShare(share.id);
-			onAssessmentUpdated(result.assessment);
-			if (shareResult?.id === share.id) setShareResult(null);
-			setFeedback('Link revogado. Ele não permite mais acesso ao relatório.');
-		} catch (requestError) {
-			setError(apiErrorMessage(requestError, 'Não foi possível revogar o link.'));
-		} finally {
-			setRevokingId(null);
-		}
+			try {
+				const result = await revokeAssessmentShare(share.id);
+				onAssessmentUpdated(result.assessment);
+				if (shareResult?.id === share.id) setShareResult(null);
+				setFeedback('Link revogado. Ele não permite mais acesso ao relatório.');
+			} catch (requestError) {
+				setError(apiErrorMessage(requestError, 'Não foi possível revogar o link.'));
+			} finally {
+				setRevokingId(null);
+			}
+		});
 	}
 
 	async function confirmRevoke() {
@@ -126,7 +132,7 @@ export default function ReportSharing({ assessment, canCreate, canRevoke, onAsse
 			<h2 className="mt-5 text-lg font-bold text-slate-950">Compartilhamento temporário</h2>
 			<div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
 				<label className="text-sm font-semibold text-slate-700">Validade do link<select value={expiresInDays} onChange={(event) => setExpiresInDays(event.target.value)} disabled={!canCreate || creating || !isOnline} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-3"><option value="1">1 dia</option><option value="3">3 dias</option><option value="7">7 dias</option><option value="15">15 dias</option><option value="30">30 dias</option></select></label>
-				<PwaButton type="button" onClick={createLink} disabled={!canCreate || creating || !isOnline} icon="share" className="self-end">{creating ? 'Criando...' : 'Criar link temporário'}</PwaButton>
+				<PwaButton type="button" onClick={createLink} disabled={!canCreate || creating || !isOnline} loading={creating} icon="share" className="self-end">{creating ? 'Criando...' : 'Criar link temporário'}</PwaButton>
 			</div>
 			{!canCreate ? <p className="mt-2 text-xs font-semibold text-amber-700">Seu perfil não pode criar links de compartilhamento.</p> : null}
 			{creating ? <ShareLinkSkeleton /> : null}

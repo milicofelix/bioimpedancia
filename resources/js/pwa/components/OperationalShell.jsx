@@ -5,6 +5,7 @@ import useOnlineStatus from '../hooks/useOnlineStatus';
 import useServiceWorkerUpdate from '../hooks/useServiceWorkerUpdate';
 import OfflineNotice from './OfflineNotice';
 import PwaUpdateNotice from './PwaUpdateNotice';
+import PwaButton from './ui/PwaButton';
 
 const navigation = [
 	{ section: 'clientes', label: 'Clientes', icon: 'users' },
@@ -46,7 +47,7 @@ export default function OperationalShell({ activeSection, clinic, currentUser, o
 							<span className="hidden sm:inline">{isOnline ? 'Online' : 'Offline'}</span>
 						</span>
 						<a href="/dashboard" aria-label="Abrir painel completo" title="Painel completo" className="pwa-focus flex h-11 w-11 items-center justify-center rounded-full border border-ricosty-200 bg-white text-ricosty-700 transition hover:bg-ricosty-50"><PwaIcon name="grid" size={18} /></a>
-						<button type="button" onClick={onLogout} aria-label="Sair da conta" title="Sair" className="pwa-focus flex h-11 w-11 items-center justify-center rounded-full border border-ricosty-200 bg-white text-ricosty-700 transition hover:bg-ricosty-50"><PwaIcon name="logOut" size={18} /></button>
+						<PwaButton type="button" onClick={onLogout} aria-label="Sair da conta" title="Sair" variant="ghost" icon="logOut" className="h-11 w-11 rounded-full border border-ricosty-200 bg-white px-0 hover:bg-ricosty-50"><span className="sr-only">Sair da conta</span></PwaButton>
 					</div>
 				</div>
 			</header>

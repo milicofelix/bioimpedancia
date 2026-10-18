@@ -12,8 +12,10 @@ import { observeMobileViewport } from '../pwa/services/mobileViewport';
 import { clearOperationalCaches } from '../security/browserSession';
 import PwaButton from '../pwa/components/ui/PwaButton';
 import PwaIcon from '../pwa/components/ui/PwaIcon';
+import useActionLock from '../hooks/useActionLock';
 
 export default function OperationalAppPage() {
+	const runAction = useActionLock();
 	const [workspace, setWorkspace] = useState(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
@@ -45,12 +47,14 @@ export default function OperationalAppPage() {
 	}, []);
 
 	async function handleLogout() {
-		try {
-			await logout();
-		} finally {
-			await clearOperationalCaches().catch(() => {});
-			window.location.assign('/login');
-		}
+		return runAction('logout', async () => {
+			try {
+				await logout();
+			} finally {
+				await clearOperationalCaches().catch(() => {});
+				window.location.assign('/login');
+			}
+		});
 	}
 
 	function handleClientCreated(client) {
