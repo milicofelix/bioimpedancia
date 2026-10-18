@@ -159,7 +159,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 			{!extraction ? (
 				<>
 					<RelaxmedicImagePicker key={pickerVersion} previewUrl={previewUrl} fileName={imageName} disabled={processing || !isOnline} error={imageError} onSelect={selectImage} />
-					{previewUrl ? <PwaButton type="button" disabled={!imageFile || processing || !isOnline} onClick={processImage} icon={processing ? 'refresh' : 'sparkles'} className="w-full">{processing ? 'Processando imagem...' : imageFile ? 'Enviar e processar imagem' : 'Selecione novamente para tentar'}</PwaButton> : null}
+					{previewUrl ? <PwaButton type="button" disabled={!imageFile || processing || !isOnline} aria-busy={processing} onClick={processImage} icon={processing ? 'refresh' : 'sparkles'} className="w-full">{processing ? 'Processando imagem...' : imageFile ? 'Enviar e processar imagem' : 'Selecione novamente para tentar'}</PwaButton> : null}
 				</>
 			) : (
 				<RelaxmedicReview previewUrl={previewUrl} form={form} extraction={extraction} confirmed={confirmed} errors={errors} saving={saving} online={isOnline} onUpdate={update} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />

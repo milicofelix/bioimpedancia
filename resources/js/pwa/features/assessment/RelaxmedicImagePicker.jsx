@@ -36,9 +36,9 @@ export default function RelaxmedicImagePicker({ previewUrl, fileName, disabled, 
 				<PwaButton type="button" icon="image" variant="secondary" disabled={disabled} onClick={() => galleryInput.current?.click()}>Escolher da galeria</PwaButton>
 			</div>
 
-			{error ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p> : null}
+			{error ? <p role="alert" className="pwa-status-enter mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p> : null}
 			{previewUrl ? (
-				<div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-3">
+				<div className="pwa-screen-enter mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-3">
 					<img src={previewUrl} alt="Prévia do relatório Relaxmedic selecionado" className="mx-auto max-h-80 rounded-lg object-contain" />
 					<p className="mt-2 truncate text-center text-xs text-slate-500">{fileName}</p>
 				</div>

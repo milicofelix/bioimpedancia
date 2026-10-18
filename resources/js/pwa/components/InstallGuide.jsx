@@ -67,7 +67,7 @@ export default function InstallGuide() {
 	const ios = isIosDevice();
 
 	return (
-		<aside className="pwa-card mb-5 p-4 text-sm text-slate-700" aria-labelledby="install-guide-title">
+		<aside className="pwa-card pwa-screen-enter mb-5 p-4 text-sm text-slate-700" aria-labelledby="install-guide-title">
 			<div className="flex items-start justify-between gap-3">
 				<div className="flex items-center gap-3">
 					<span className="flex h-10 w-10 items-center justify-center rounded-xl bg-ricosty-100 text-ricosty-700"><PwaIcon name="shield" size={20} /></span>
@@ -75,7 +75,7 @@ export default function InstallGuide() {
 					<h2 id="install-guide-title" className="mt-1 font-bold text-slate-950">Use como um aplicativo</h2>
 					</div>
 				</div>
-				<button type="button" onClick={dismiss} aria-label="Fechar orientação de instalação" className="rounded-lg px-2 py-1 text-lg leading-none text-slate-500">×</button>
+				<button type="button" onClick={dismiss} aria-label="Fechar orientação de instalação" className="pwa-focus pwa-pressable flex h-11 w-11 items-center justify-center rounded-xl text-xl leading-none text-slate-500 hover:bg-ricosty-50">×</button>
 			</div>
 			<div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
 				<strong>Atenção:</strong> não instale a PWA em celular compartilhado. A instalação mantém acesso rápido à tela de login e pode expor a sessão se você permanecer conectado.
@@ -90,7 +90,7 @@ export default function InstallGuide() {
 			) : installPrompt ? (
 				<>
 					<p className="mt-2 leading-5">Instale a área operacional na tela inicial para abrir em modo aplicativo.</p>
-					<button type="button" onClick={requestInstall} className="pwa-button-primary mt-3 px-4 py-2">Instalar agora</button>
+					<button type="button" onClick={requestInstall} className="pwa-button-primary pwa-focus pwa-pressable mt-3 px-4 py-2">Instalar agora</button>
 				</>
 			) : ios ? (
 				<ol className="mt-2 list-decimal space-y-1 pl-5 leading-5">

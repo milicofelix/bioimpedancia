@@ -64,8 +64,9 @@ export default function ClientSearchList({ clients, canCreate, onCreate, onSelec
 					value={query}
 					onChange={(event) => setQuery(event.target.value)}
 					placeholder="Nome, telefone, e-mail ou CPF"
-					className="pwa-focus min-h-13 w-full rounded-2xl border border-ricosty-200 bg-white/90 py-3 pl-12 pr-4 text-base shadow-sm transition placeholder:text-slate-400 focus:border-ricosty-400"
+					className="pwa-focus min-h-13 w-full rounded-2xl border border-ricosty-200 bg-white/90 py-3 pl-12 pr-12 text-base shadow-sm transition placeholder:text-slate-400 focus:border-ricosty-400"
 				/>
+				{query ? <button type="button" onClick={() => setQuery('')} aria-label="Limpar busca" className="pwa-focus absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-xl text-slate-500 hover:bg-ricosty-50">×</button> : null}
 			</label>
 
 			<label className="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-600">
@@ -75,12 +76,12 @@ export default function ClientSearchList({ clients, canCreate, onCreate, onSelec
 
 			<div className="mt-5 flex items-center justify-between">
 				<h3 className="text-sm font-bold text-slate-800">{query.trim() ? 'Resultados da busca' : 'Clientes recentes'}</h3>
-				<span className="text-xs text-slate-500">{filteredClients.length} encontrado(s)</span>
+				<span aria-live="polite" className="text-xs text-slate-500">{filteredClients.length} encontrado(s)</span>
 			</div>
 
 			<div className="mt-3 space-y-2">
 				{visibleClients.map((client) => (
-					<PwaCard as="button" type="button" key={client.id} onClick={() => onSelect(client)} className="pwa-focus block w-full p-4 text-left transition hover:-translate-y-0.5 hover:border-ricosty-300 hover:shadow-[0_16px_36px_rgba(97,38,55,0.11)]">
+					<PwaCard as="button" type="button" key={client.id} onClick={() => onSelect(client)} aria-label={`Abrir cliente ${client.full_name}`} className="pwa-focus pwa-pressable block w-full touch-manipulation p-4 text-left transition hover:-translate-y-0.5 hover:border-ricosty-300 hover:shadow-[0_16px_36px_rgba(97,38,55,0.11)]">
 						<span className="flex items-center gap-3">
 							<span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-ricosty-100 to-ricosty-200 text-sm font-black text-ricosty-700 ring-1 ring-ricosty-200">{initials(client.full_name)}</span>
 							<span className="min-w-0 flex-1"><span className="block truncate font-bold text-ricosty-950">{client.full_name}</span><span className="mt-0.5 block truncate text-sm text-slate-600">{client.phone || client.email || 'Sem contato cadastrado'}</span></span>

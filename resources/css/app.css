@@ -36,6 +36,8 @@ body {
 body {
     margin: 0;
     background: #fffaf6;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
 }
 
 #app {
@@ -71,12 +73,19 @@ body {
         color: white;
         font-weight: 700;
         box-shadow: 0 10px 22px rgb(173 63 91 / 22%);
+        touch-action: manipulation;
         transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
     }
 
     .pwa-button-primary:hover {
         box-shadow: 0 13px 28px rgb(173 63 91 / 28%);
         transform: translateY(-1px);
+    }
+
+    .pwa-button-primary:active:not(:disabled),
+    .pwa-button-secondary:active:not(:disabled),
+    .pwa-pressable:active:not(:disabled) {
+        transform: scale(0.98);
     }
 
     .pwa-button-secondary {
@@ -87,6 +96,7 @@ body {
         color: #8e3049;
         font-weight: 700;
         transition: background 160ms ease, border-color 160ms ease;
+        touch-action: manipulation;
     }
 
     .pwa-button-secondary:hover {
@@ -105,6 +115,47 @@ body {
     .pwa-safe-top {
         padding-top: max(0.75rem, env(safe-area-inset-top));
     }
+
+    .pwa-safe-bottom {
+        padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    }
+
+    .pwa-screen-enter {
+        animation: pwa-screen-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .pwa-status-enter {
+        animation: pwa-status-enter 220ms ease-out both;
+    }
+
+    .pwa-skeleton {
+        position: relative;
+        overflow: hidden;
+        background: #f6e9eb;
+    }
+
+    .pwa-skeleton::after {
+        position: absolute;
+        inset: 0;
+        content: '';
+        background: linear-gradient(90deg, transparent, rgb(255 255 255 / 65%), transparent);
+        transform: translateX(-100%);
+        animation: pwa-shimmer 1.35s infinite;
+    }
+}
+
+@keyframes pwa-screen-enter {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pwa-status-enter {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pwa-shimmer {
+    to { transform: translateX(100%); }
 }
 
 @media (prefers-reduced-motion: reduce) {

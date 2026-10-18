@@ -7,7 +7,7 @@ export default function ObservationSuggestion({ assistant, draft, saving, online
 	const edited = generated && draft !== assistant.suggestion;
 
 	return (
-		<section className="pwa-card p-5">
+		<section className="pwa-card p-5" aria-busy={saving}>
 			<div className="flex flex-wrap items-center justify-between gap-2">
 				<div>
 					<p className="text-xs font-bold uppercase tracking-wide text-violet-700">Sugestão para revisão</p>

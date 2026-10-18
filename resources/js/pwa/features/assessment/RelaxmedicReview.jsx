@@ -21,7 +21,7 @@ export default function RelaxmedicReview({ previewUrl, form, extraction, confirm
 	const warnings = (extraction?.suspicious_values ?? []).map((item) => item?.reason).filter(Boolean);
 
 	return (
-		<form onSubmit={onSubmit} className="pwa-card p-4 sm:p-5">
+		<form onSubmit={onSubmit} aria-busy={saving} className="pwa-card p-4 sm:p-5">
 			<div className="flex items-start justify-between gap-3">
 				<div>
 					<p className="text-xs font-bold uppercase tracking-wide text-emerald-700">2. Conferência humana</p>
@@ -82,7 +82,7 @@ export default function RelaxmedicReview({ previewUrl, form, extraction, confirm
 				</label>
 			</div>
 			{generalError ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{generalError}</p> : null}
-			<PwaButton type="submit" disabled={!confirmed || saving || !online} icon="check" className="mt-4 w-full">{saving ? 'Criando avaliação...' : 'Confirmar e criar avaliação'}</PwaButton>
+			<PwaButton type="submit" disabled={!confirmed || saving || !online} aria-busy={saving} icon="check" className="mt-4 w-full">{saving ? 'Criando avaliação...' : 'Confirmar e criar avaliação'}</PwaButton>
 		</form>
 	);
 }

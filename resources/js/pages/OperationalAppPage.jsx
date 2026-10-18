@@ -9,6 +9,8 @@ import useOperationalSection from '../pwa/hooks/useOperationalSection';
 import { apiErrorMessage, loadOperationalWorkspace, logout } from '../services/bioimpedanceApi';
 import { registerOperationalServiceWorker } from '../pwa/services/registerServiceWorker';
 import { clearOperationalCaches } from '../security/browserSession';
+import PwaButton from '../pwa/components/ui/PwaButton';
+import PwaIcon from '../pwa/components/ui/PwaIcon';
 
 export default function OperationalAppPage() {
 	const [workspace, setWorkspace] = useState(null);
@@ -97,16 +99,17 @@ export default function OperationalAppPage() {
 	}
 
 	if (loading) {
-		return <div className="flex min-h-dvh items-center justify-center bg-slate-100 px-6 text-sm font-semibold text-slate-600">Carregando área operacional...</div>;
+		return <OperationalLoading />;
 	}
 
 	if (error) {
 		return (
-			<div className="flex min-h-dvh items-center justify-center bg-slate-100 px-6">
-				<div className="w-full max-w-sm rounded-2xl border border-rose-200 bg-white p-5 text-center shadow-sm">
-					<h1 className="font-bold text-slate-950">Não foi possível abrir a área operacional</h1>
+			<div className="pwa-shell flex min-h-dvh items-center justify-center px-6">
+				<div role="alert" className="pwa-card w-full max-w-sm p-6 text-center">
+					<div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 text-rose-700"><PwaIcon name="alertTriangle" /></div>
+					<h1 className="mt-3 font-bold text-slate-950">Não foi possível abrir a área operacional</h1>
 					<p className="mt-2 text-sm text-rose-700">{error}</p>
-					<button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-xl bg-slate-950 px-4 py-2 text-sm font-bold text-white">Tentar novamente</button>
+					<PwaButton type="button" icon="refresh" onClick={() => window.location.reload()} className="mt-5">Tentar novamente</PwaButton>
 				</div>
 			</div>
 		);
@@ -156,5 +159,19 @@ export default function OperationalAppPage() {
 				<OperationalModulePlaceholder section={section} selectedClient={selectedClient} selectedAssessment={selectedAssessment} onBackToClients={() => navigate('clientes')} />
 			)}
 		</OperationalShell>
+	);
+}
+
+function OperationalLoading() {
+	return (
+		<div role="status" aria-live="polite" aria-label="Carregando área operacional" className="pwa-shell min-h-dvh px-4 py-5">
+			<div className="mx-auto max-w-xl">
+				<div className="flex items-center justify-between"><span className="pwa-skeleton h-11 w-28 rounded-xl" /><span className="pwa-skeleton h-10 w-24 rounded-full" /></div>
+				<div className="pwa-skeleton mt-6 h-36 rounded-[1.6rem]" />
+				<div className="mt-6 flex items-end justify-between"><div className="space-y-2"><span className="pwa-skeleton block h-3 w-20 rounded" /><span className="pwa-skeleton block h-8 w-36 rounded-lg" /></div><span className="pwa-skeleton h-11 w-24 rounded-xl" /></div>
+				<div className="mt-5 space-y-3">{[1, 2, 3].map((item) => <div key={item} className="pwa-card flex items-center gap-3 p-4"><span className="pwa-skeleton h-11 w-11 shrink-0 rounded-full" /><span className="flex-1 space-y-2"><span className="pwa-skeleton block h-4 w-2/3 rounded" /><span className="pwa-skeleton block h-3 w-1/2 rounded" /></span></div>)}</div>
+				<span className="sr-only">Carregando área operacional...</span>
+			</div>
+		</div>
 	);
 }
