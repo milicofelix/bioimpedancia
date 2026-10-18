@@ -700,7 +700,7 @@ class BioimpedanceController extends Controller
         $assessment = $share->assessment;
         config(['dompdf.public_path' => public_path()]);
 
-        return response()->view('bioimpedance.report-pdf', [
+        $pdf = Pdf::loadView('bioimpedance.report-pdf', [
             'clinic' => [
                 ...$this->clinicPayload(),
                 'logo_data_uri' => $this->logoDataUri(),
@@ -708,7 +708,12 @@ class BioimpedanceController extends Controller
             'client' => $this->clientPayload($assessment->client->setRelation('assessments', collect([$assessment]))),
             'assessment' => $this->assessmentPayload($assessment),
             'issuedAt' => $assessment->report_issued_at ?? $assessment->evaluated_at,
-        ], 200, $this->reportSharePresenter->publicReportHeaders());
+        ])->setPaper('a4');
+
+        $response = $pdf->stream($this->pdfFileName($assessment));
+        $response->headers->add($this->reportSharePresenter->publicReportHeaders());
+
+        return $response;
     }
 
     private function validateAssessment(Request $request, bool $requireClient = true, ?string $deviceModel = null): array

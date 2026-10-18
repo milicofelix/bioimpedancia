@@ -21,9 +21,9 @@
 <main>
     <div class="badge">Conteúdo confidencial</div>
     <h1>Relatório com dados sensíveis</h1>
-    <p>Este link contém informações pessoais e clínicas. Confirme que você é o destinatário correto e está em um ambiente privado antes de continuar.</p>
+    <p>Este link abrirá um relatório em PDF com informações pessoais e clínicas. Confirme que você é o destinatário correto e está em um ambiente privado antes de continuar.</p>
     <div class="warning">Não encaminhe o link sem autorização. Feche a página ao terminar, especialmente em aparelhos compartilhados.</div>
-    <a href="{{ $confirmUrl }}" rel="nofollow">Confirmar e abrir relatório</a>
+    <a href="{{ $confirmUrl }}" rel="nofollow">Confirmar e abrir PDF</a>
     <small>Link válido até {{ $expiresAt->format('d/m/Y H:i') }}.</small>
 </main>
 </body>

@@ -155,7 +155,6 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 		<div className="space-y-4">
 			<PwaJourneyHeader icon="camera" eyebrow="Nova avaliação · Relaxmedic" title={client.full_name} description="A avaliação só será criada depois do processamento e da sua confirmação." />
 			<PwaStepIndicator steps={['Imagem', 'Processamento', 'Conferência', 'Conclusão']} current={extraction ? 3 : processing ? 2 : 1} />
-			{!isOnline ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">Sem conexão. O processamento e a criação ficam bloqueados para evitar envios incompletos ou duplicados.</p> : null}
 
 			{processing ? <RelaxmedicOcrProgress previewUrl={previewUrl} /> : !extraction ? (
 				<>

@@ -21,23 +21,23 @@ export default function ClientDetails({ client, currentUser, scaleModel, onBack,
 			<PwaButton type="button" onClick={onBack} variant="ghost" icon="arrowLeft" className="-ml-3">Voltar para clientes</PwaButton>
 
 			<PwaCard className="mt-3 p-5 sm:p-6">
-				<div className="flex items-start justify-between gap-3">
+				<div className="flex flex-wrap items-start justify-between gap-3">
 					<div className="flex min-w-0 items-center gap-3">
 						<span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-ricosty-100 to-ricosty-200 text-lg font-extrabold text-ricosty-800 ring-1 ring-ricosty-200">{initials(client.full_name)}</span>
 						<div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[0.14em] text-ricosty-600">Cliente</p>
-						<h2 id="client-details-title" className="mt-1 truncate text-xl font-extrabold text-ricosty-ink">{client.full_name}</h2></div>
+						<h2 id="client-details-title" className="mt-1 break-words text-xl font-extrabold text-ricosty-ink">{client.full_name}</h2></div>
 					</div>
 					{client.is_anonymized ? (
-						<span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold uppercase text-amber-700">Anonimizado</span>
+						<span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-bold uppercase text-amber-900">Anonimizado</span>
 					) : !client.is_active ? (
-						<span className="rounded-full bg-slate-200 px-2 py-1 text-[10px] font-bold uppercase text-slate-600">Inativo</span>
+						<span className="rounded-full bg-slate-200 px-2 py-1 text-[11px] font-bold uppercase text-slate-800">Inativo</span>
 					) : (
-						<span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase text-emerald-700">Ativo</span>
+						<span className="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-bold uppercase text-emerald-900">Ativo</span>
 					)}
 				</div>
 
-				<dl className="mt-5 grid grid-cols-2 gap-2 text-sm">
-					{[['Idade', `${client.age ?? '-'} anos`], ['Sexo', sexLabels[client.biological_sex] ?? '-'], ['Altura', `${numberBr(client.height_cm, 0)} cm`], ['Nascimento', formatIssueDate(client.birth_date)]].map(([label, value]) => <div key={label} className="rounded-xl bg-ricosty-cream/70 p-3"><dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</dt><dd className="mt-1 font-bold text-ricosty-ink">{value}</dd></div>)}
+				<dl className="mt-5 grid gap-2 sm:grid-cols-2 text-sm">
+					{[['Idade', `${client.age ?? '-'} anos`], ['Sexo', sexLabels[client.biological_sex] ?? '-'], ['Altura', `${numberBr(client.height_cm, 0)} cm`], ['Nascimento', formatIssueDate(client.birth_date)]].map(([label, value]) => <div key={label} className="rounded-xl bg-ricosty-cream/70 p-3"><dt className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{label}</dt><dd className="mt-1 font-bold text-ricosty-ink">{value}</dd></div>)}
 				</dl>
 
 				<div className="mt-4 space-y-2 border-t border-ricosty-100 pt-4 text-sm text-slate-600">
@@ -69,10 +69,10 @@ export default function ClientDetails({ client, currentUser, scaleModel, onBack,
 									<span className="flex items-center gap-1.5 text-sm font-bold text-slate-900"><PwaIcon name="calendar" size={15} className="text-ricosty-500" />{formatDate(assessment.evaluated_at)}</span>
 									<span className="text-[10px] font-bold uppercase text-slate-500">{assessment.is_canceled ? 'Cancelada' : assessment.device_model}</span>
 								</div>
-								<div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-lg bg-white/80 px-3 py-2"><span className="block text-[10px] font-bold uppercase text-slate-400">Peso</span><strong className="text-sm text-slate-800">{numberBr(assessment.weight_kg, 1)} kg</strong></div><div className="rounded-lg bg-white/80 px-3 py-2"><span className="block text-[10px] font-bold uppercase text-slate-400">IMC</span><strong className="text-sm text-slate-800">{numberBr(assessment.calculated_bmi ?? assessment.scale_bmi, 1)}</strong></div></div>
+								<div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-lg bg-white/80 px-3 py-2"><span className="block text-[11px] font-bold uppercase text-slate-600">Peso</span><strong className="text-sm text-slate-800">{numberBr(assessment.weight_kg, 1)} kg</strong></div><div className="rounded-lg bg-white/80 px-3 py-2"><span className="block text-[11px] font-bold uppercase text-slate-600">IMC</span><strong className="text-sm text-slate-800">{numberBr(assessment.calculated_bmi ?? assessment.scale_bmi, 1)}</strong></div></div>
 								<div className="mt-3 flex flex-wrap gap-2">
-									<PwaButton type="button" onClick={() => onOpenReport(client, assessment)} variant="secondary" icon="fileText" className="min-h-9 px-3 text-xs">Relatório</PwaButton>
-									{canUseClinicalFeatures(currentUser) ? <PwaButton type="button" onClick={() => onOpenAssistant(client, assessment)} variant="ghost" icon="sparkles" className="min-h-9 px-3 text-xs">Assistente</PwaButton> : null}
+									<PwaButton type="button" onClick={() => onOpenReport(client, assessment)} variant="secondary" icon="fileText" className="px-3 text-xs">Relatório</PwaButton>
+									{canUseClinicalFeatures(currentUser) ? <PwaButton type="button" onClick={() => onOpenAssistant(client, assessment)} variant="ghost" icon="sparkles" className="px-3 text-xs">Assistente</PwaButton> : null}
 								</div>
 							</div>
 						</li>

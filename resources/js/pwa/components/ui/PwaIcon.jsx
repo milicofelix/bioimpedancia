@@ -36,7 +36,7 @@ const icons = {
 
 export default function PwaIcon({ name, size = 20, className = '', label }) {
 	return (
-		<svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden={label ? undefined : true} role={label ? 'img' : undefined}>
+		<svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" focusable="false" className={className} aria-hidden={label ? undefined : true} aria-label={label || undefined} role={label ? 'img' : undefined}>
 			{label ? <title>{label}</title> : null}
 			{icons[name] ?? icons.sparkles}
 		</svg>

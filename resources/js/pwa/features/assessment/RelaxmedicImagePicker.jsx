@@ -29,17 +29,17 @@ export default function RelaxmedicImagePicker({ previewUrl, fileName, disabled, 
 
 			<input ref={cameraInput} type="file" accept="image/jpeg,.jpg,.jpeg" capture="environment" onChange={select} className="sr-only" tabIndex={-1} />
 			<input ref={galleryInput} type="file" accept="image/jpeg,.jpg,.jpeg" onChange={select} className="sr-only" tabIndex={-1} />
-			<div className="mt-4 grid grid-cols-2 gap-3">
+			<div className="mt-4 grid gap-3 sm:grid-cols-2">
 				<PwaButton type="button" icon="camera" disabled={disabled} onClick={() => cameraInput.current?.click()} className="min-h-24 flex-col px-2"><span className="text-center">Fotografar<span className="mt-1 block text-[10px] font-medium text-white/75">Abrir câmera traseira</span></span></PwaButton>
 				<PwaButton type="button" icon="image" variant="secondary" disabled={disabled} onClick={() => galleryInput.current?.click()} className="min-h-24 flex-col px-2"><span className="text-center">Galeria<span className="mt-1 block text-[10px] font-medium text-slate-500">Usar foto existente</span></span></PwaButton>
 			</div>
-			<div className="mt-3 grid grid-cols-3 gap-2 text-center text-[10px] font-semibold text-slate-500"><span className="rounded-lg bg-slate-50 px-2 py-2">Página inteira</span><span className="rounded-lg bg-slate-50 px-2 py-2">Sem reflexos</span><span className="rounded-lg bg-slate-50 px-2 py-2">Texto legível</span></div>
+			<div className="mt-3 grid gap-2 text-center text-xs font-semibold text-slate-600 sm:grid-cols-3"><span className="rounded-lg bg-slate-50 px-2 py-2">Página inteira</span><span className="rounded-lg bg-slate-50 px-2 py-2">Sem reflexos</span><span className="rounded-lg bg-slate-50 px-2 py-2">Texto legível</span></div>
 
 			{error ? <p role="alert" className="pwa-status-enter mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p> : null}
 			{previewUrl ? (
 				<div className="pwa-screen-enter mt-4 overflow-hidden rounded-2xl border border-ricosty-200 bg-ricosty-cream/50 p-3">
 					<img src={previewUrl} alt="Prévia do relatório Relaxmedic selecionado" className="mx-auto max-h-80 rounded-lg object-contain" />
-					<div className="mt-3 flex items-center justify-center gap-2 text-xs text-slate-600"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><PwaIcon name="check" size={12} /></span><span className="max-w-[80%] truncate">{fileName}</span></div>
+					<div className="mt-3 flex items-start justify-center gap-2 text-xs text-slate-700"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><PwaIcon name="check" size={12} /></span><span className="break-all text-center">{fileName}</span></div>
 				</div>
 			) : null}
 		</section>

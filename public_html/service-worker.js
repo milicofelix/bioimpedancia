@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'ricosty-pwa-v2';
+const CACHE_VERSION = 'ricosty-pwa-v3';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const OFFLINE_URL = '/offline.html';
 const PRECACHE_URLS = [
@@ -7,6 +7,7 @@ const PRECACHE_URLS = [
     '/pwa/icons/icon-192.png',
     '/pwa/icons/icon-512.png',
     '/pwa/icons/icon-maskable-512.png',
+    '/pwa/icons/icon-monochrome.svg',
     '/pwa/icons/apple-touch-icon.png',
 ];
 
@@ -19,7 +20,6 @@ const NEVER_CACHE_PREFIXES = [
 
 self.addEventListener('install', (event) => {
     event.waitUntil(caches.open(STATIC_CACHE).then((cache) => cache.addAll(PRECACHE_URLS)));
-    self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -31,6 +31,11 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('message', (event) => {
+    if (event.data?.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+        return;
+    }
+
     if (event.data?.type !== 'CLEAR_OPERATIONAL_CACHES') return;
 
     event.waitUntil(

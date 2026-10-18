@@ -15,7 +15,7 @@ export default function PwaJourneyHeader({ icon, eyebrow, title, description, ch
 				{icon ? <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-ricosty-100"><PwaIcon name={icon} size={24} /></span> : null}
 				<div className="min-w-0 flex-1">
 					<p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-ricosty-100">{eyebrow}</p>
-					<h1 className="mt-1 truncate text-xl font-extrabold tracking-tight sm:text-2xl">{title}</h1>
+					<h1 className="mt-1 break-words text-xl font-extrabold tracking-tight sm:text-2xl">{title}</h1>
 					{description ? <p className="mt-2 text-sm leading-6 text-white/75">{description}</p> : null}
 					{children ? <div className="mt-4 flex flex-wrap gap-2">{children}</div> : null}
 				</div>

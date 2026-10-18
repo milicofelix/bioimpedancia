@@ -26,11 +26,14 @@
 
 :root {
     color-scheme: light;
+    --pwa-viewport-height: 100dvh;
 }
 
 html,
 body {
     min-height: 100%;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 }
 
 body {
@@ -42,6 +45,12 @@ body {
 
 #app {
     min-height: 100vh;
+    min-height: 100dvh;
+}
+
+:where(a, button, input, select, textarea, summary):focus-visible {
+    outline: 3px solid #8e3049;
+    outline-offset: 2px;
 }
 
 @layer components {
@@ -50,6 +59,11 @@ body {
             radial-gradient(circle at 8% 3%, rgb(246 213 219 / 70%), transparent 26rem),
             radial-gradient(circle at 94% 18%, rgb(247 205 165 / 32%), transparent 22rem),
             linear-gradient(180deg, #fffaf6 0%, #fff 42%, #fdf7f8 100%);
+    }
+
+    .pwa-native-shell,
+    .pwa-launch-screen {
+        min-height: var(--pwa-viewport-height, 100dvh);
     }
 
     .pwa-card {
@@ -109,15 +123,36 @@ body {
     }
 
     .pwa-focus:focus-visible {
-        box-shadow: 0 0 0 3px rgb(238 179 191 / 70%);
+        outline: 3px solid #8e3049;
+        outline-offset: 2px;
+        box-shadow: 0 0 0 5px rgb(255 255 255 / 90%);
     }
 
     .pwa-safe-top {
         padding-top: max(0.75rem, env(safe-area-inset-top));
     }
 
+    .pwa-safe-inline {
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+    }
+
     .pwa-safe-bottom {
         padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    }
+
+    .pwa-bottom-navigation {
+        padding-right: max(0.75rem, env(safe-area-inset-right));
+        padding-bottom: max(0.6rem, env(safe-area-inset-bottom));
+        padding-left: max(0.75rem, env(safe-area-inset-left));
+    }
+
+    .pwa-update-notice {
+        right: max(1rem, env(safe-area-inset-right));
+        bottom: calc(6.25rem + env(safe-area-inset-bottom));
+        left: max(1rem, env(safe-area-inset-left));
+        margin-inline: auto;
+        max-width: 24rem;
     }
 
     .pwa-screen-enter {
@@ -141,6 +176,28 @@ body {
         background: linear-gradient(90deg, transparent, rgb(255 255 255 / 65%), transparent);
         transform: translateX(-100%);
         animation: pwa-shimmer 1.35s infinite;
+    }
+}
+
+html[data-keyboard-open] .pwa-bottom-navigation,
+html[data-keyboard-open] .pwa-update-notice {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+html[data-keyboard-open] .pwa-native-shell {
+    padding-bottom: 1rem;
+}
+
+@media (display-mode: standalone) {
+    .pwa-native-shell {
+        overscroll-behavior: none;
+    }
+}
+
+@media (forced-colors: active) {
+    .pwa-focus:focus-visible {
+        outline: 3px solid Highlight;
     }
 }
 
