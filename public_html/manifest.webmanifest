@@ -1,0 +1,33 @@
+{
+    "id": "/app",
+    "name": "Ricosty Atendimento",
+    "short_name": "Ricosty",
+    "description": "Área operacional para clientes, avaliações e relatórios de bioimpedância.",
+    "lang": "pt-BR",
+    "start_url": "/app",
+    "scope": "/app",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "background_color": "#f8fafc",
+    "theme_color": "#d88b9a",
+    "icons": [
+        {
+            "src": "/pwa/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/pwa/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/pwa/icons/icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

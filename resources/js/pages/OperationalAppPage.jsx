@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import OperationalShell from '../pwa/components/OperationalShell';
 import OperationalOverview from '../pwa/features/home/OperationalOverview';
 import { apiErrorMessage, loadOperationalWorkspace, logout } from '../services/bioimpedanceApi';
+import { registerOperationalServiceWorker } from '../pwa/services/registerServiceWorker';
 
 export default function OperationalAppPage() {
 	const [workspace, setWorkspace] = useState(null);
@@ -9,6 +10,8 @@ export default function OperationalAppPage() {
 	const [error, setError] = useState('');
 
 	useEffect(() => {
+		registerOperationalServiceWorker();
+
 		let active = true;
 
 		loadOperationalWorkspace()

@@ -1,4 +1,6 @@
 import React from 'react';
+import InstallGuide from './InstallGuide';
+import useOnlineStatus from '../hooks/useOnlineStatus';
 
 const navigation = [
 	{ href: '#clientes', label: 'Clientes', symbol: 'C' },
@@ -8,6 +10,8 @@ const navigation = [
 ];
 
 export default function OperationalShell({ clinic, currentUser, onLogout, children }) {
+	const isOnline = useOnlineStatus();
+
 	return (
 		<div className="min-h-dvh bg-slate-100 pb-24">
 			<header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
@@ -17,6 +21,9 @@ export default function OperationalShell({ clinic, currentUser, onLogout, childr
 						<p className="truncate text-xs text-slate-500">Atendimento operacional</p>
 					</div>
 					<div className="flex items-center gap-2">
+						<span className={`rounded-full px-2 py-1 text-[10px] font-bold ${isOnline ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+							{isOnline ? 'Online' : 'Offline'}
+						</span>
 						<a href="/dashboard" className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600">Painel</a>
 						<button type="button" onClick={onLogout} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600">Sair</button>
 					</div>
@@ -24,11 +31,17 @@ export default function OperationalShell({ clinic, currentUser, onLogout, childr
 			</header>
 
 			<main className="mx-auto max-w-lg px-4 py-5">
+				{!isOnline ? (
+					<div role="status" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
+						Sem conexão. Consultas, avaliações e relatórios ficam indisponíveis até a reconexão.
+					</div>
+				) : null}
 				<div className="mb-5 rounded-2xl bg-slate-950 p-5 text-white shadow-sm">
 					<p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300">Área móvel</p>
 					<h1 className="mt-2 text-xl font-bold">Olá, {currentUser?.name ?? 'profissional'}</h1>
 					<p className="mt-1 text-sm text-slate-300">Acesso rápido às etapas do atendimento.</p>
 				</div>
+				<InstallGuide />
 				{children}
 			</main>
 
