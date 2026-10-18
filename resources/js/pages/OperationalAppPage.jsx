@@ -3,6 +3,7 @@ import OperationalShell from '../pwa/components/OperationalShell';
 import OperationalModulePlaceholder from '../pwa/components/OperationalModulePlaceholder';
 import ClientsFeature from '../pwa/features/clients/ClientsFeature';
 import RelaxmedicAssessmentFeature from '../pwa/features/assessment/RelaxmedicAssessmentFeature';
+import AssessmentAssistantFeature from '../pwa/features/assistant/AssessmentAssistantFeature';
 import useOperationalSection from '../pwa/hooks/useOperationalSection';
 import { apiErrorMessage, loadOperationalWorkspace, logout } from '../services/bioimpedanceApi';
 import { registerOperationalServiceWorker } from '../pwa/services/registerServiceWorker';
@@ -55,12 +56,22 @@ export default function OperationalAppPage() {
 	}
 
 	function assessmentCreated(client, assessment) {
+		updateAssessmentState(client, assessment);
+	}
+
+	function updateAssessmentState(client, assessment) {
 		setWorkspace((current) => ({
 			...current,
 			clients: (current.clients ?? []).map((item) => (item.id === client.id ? client : item)),
 		}));
 		setSelectedClient(client);
 		setSelectedAssessment(assessment);
+	}
+
+	function openAssistant(client, assessment) {
+		setSelectedClient(client);
+		setSelectedAssessment(assessment);
+		navigate('assistente');
 	}
 
 	if (loading) {
@@ -90,6 +101,7 @@ export default function OperationalAppPage() {
 					scaleModel={scaleModel}
 					onClientCreated={handleClientCreated}
 					onNewAssessment={startAssessment}
+					onOpenAssistant={openAssistant}
 				/>
 			) : section === 'avaliacao' ? (
 				<RelaxmedicAssessmentFeature
@@ -99,6 +111,14 @@ export default function OperationalAppPage() {
 					onBackToClients={() => navigate('clientes')}
 					onCreated={assessmentCreated}
 					onOpenAssistant={() => navigate('assistente')}
+				/>
+			) : section === 'assistente' ? (
+				<AssessmentAssistantFeature
+					client={selectedClient}
+					assessment={selectedAssessment}
+					currentUser={workspace.current_user}
+					onBackToClients={() => navigate('clientes')}
+					onApproved={updateAssessmentState}
 				/>
 			) : (
 				<OperationalModulePlaceholder section={section} selectedClient={selectedClient} selectedAssessment={selectedAssessment} onBackToClients={() => navigate('clientes')} />

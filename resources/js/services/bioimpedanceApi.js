@@ -37,6 +37,18 @@ export async function createBioimpedanceAssessment(payload) {
 	return data;
 }
 
+export async function generateAssessmentObservation(assessmentId) {
+	const { data } = await window.axios.get(`/bioimpedance/assessments/${assessmentId}/observation-suggestion`);
+
+	return data.assistant;
+}
+
+export async function approveAssessmentObservation(assessmentId, payload) {
+	const { data } = await window.axios.patch(`/bioimpedance/assessments/${assessmentId}/observation`, payload);
+
+	return data;
+}
+
 export async function logout() {
 	await window.axios.post(endpoints.logout, {}, {
 		headers: { Accept: 'application/json' },

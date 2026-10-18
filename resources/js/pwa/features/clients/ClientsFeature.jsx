@@ -4,7 +4,7 @@ import ClientDetails from './ClientDetails';
 import ClientSearchList from './ClientSearchList';
 import { canCreateClient } from './clientAccess';
 
-export default function ClientsFeature({ clients, currentUser, scaleModel, onClientCreated, onNewAssessment }) {
+export default function ClientsFeature({ clients, currentUser, scaleModel, onClientCreated, onNewAssessment, onOpenAssistant }) {
 	const [screen, setScreen] = useState('list');
 	const [selectedClientId, setSelectedClientId] = useState(null);
 	const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null;
@@ -32,6 +32,7 @@ export default function ClientsFeature({ clients, currentUser, scaleModel, onCli
 				scaleModel={scaleModel}
 				onBack={() => setScreen('list')}
 				onNewAssessment={onNewAssessment}
+				onOpenAssistant={onOpenAssistant}
 			/>
 		);
 	}
