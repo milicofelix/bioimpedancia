@@ -49,6 +49,18 @@ export async function approveAssessmentObservation(assessmentId, payload) {
 	return data;
 }
 
+export async function createAssessmentShare(assessmentId, payload) {
+	const { data } = await window.axios.post(`/bioimpedance/assessments/${assessmentId}/shares`, payload);
+
+	return data;
+}
+
+export async function revokeAssessmentShare(shareId) {
+	const { data } = await window.axios.patch(`/bioimpedance/report-shares/${shareId}/revoke`);
+
+	return data;
+}
+
 export async function logout() {
 	await window.axios.post(endpoints.logout, {}, {
 		headers: { Accept: 'application/json' },

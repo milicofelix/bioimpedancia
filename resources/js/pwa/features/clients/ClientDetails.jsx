@@ -5,7 +5,7 @@ import { assessmentAccess, canUseClinicalFeatures } from './clientAccess';
 
 const sexLabels = { female: 'Feminino', male: 'Masculino' };
 
-export default function ClientDetails({ client, currentUser, scaleModel, onBack, onNewAssessment, onOpenAssistant }) {
+export default function ClientDetails({ client, currentUser, scaleModel, onBack, onNewAssessment, onOpenAssistant, onOpenReport }) {
 	const access = assessmentAccess(client, currentUser, scaleModel);
 	const assessments = client.assessments ?? [];
 
@@ -62,7 +62,10 @@ export default function ClientDetails({ client, currentUser, scaleModel, onBack,
 								<span className="text-[10px] font-bold uppercase text-slate-500">{assessment.is_canceled ? 'Cancelada' : assessment.device_model}</span>
 							</div>
 							<p className="mt-1 text-xs text-slate-600">Peso {numberBr(assessment.weight_kg, 1)} kg • IMC {numberBr(assessment.calculated_bmi, 1)}</p>
-							{canUseClinicalFeatures(currentUser) ? <button type="button" onClick={() => onOpenAssistant(client, assessment)} className="mt-3 rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs font-bold text-violet-700">Abrir assistente</button> : null}
+							<div className="mt-3 flex flex-wrap gap-2">
+								<button type="button" onClick={() => onOpenReport(client, assessment)} className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-bold text-sky-700">Abrir relatório</button>
+								{canUseClinicalFeatures(currentUser) ? <button type="button" onClick={() => onOpenAssistant(client, assessment)} className="rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs font-bold text-violet-700">Abrir assistente</button> : null}
+							</div>
 						</div>
 					))}
 					{!assessments.length ? <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500">Nenhuma avaliação registrada.</p> : null}

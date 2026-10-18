@@ -4,6 +4,7 @@ import OperationalModulePlaceholder from '../pwa/components/OperationalModulePla
 import ClientsFeature from '../pwa/features/clients/ClientsFeature';
 import RelaxmedicAssessmentFeature from '../pwa/features/assessment/RelaxmedicAssessmentFeature';
 import AssessmentAssistantFeature from '../pwa/features/assistant/AssessmentAssistantFeature';
+import AssessmentReportFeature from '../pwa/features/report/AssessmentReportFeature';
 import useOperationalSection from '../pwa/hooks/useOperationalSection';
 import { apiErrorMessage, loadOperationalWorkspace, logout } from '../services/bioimpedanceApi';
 import { registerOperationalServiceWorker } from '../pwa/services/registerServiceWorker';
@@ -74,6 +75,22 @@ export default function OperationalAppPage() {
 		navigate('assistente');
 	}
 
+	function openReport(client, assessment) {
+		setSelectedClient(client);
+		setSelectedAssessment(assessment);
+		navigate('relatorio');
+	}
+
+	function updateSelectedAssessment(assessment) {
+		const client = (workspace.clients ?? []).find((item) => item.id === assessment.bioimpedance_client_id) ?? selectedClient;
+		if (!client) return;
+
+		updateAssessmentState({
+			...client,
+			assessments: (client.assessments ?? []).map((item) => (item.id === assessment.id ? assessment : item)),
+		}, assessment);
+	}
+
 	if (loading) {
 		return <div className="flex min-h-dvh items-center justify-center bg-slate-100 px-6 text-sm font-semibold text-slate-600">Carregando área operacional...</div>;
 	}
@@ -102,6 +119,7 @@ export default function OperationalAppPage() {
 					onClientCreated={handleClientCreated}
 					onNewAssessment={startAssessment}
 					onOpenAssistant={openAssistant}
+					onOpenReport={openReport}
 				/>
 			) : section === 'avaliacao' ? (
 				<RelaxmedicAssessmentFeature
@@ -119,6 +137,15 @@ export default function OperationalAppPage() {
 					currentUser={workspace.current_user}
 					onBackToClients={() => navigate('clientes')}
 					onApproved={updateAssessmentState}
+					onOpenReport={() => navigate('relatorio')}
+				/>
+			) : section === 'relatorio' ? (
+				<AssessmentReportFeature
+					client={selectedClient}
+					assessment={selectedAssessment}
+					currentUser={workspace.current_user}
+					onBackToClients={() => navigate('clientes')}
+					onAssessmentUpdated={updateSelectedAssessment}
 				/>
 			) : (
 				<OperationalModulePlaceholder section={section} selectedClient={selectedClient} selectedAssessment={selectedAssessment} onBackToClients={() => navigate('clientes')} />

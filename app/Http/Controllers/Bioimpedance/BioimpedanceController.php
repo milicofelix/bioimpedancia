@@ -517,7 +517,9 @@ class BioimpedanceController extends Controller
             'issuedAt' => $assessment->report_issued_at,
         ])->setPaper('a4');
 
-        return $pdf->download($this->pdfFileName($assessment));
+        return request()->boolean('inline')
+            ? $pdf->stream($this->pdfFileName($assessment))
+            : $pdf->download($this->pdfFileName($assessment));
     }
 
     public function createAssessmentShare(Request $request, BioimpedanceAssessment $assessment): JsonResponse

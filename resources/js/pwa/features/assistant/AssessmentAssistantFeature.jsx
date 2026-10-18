@@ -6,7 +6,7 @@ import AssistantProgress from './AssistantProgress';
 import ObservationSuggestion from './ObservationSuggestion';
 import { assistantProcessingSteps } from './assistantSteps';
 
-export default function AssessmentAssistantFeature({ client, assessment, currentUser, onBackToClients, onApproved }) {
+export default function AssessmentAssistantFeature({ client, assessment, currentUser, onBackToClients, onApproved, onOpenReport }) {
 	const [assistant, setAssistant] = useState(null);
 	const [draft, setDraft] = useState('');
 	const [generating, setGenerating] = useState(false);
@@ -100,7 +100,7 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 					<div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-lg font-black text-emerald-700">✓</div>
 					<h2 className="mt-3 text-lg font-bold text-slate-950">Observação adicionada</h2>
 					<p className="mt-2 text-sm leading-6 text-slate-600">A aprovação foi registrada na avaliação e na auditoria. O texto já poderá ser usado no relatório.</p>
-					<button type="button" onClick={() => setApproved(false)} className="mt-4 rounded-xl border border-violet-200 px-4 py-3 text-sm font-bold text-violet-700">Gerar outra sugestão</button>
+					<div className="mt-4 grid gap-3 sm:grid-cols-2"><button type="button" onClick={() => setApproved(false)} className="rounded-xl border border-violet-200 px-4 py-3 text-sm font-bold text-violet-700">Gerar outra sugestão</button><button type="button" onClick={onOpenReport} className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">Abrir relatório</button></div>
 				</section>
 			) : generating ? (
 				<AssistantProgress currentStep={processingStep} />
