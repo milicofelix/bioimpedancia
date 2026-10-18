@@ -5,6 +5,9 @@ import useOnlineStatus from '../../hooks/useOnlineStatus';
 import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaIcon from '../../components/ui/PwaIcon';
+import PwaToast from '../../components/ui/PwaToast';
+import PwaConfirmSheet from '../../components/ui/PwaConfirmSheet';
+import ShareLinkSkeleton from './ShareLinkSkeleton';
 
 function shareStatus(share) {
 	if (share.revoked_at) return { label: 'Revogado', icon: 'minus', badge: 'bg-slate-200 text-slate-700', card: 'border-slate-200 bg-slate-50' };
@@ -20,24 +23,20 @@ export default function ReportSharing({ assessment, canCreate, canRevoke, onAsse
 	const [feedback, setFeedback] = useState('');
 	const [error, setError] = useState('');
 	const [pendingShareAction, setPendingShareAction] = useState(null);
-	const cancelShareReference = useRef(null);
+	const [pendingRevoke, setPendingRevoke] = useState(null);
+	const [copied, setCopied] = useState(false);
+	const copyFeedbackTimeout = useRef(null);
 	const isOnline = useOnlineStatus();
 
-	useEffect(() => {
-		if (!pendingShareAction) return undefined;
-		cancelShareReference.current?.focus();
-		const closeOnEscape = (event) => {
-			if (event.key === 'Escape') setPendingShareAction(null);
-		};
-		window.addEventListener('keydown', closeOnEscape);
-		return () => window.removeEventListener('keydown', closeOnEscape);
-	}, [pendingShareAction]);
+	useEffect(() => () => window.clearTimeout(copyFeedbackTimeout.current), []);
 
 	async function createLink() {
 		if (!canCreate || creating || !isOnline) return;
 		setCreating(true);
 		setError('');
 		setFeedback('');
+		setCopied(false);
+		setShareResult(null);
 
 		try {
 			const result = await createAssessmentShare(assessment.id, {
@@ -57,11 +56,17 @@ export default function ReportSharing({ assessment, canCreate, canRevoke, onAsse
 
 	async function copyLink() {
 		if (!shareResult?.url) return;
+		setFeedback('');
+		setError('');
 		try {
 			await navigator.clipboard.writeText(shareResult.url);
 			setFeedback('Link copiado para a área de transferência.');
 			setError('');
+			setCopied(true);
+			window.clearTimeout(copyFeedbackTimeout.current);
+			copyFeedbackTimeout.current = window.setTimeout(() => setCopied(false), 2500);
 		} catch {
+			setCopied(false);
 			setError('O navegador não permitiu copiar automaticamente. Toque e segure o link para copiá-lo.');
 		}
 	}
@@ -105,8 +110,15 @@ export default function ReportSharing({ assessment, canCreate, canRevoke, onAsse
 		}
 	}
 
+	async function confirmRevoke() {
+		const share = pendingRevoke;
+		setPendingRevoke(null);
+		if (share) await revoke(share);
+	}
+
 	return (
 		<PwaCard className="p-5">
+			<PwaToast message={error || feedback} tone={error ? 'error' : 'success'} onDismiss={() => { setError(''); setFeedback(''); }} />
 			<div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
 				<div className="flex items-start gap-3"><PwaIcon name="shield" className="mt-0.5 shrink-0" /><p><strong>Dados sensíveis:</strong> o link dá acesso ao relatório clínico do cliente. Compartilhe somente com a pessoa correta e revogue quando não for mais necessário.</p></div>
 			</div>
@@ -118,28 +130,17 @@ export default function ReportSharing({ assessment, canCreate, canRevoke, onAsse
 				<PwaButton type="button" onClick={createLink} disabled={!canCreate || creating || !isOnline} icon="share" className="self-end">{creating ? 'Criando...' : 'Criar link temporário'}</PwaButton>
 			</div>
 			{!canCreate ? <p className="mt-2 text-xs font-semibold text-amber-700">Seu perfil não pode criar links de compartilhamento.</p> : null}
+			{creating ? <ShareLinkSkeleton /> : null}
 
-			{shareResult ? <div className="mt-4 rounded-2xl border border-ricosty-200 bg-ricosty-50 p-4"><div className="flex items-center justify-between gap-2"><span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase text-emerald-800"><PwaIcon name="check" size={12} />Ativo</span><p className="flex items-center gap-1 text-xs font-bold text-ricosty-800"><PwaIcon name="clock" size={14} />Expira em {formatDate(shareResult.expires_at)}</p></div><p className="mt-3 break-all rounded-lg bg-white/80 p-2 text-xs text-ricosty-900">{shareResult.url}</p><div className="mt-3 grid gap-2 sm:grid-cols-2"><PwaButton type="button" onClick={() => setPendingShareAction('native')} icon="share" className="min-h-10 text-xs">Compartilhar no dispositivo</PwaButton><PwaButton type="button" onClick={() => setPendingShareAction('copy')} icon="copy" variant="secondary" className="min-h-10 text-xs">Copiar link</PwaButton></div></div> : null}
-			{feedback ? <p role="status" className="mt-3 text-sm font-semibold text-emerald-700">{feedback}</p> : null}
-			{error ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
+			{shareResult ? <div className={`mt-4 rounded-2xl border p-4 transition ${copied ? 'border-emerald-300 bg-emerald-50 ring-2 ring-emerald-100' : 'border-ricosty-200 bg-ricosty-50'}`}><div className="flex items-center justify-between gap-2"><span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase text-emerald-800"><PwaIcon name="check" size={12} />Ativo</span><p className="flex items-center gap-1 text-xs font-bold text-ricosty-800"><PwaIcon name="clock" size={14} />Expira em {formatDate(shareResult.expires_at)}</p></div><p className="mt-3 break-all rounded-lg bg-white/80 p-2 text-xs text-ricosty-900">{shareResult.url}</p><div className="mt-3 grid gap-2 sm:grid-cols-2"><PwaButton type="button" onClick={() => setPendingShareAction('native')} icon="share" className="min-h-10 text-xs">Compartilhar no dispositivo</PwaButton><PwaButton type="button" onClick={() => setPendingShareAction('copy')} icon={copied ? 'check' : 'copy'} variant="secondary" className={`min-h-10 text-xs ${copied ? 'border-emerald-300 text-emerald-700' : ''}`}>{copied ? 'Link copiado!' : 'Copiar link'}</PwaButton></div></div> : null}
 
 			{assessment.shares?.length ? <div className="mt-5"><div className="flex items-center justify-between"><h3 className="text-sm font-bold text-slate-900">Links criados</h3><span className="text-xs text-slate-400">{assessment.shares.length} no total</span></div><div className="mt-2 space-y-2">{assessment.shares.map((share) => {
 				const status = shareStatus(share);
-				return <div key={share.id} className={`rounded-xl border p-3 ${status.card}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${status.badge}`}><PwaIcon name={status.icon} size={12} />{status.label}</span><p className="mt-2 text-xs font-bold text-slate-700">Expira em {formatDate(share.expires_at)}</p><p className="mt-1 text-xs text-slate-500">{share.view_count} visualização(ões){share.revoked_at ? ` · revogado em ${formatDate(share.revoked_at)}` : ''}</p></div>{status.label === 'Ativo' && canRevoke ? <button type="button" onClick={() => revoke(share)} disabled={revokingId === share.id || !isOnline} className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700 disabled:opacity-50">{revokingId === share.id ? 'Revogando...' : 'Revogar'}</button> : null}</div></div>;
+				return <div key={share.id} className={`rounded-xl border p-3 ${status.card}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${status.badge}`}><PwaIcon name={status.icon} size={12} />{status.label}</span><p className="mt-2 text-xs font-bold text-slate-700">Expira em {formatDate(share.expires_at)}</p><p className="mt-1 text-xs text-slate-500">{share.view_count} visualização(ões){share.revoked_at ? ` · revogado em ${formatDate(share.revoked_at)}` : ''}</p></div>{status.label === 'Ativo' && canRevoke ? <button type="button" onClick={() => setPendingRevoke(share)} disabled={revokingId === share.id || !isOnline} className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700 disabled:opacity-50">{revokingId === share.id ? 'Revogando...' : 'Revogar'}</button> : null}</div></div>;
 			})}</div></div> : null}
 
-			{pendingShareAction ? (
-				<div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-4 backdrop-blur-sm sm:items-center" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingShareAction(null); }}>
-					<div role="dialog" aria-modal="true" aria-labelledby="confirm-share-title" aria-describedby="confirm-share-description" className="pwa-screen-enter w-full max-w-sm rounded-[1.5rem] bg-white p-5 shadow-2xl">
-						<div className="mx-auto h-1 w-12 rounded-full bg-slate-200 sm:hidden" aria-hidden="true" />
-						<div className="mt-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-800"><PwaIcon name="shield" /></div>
-						<h2 id="confirm-share-title" className="mt-4 text-lg font-bold text-slate-950">Confirmar compartilhamento</h2>
-						<p id="confirm-share-description" className="mt-2 text-sm leading-6 text-slate-600">Este link contém dados clínicos sensíveis. Confirme a identidade do destinatário e evite enviar para grupos ou aparelhos compartilhados.</p>
-						<div className="mt-4 rounded-xl bg-ricosty-50 p-3 text-xs text-ricosty-900"><strong>Validade:</strong> até {formatDate(shareResult?.expires_at)}</div>
-						<div className="mt-5 grid grid-cols-2 gap-3"><PwaButton ref={cancelShareReference} type="button" variant="secondary" onClick={() => setPendingShareAction(null)}>Cancelar</PwaButton><PwaButton type="button" icon={pendingShareAction === 'copy' ? 'copy' : 'share'} onClick={confirmShare}>Confirmar</PwaButton></div>
-					</div>
-				</div>
-			) : null}
+			<PwaConfirmSheet open={Boolean(pendingShareAction)} title="Confirmar compartilhamento" description="Este link contém dados clínicos sensíveis. Confirme a identidade do destinatário e evite enviar para grupos ou aparelhos compartilhados." detail={<><strong>Validade:</strong> até {formatDate(shareResult?.expires_at)}</>} confirmIcon={pendingShareAction === 'copy' ? 'copy' : 'share'} onCancel={() => setPendingShareAction(null)} onConfirm={confirmShare} />
+			<PwaConfirmSheet open={Boolean(pendingRevoke)} title="Revogar este link?" description="O cliente perderá o acesso imediatamente. Esta ação não pode ser desfeita; se necessário, será preciso criar um novo link." icon="alertTriangle" tone="danger" confirmLabel="Revogar link" confirmVariant="danger" onCancel={() => setPendingRevoke(null)} onConfirm={confirmRevoke} />
 		</PwaCard>
 	);
 }
