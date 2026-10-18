@@ -8,6 +8,20 @@
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+    --color-ricosty-50: #fff7f7;
+    --color-ricosty-100: #fcebed;
+    --color-ricosty-200: #f6d5db;
+    --color-ricosty-300: #eeb3bf;
+    --color-ricosty-400: #dc8296;
+    --color-ricosty-500: #c6536e;
+    --color-ricosty-600: #ad3f5b;
+    --color-ricosty-700: #8e3049;
+    --color-ricosty-800: #722a3e;
+    --color-ricosty-900: #612637;
+    --color-ricosty-950: #38101d;
+    --color-ricosty-cream: #fffaf6;
+    --color-ricosty-gold: #d79a63;
+    --color-ricosty-ink: #332b32;
 }
 
 :root {
@@ -21,11 +35,87 @@ body {
 
 body {
     margin: 0;
-    background: #f8fafc;
+    background: #fffaf6;
 }
 
 #app {
     min-height: 100vh;
+}
+
+@layer components {
+    .pwa-shell {
+        background:
+            radial-gradient(circle at 8% 3%, rgb(246 213 219 / 70%), transparent 26rem),
+            radial-gradient(circle at 94% 18%, rgb(247 205 165 / 32%), transparent 22rem),
+            linear-gradient(180deg, #fffaf6 0%, #fff 42%, #fdf7f8 100%);
+    }
+
+    .pwa-card {
+        border: 1px solid rgb(246 213 219 / 75%);
+        border-radius: 1.25rem;
+        background: rgb(255 255 255 / 92%);
+        box-shadow: 0 14px 38px rgb(97 38 55 / 7%);
+        backdrop-filter: blur(14px);
+    }
+
+    .pwa-card-soft {
+        border: 1px solid rgb(246 213 219 / 70%);
+        border-radius: 1rem;
+        background: linear-gradient(145deg, rgb(255 247 247 / 95%), rgb(255 250 246 / 95%));
+    }
+
+    .pwa-button-primary {
+        min-height: 3rem;
+        border-radius: 0.875rem;
+        background: linear-gradient(135deg, #c6536e, #8e3049);
+        color: white;
+        font-weight: 700;
+        box-shadow: 0 10px 22px rgb(173 63 91 / 22%);
+        transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+    }
+
+    .pwa-button-primary:hover {
+        box-shadow: 0 13px 28px rgb(173 63 91 / 28%);
+        transform: translateY(-1px);
+    }
+
+    .pwa-button-secondary {
+        min-height: 3rem;
+        border: 1px solid #f0c4cd;
+        border-radius: 0.875rem;
+        background: white;
+        color: #8e3049;
+        font-weight: 700;
+        transition: background 160ms ease, border-color 160ms ease;
+    }
+
+    .pwa-button-secondary:hover {
+        border-color: #dc8296;
+        background: #fff7f7;
+    }
+
+    .pwa-focus {
+        outline: none;
+    }
+
+    .pwa-focus:focus-visible {
+        box-shadow: 0 0 0 3px rgb(238 179 191 / 70%);
+    }
+
+    .pwa-safe-top {
+        padding-top: max(0.75rem, env(safe-area-inset-top));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
 
 @media print {

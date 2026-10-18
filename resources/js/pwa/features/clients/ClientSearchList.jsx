@@ -1,11 +1,18 @@
 import React, { useMemo, useState } from 'react';
 import { formatIssueDate } from '../../../shared/formatters';
+import PwaButton from '../../components/ui/PwaButton';
+import PwaCard from '../../components/ui/PwaCard';
+import PwaIcon from '../../components/ui/PwaIcon';
 
 function searchable(value) {
 	return String(value ?? '')
 		.normalize('NFD')
 		.replace(/[\u0300-\u036f]/g, '')
 		.toLowerCase();
+}
+
+function initials(name) {
+	return String(name ?? '?').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 }
 
 export default function ClientSearchList({ clients, canCreate, onCreate, onSelect }) {
@@ -42,27 +49,27 @@ export default function ClientSearchList({ clients, canCreate, onCreate, onSelec
 		<section aria-labelledby="clients-title">
 			<div className="flex items-start justify-between gap-3">
 				<div>
-					<p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Atendimento</p>
-					<h2 id="clients-title" className="mt-1 text-xl font-bold text-slate-950">Clientes</h2>
+					<p className="text-xs font-bold uppercase tracking-[0.16em] text-ricosty-600">Atendimento</p>
+					<h2 id="clients-title" className="mt-1 text-2xl font-bold text-ricosty-950">Clientes</h2>
+					<p className="mt-1 text-sm text-slate-500">Localize rapidamente quem será atendido.</p>
 				</div>
-				{canCreate ? (
-					<button type="button" onClick={onCreate} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm">Cadastrar</button>
-				) : null}
+				{canCreate ? <PwaButton type="button" icon="plus" onClick={onCreate} className="min-h-11 px-3">Cadastrar</PwaButton> : null}
 			</div>
 
-			<label className="mt-4 block">
+			<label className="relative mt-5 block">
 				<span className="sr-only">Buscar clientes</span>
+				<PwaIcon name="search" size={20} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ricosty-400" />
 				<input
 					type="search"
 					value={query}
 					onChange={(event) => setQuery(event.target.value)}
 					placeholder="Nome, telefone, e-mail ou CPF"
-					className="min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+					className="pwa-focus min-h-13 w-full rounded-2xl border border-ricosty-200 bg-white/90 py-3 pl-12 pr-4 text-base shadow-sm transition placeholder:text-slate-400 focus:border-ricosty-400"
 				/>
 			</label>
 
 			<label className="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-600">
-				<input type="checkbox" checked={showUnavailable} onChange={(event) => setShowUnavailable(event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
+				<input type="checkbox" checked={showUnavailable} onChange={(event) => setShowUnavailable(event.target.checked)} className="h-4 w-4 rounded border-ricosty-300 text-ricosty-600 focus:ring-ricosty-300" />
 				Mostrar clientes inativos ou anonimizados
 			</label>
 
@@ -73,18 +80,18 @@ export default function ClientSearchList({ clients, canCreate, onCreate, onSelec
 
 			<div className="mt-3 space-y-2">
 				{visibleClients.map((client) => (
-					<button type="button" key={client.id} onClick={() => onSelect(client)} className="block w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/40">
-						<span className="flex items-start justify-between gap-3">
-							<span className="font-bold text-slate-950">{client.full_name}</span>
+					<PwaCard as="button" type="button" key={client.id} onClick={() => onSelect(client)} className="pwa-focus block w-full p-4 text-left transition hover:-translate-y-0.5 hover:border-ricosty-300 hover:shadow-[0_16px_36px_rgba(97,38,55,0.11)]">
+						<span className="flex items-center gap-3">
+							<span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-ricosty-100 to-ricosty-200 text-sm font-black text-ricosty-700 ring-1 ring-ricosty-200">{initials(client.full_name)}</span>
+							<span className="min-w-0 flex-1"><span className="block truncate font-bold text-ricosty-950">{client.full_name}</span><span className="mt-0.5 block truncate text-sm text-slate-600">{client.phone || client.email || 'Sem contato cadastrado'}</span></span>
 							{client.is_anonymized ? (
 								<span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold uppercase text-amber-700">Anonimizado</span>
 							) : !client.is_active ? (
 								<span className="rounded-full bg-slate-200 px-2 py-1 text-[10px] font-bold uppercase text-slate-600">Inativo</span>
-							) : null}
+							) : <PwaIcon name="chevronRight" size={18} className="text-ricosty-400" />}
 						</span>
-						<span className="mt-1 block text-sm text-slate-600">{client.phone || client.email || 'Sem contato cadastrado'}</span>
-						<span className="mt-2 block text-xs text-slate-400">Última avaliação: {formatIssueDate(client.last_assessment_at)}</span>
-					</button>
+						<span className="mt-3 block border-t border-ricosty-100 pt-2 text-xs text-slate-400">Última avaliação: {formatIssueDate(client.last_assessment_at)}</span>
+					</PwaCard>
 				))}
 			</div>
 

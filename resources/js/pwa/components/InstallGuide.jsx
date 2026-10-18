@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import PwaIcon from './ui/PwaIcon';
 
 const DISMISSED_KEY = 'ricosty:pwa-install-guide-security-v2-dismissed';
 
@@ -66,11 +67,13 @@ export default function InstallGuide() {
 	const ios = isIosDevice();
 
 	return (
-		<aside className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-slate-700" aria-labelledby="install-guide-title">
+		<aside className="pwa-card mb-5 p-4 text-sm text-slate-700" aria-labelledby="install-guide-title">
 			<div className="flex items-start justify-between gap-3">
-				<div>
-					<p className="text-xs font-bold uppercase tracking-wide text-[#b96f7d]">Instalar no celular</p>
+				<div className="flex items-center gap-3">
+					<span className="flex h-10 w-10 items-center justify-center rounded-xl bg-ricosty-100 text-ricosty-700"><PwaIcon name="shield" size={20} /></span>
+					<div><p className="text-xs font-bold uppercase tracking-wide text-ricosty-600">Instalar no celular</p>
 					<h2 id="install-guide-title" className="mt-1 font-bold text-slate-950">Use como um aplicativo</h2>
+					</div>
 				</div>
 				<button type="button" onClick={dismiss} aria-label="Fechar orientação de instalação" className="rounded-lg px-2 py-1 text-lg leading-none text-slate-500">×</button>
 			</div>
@@ -87,7 +90,7 @@ export default function InstallGuide() {
 			) : installPrompt ? (
 				<>
 					<p className="mt-2 leading-5">Instale a área operacional na tela inicial para abrir em modo aplicativo.</p>
-					<button type="button" onClick={requestInstall} className="mt-3 rounded-xl bg-[#b96f7d] px-4 py-2 font-bold text-white">Instalar agora</button>
+					<button type="button" onClick={requestInstall} className="pwa-button-primary mt-3 px-4 py-2">Instalar agora</button>
 				</>
 			) : ios ? (
 				<ol className="mt-2 list-decimal space-y-1 pl-5 leading-5">

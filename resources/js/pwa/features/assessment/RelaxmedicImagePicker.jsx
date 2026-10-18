@@ -1,5 +1,7 @@
 import React, { useRef } from 'react';
 import { relaxmedicMaxImageBytes } from '../../../domain/bioimpedance/relaxmedic';
+import PwaButton from '../../components/ui/PwaButton';
+import PwaIcon from '../../components/ui/PwaIcon';
 
 export function validateRelaxmedicImage(file) {
 	if (!file) return 'Selecione uma imagem JPEG ou JPG.';
@@ -21,16 +23,17 @@ export default function RelaxmedicImagePicker({ previewUrl, fileName, disabled, 
 	}
 
 	return (
-		<section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-			<p className="text-xs font-bold uppercase tracking-wide text-emerald-700">1. Relatório Relaxmedic</p>
+		<section className="pwa-card p-5">
+			<div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-ricosty-100 text-ricosty-700"><PwaIcon name="camera" size={23} /></div>
+			<p className="mt-4 text-xs font-bold uppercase tracking-wide text-ricosty-600">1. Relatório Relaxmedic</p>
 			<h2 className="mt-2 text-lg font-bold text-slate-950">Envie a imagem do relatório</h2>
 			<p className="mt-1 text-sm leading-6 text-slate-600">Use a foto completa, nítida e sem reflexos. Formato JPEG/JPG, até 10 MB.</p>
 
 			<input ref={cameraInput} type="file" accept="image/jpeg,.jpg,.jpeg" capture="environment" onChange={select} className="sr-only" tabIndex={-1} />
 			<input ref={galleryInput} type="file" accept="image/jpeg,.jpg,.jpeg" onChange={select} className="sr-only" tabIndex={-1} />
 			<div className="mt-4 grid gap-3 sm:grid-cols-2">
-				<button type="button" disabled={disabled} onClick={() => cameraInput.current?.click()} className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">Fotografar relatório</button>
-				<button type="button" disabled={disabled} onClick={() => galleryInput.current?.click()} className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Escolher da galeria</button>
+				<PwaButton type="button" icon="camera" disabled={disabled} onClick={() => cameraInput.current?.click()}>Fotografar relatório</PwaButton>
+				<PwaButton type="button" icon="image" variant="secondary" disabled={disabled} onClick={() => galleryInput.current?.click()}>Escolher da galeria</PwaButton>
 			</div>
 
 			{error ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p> : null}
