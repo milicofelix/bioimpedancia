@@ -14,6 +14,7 @@ import {
 	toDatetimeLocal,
 } from '../shared/formatters';
 import { loadBioimpedanceWorkspace, logout } from '../services/bioimpedanceApi';
+import { cpfMask, heightMask, normalizeInteger, phoneMask } from '../shared/inputMasks';
 
 const emptyClient = {
 	full_name: '',
@@ -354,10 +355,6 @@ function normalizeDecimal(value) {
 	return String(value).replace(',', '.').replace(/[^\d.]/g, '');
 }
 
-function normalizeInteger(value) {
-	return String(value ?? '').replace(/\D/g, '');
-}
-
 function normalizeHeightToCentimeters(value) {
 	const normalized = Number(normalizeDecimal(value));
 
@@ -374,36 +371,6 @@ function decimalMask(value, precision = 1) {
 	return decimal.length || cleaned.includes(',')
 		? `${integer.slice(0, 4)},${decimal.slice(0, precision)}`
 		: integer.slice(0, 4);
-}
-
-function heightMask(value) {
-	const cleaned = String(value ?? '').replace(/[^\d,.]/g, '').replace('.', ',');
-
-	if (cleaned.includes(',')) {
-		const [meters = '', centimeters = ''] = cleaned.split(',');
-		return `${meters.slice(0, 1)},${centimeters.slice(0, 2)}`;
-	}
-
-	return cleaned.slice(0, 3);
-}
-
-function phoneMask(value) {
-	const digits = normalizeInteger(value).slice(0, 11);
-
-	if (digits.length <= 2) return digits;
-	if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-
-	return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
-}
-
-function cpfMask(value) {
-	const digits = normalizeInteger(value).slice(0, 11);
-
-	if (digits.length <= 3) return digits;
-	if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
-	if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
-
-	return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
 }
 
 function clientFormFromClient(client) {

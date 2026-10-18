@@ -16,6 +16,12 @@ export async function loadOperationalWorkspace() {
 	return data;
 }
 
+export async function createBioimpedanceClient(payload) {
+	const { data } = await window.axios.post('/bioimpedance/clients', payload);
+
+	return data.client;
+}
+
 export async function logout() {
 	await window.axios.post(endpoints.logout, {}, {
 		headers: { Accept: 'application/json' },
@@ -24,4 +30,8 @@ export async function logout() {
 
 export function apiErrorMessage(error, fallback = 'Não foi possível concluir a operação.') {
 	return error?.response?.data?.message ?? fallback;
+}
+
+export function apiValidationErrors(error) {
+	return error?.response?.data?.errors ?? {};
 }

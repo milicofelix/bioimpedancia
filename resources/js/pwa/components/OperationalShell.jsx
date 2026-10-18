@@ -9,7 +9,7 @@ const navigation = [
 	{ href: '#relatorio', label: 'Relatório', symbol: 'R' },
 ];
 
-export default function OperationalShell({ clinic, currentUser, onLogout, children }) {
+export default function OperationalShell({ activeSection, clinic, currentUser, onLogout, onNavigate, children }) {
 	const isOnline = useOnlineStatus();
 
 	return (
@@ -47,12 +47,17 @@ export default function OperationalShell({ clinic, currentUser, onLogout, childr
 
 			<nav aria-label="Navegação operacional" className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur">
 				<div className="mx-auto grid max-w-lg grid-cols-4 gap-1">
-					{navigation.map((item) => (
-						<a key={item.href} href={item.href} className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-400">
-							<span aria-hidden="true" className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-100 text-xs font-black text-emerald-700">{item.symbol}</span>
-							{item.label}
-						</a>
-					))}
+					{navigation.map((item) => {
+						const section = item.href.replace('#', '');
+						const active = section === activeSection;
+
+						return (
+							<button type="button" key={item.href} onClick={() => onNavigate(section)} aria-current={active ? 'page' : undefined} className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-emerald-400 ${active ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-100'}`}>
+								<span aria-hidden="true" className={`flex h-6 w-6 items-center justify-center rounded-lg text-xs font-black ${active ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-700'}`}>{item.symbol}</span>
+								{item.label}
+							</button>
+						);
+					})}
 				</div>
 			</nav>
 		</div>

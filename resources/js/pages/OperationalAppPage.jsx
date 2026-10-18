@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import OperationalShell from '../pwa/components/OperationalShell';
-import OperationalOverview from '../pwa/features/home/OperationalOverview';
+import OperationalModulePlaceholder from '../pwa/components/OperationalModulePlaceholder';
+import ClientsFeature from '../pwa/features/clients/ClientsFeature';
+import useOperationalSection from '../pwa/hooks/useOperationalSection';
 import { apiErrorMessage, loadOperationalWorkspace, logout } from '../services/bioimpedanceApi';
 import { registerOperationalServiceWorker } from '../pwa/services/registerServiceWorker';
 
@@ -8,6 +10,8 @@ export default function OperationalAppPage() {
 	const [workspace, setWorkspace] = useState(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
+	const [selectedClient, setSelectedClient] = useState(null);
+	const { section, navigate } = useOperationalSection();
 
 	useEffect(() => {
 		registerOperationalServiceWorker();
@@ -35,6 +39,18 @@ export default function OperationalAppPage() {
 		window.location.assign('/login');
 	}
 
+	function handleClientCreated(client) {
+		setWorkspace((current) => ({
+			...current,
+			clients: [client, ...(current.clients ?? []).filter((item) => item.id !== client.id)],
+		}));
+	}
+
+	function startAssessment(client) {
+		setSelectedClient(client);
+		navigate('avaliacao');
+	}
+
 	if (loading) {
 		return <div className="flex min-h-dvh items-center justify-center bg-slate-100 px-6 text-sm font-semibold text-slate-600">Carregando área operacional...</div>;
 	}
@@ -51,12 +67,21 @@ export default function OperationalAppPage() {
 		);
 	}
 
+	const scaleModel = workspace.clinic?.scale_model;
+
 	return (
-		<OperationalShell clinic={workspace.clinic} currentUser={workspace.current_user} onLogout={handleLogout}>
-			<OperationalOverview
-				clientsCount={workspace.clients?.length ?? 0}
-				scaleModel={workspace.clinic?.scale_model_name ?? workspace.clinic?.scale_model}
-			/>
+		<OperationalShell activeSection={section} clinic={workspace.clinic} currentUser={workspace.current_user} onLogout={handleLogout} onNavigate={navigate}>
+			{section === 'clientes' ? (
+				<ClientsFeature
+					clients={workspace.clients ?? []}
+					currentUser={workspace.current_user}
+					scaleModel={scaleModel}
+					onClientCreated={handleClientCreated}
+					onNewAssessment={startAssessment}
+				/>
+			) : (
+				<OperationalModulePlaceholder section={section} selectedClient={selectedClient} onBackToClients={() => navigate('clientes')} />
+			)}
 		</OperationalShell>
 	);
 }
