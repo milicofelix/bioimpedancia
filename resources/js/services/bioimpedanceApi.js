@@ -22,6 +22,21 @@ export async function createBioimpedanceClient(payload) {
 	return data.client;
 }
 
+export async function processRelaxmedicImage(image) {
+	const payload = new FormData();
+	payload.append('image', image);
+
+	const { data } = await window.axios.post('/bioimpedance/relaxmedic/process-image', payload);
+
+	return data.extraction;
+}
+
+export async function createBioimpedanceAssessment(payload) {
+	const { data } = await window.axios.post('/bioimpedance/assessments', payload);
+
+	return data;
+}
+
 export async function logout() {
 	await window.axios.post(endpoints.logout, {}, {
 		headers: { Accept: 'application/json' },

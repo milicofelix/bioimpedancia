@@ -15,7 +15,7 @@ const content = {
 	},
 };
 
-export default function OperationalModulePlaceholder({ section, selectedClient, onBackToClients }) {
+export default function OperationalModulePlaceholder({ section, selectedClient, selectedAssessment, onBackToClients }) {
 	const module = content[section] ?? content.avaliacao;
 
 	return (
@@ -24,6 +24,7 @@ export default function OperationalModulePlaceholder({ section, selectedClient, 
 			<h2 className="mt-2 text-xl font-bold text-slate-950">{module.title}</h2>
 			<p className="mt-2 text-sm leading-6 text-slate-600">{module.description}</p>
 			{selectedClient ? <p className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">Cliente selecionado: {selectedClient.full_name}</p> : null}
+			{selectedAssessment ? <p className="mt-2 text-xs font-semibold text-slate-500">Avaliação #{selectedAssessment.id} pronta para a próxima etapa.</p> : null}
 			<button type="button" onClick={onBackToClients} className="mt-5 rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">Voltar para clientes</button>
 		</section>
 	);
