@@ -8,6 +8,7 @@ import AssessmentReportFeature from '../pwa/features/report/AssessmentReportFeat
 import useOperationalSection from '../pwa/hooks/useOperationalSection';
 import { apiErrorMessage, loadOperationalWorkspace, logout } from '../services/bioimpedanceApi';
 import { registerOperationalServiceWorker } from '../pwa/services/registerServiceWorker';
+import { clearOperationalCaches } from '../security/browserSession';
 
 export default function OperationalAppPage() {
 	const [workspace, setWorkspace] = useState(null);
@@ -39,8 +40,12 @@ export default function OperationalAppPage() {
 	}, []);
 
 	async function handleLogout() {
-		await logout();
-		window.location.assign('/login');
+		try {
+			await logout();
+		} finally {
+			await clearOperationalCaches().catch(() => {});
+			window.location.assign('/login');
+		}
 	}
 
 	function handleClientCreated(client) {

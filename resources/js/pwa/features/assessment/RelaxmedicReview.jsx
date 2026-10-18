@@ -8,7 +8,7 @@ function fieldError(errors, field) {
 	return Array.isArray(value) ? value[0] : value;
 }
 
-export default function RelaxmedicReview({ previewUrl, form, extraction, confirmed, errors, saving, onUpdate, onConfirm, onSubmit, onRestart }) {
+export default function RelaxmedicReview({ previewUrl, form, extraction, confirmed, errors, saving, online, onUpdate, onConfirm, onSubmit, onRestart }) {
 	const [panel, setPanel] = useState('image');
 	const flaggedFields = useMemo(() => new Set([
 		...(extraction?.missing_fields ?? []),
@@ -80,7 +80,7 @@ export default function RelaxmedicReview({ previewUrl, form, extraction, confirm
 				</label>
 			</div>
 			{generalError ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{generalError}</p> : null}
-			<button type="submit" disabled={!confirmed || saving} className="mt-4 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'Criando avaliação...' : 'Confirmar e criar avaliação'}</button>
+			<button type="submit" disabled={!confirmed || saving || !online} className="mt-4 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'Criando avaliação...' : 'Confirmar e criar avaliação'}</button>
 		</form>
 	);
 }

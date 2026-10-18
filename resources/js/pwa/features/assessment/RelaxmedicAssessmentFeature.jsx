@@ -4,6 +4,7 @@ import { assessmentAccess } from '../clients/clientAccess';
 import RelaxmedicImagePicker, { validateRelaxmedicImage } from './RelaxmedicImagePicker';
 import RelaxmedicReview from './RelaxmedicReview';
 import { assessmentFromExtraction, emptyRelaxmedicAssessment, maskRelaxmedicValue, relaxmedicAssessmentPayload } from './relaxmedicAssessmentForm';
+import useOnlineStatus from '../../hooks/useOnlineStatus';
 
 export default function RelaxmedicAssessmentFeature({ client, currentUser, scaleModel, onBackToClients, onCreated, onOpenAssistant }) {
 	const previewReference = useRef('');
@@ -20,6 +21,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 	const [errors, setErrors] = useState({});
 	const [createdAssessment, setCreatedAssessment] = useState(null);
 	const [pickerVersion, setPickerVersion] = useState(0);
+	const isOnline = useOnlineStatus();
 
 	useEffect(() => () => {
 		if (previewReference.current) URL.revokeObjectURL(previewReference.current);
@@ -67,7 +69,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 	}
 
 	async function processImage() {
-		if (!imageFile || processing) return;
+		if (!imageFile || processing || !isOnline) return;
 		setProcessing(true);
 		setImageError('');
 		setGeneralError('');
@@ -97,7 +99,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 
 	async function submit(event) {
 		event.preventDefault();
-		if (!client || !extraction || !confirmed || saving) return;
+		if (!client || !extraction || !confirmed || saving || !isOnline) return;
 		setSaving(true);
 		setGeneralError('');
 		setErrors({});
@@ -150,14 +152,15 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 				<h2 className="mt-2 text-lg font-bold">{client.full_name}</h2>
 				<p className="mt-1 text-sm text-slate-300">A avaliação só será criada depois do processamento e da sua confirmação.</p>
 			</section>
+			{!isOnline ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">Sem conexão. O processamento e a criação ficam bloqueados para evitar envios incompletos ou duplicados.</p> : null}
 
 			{!extraction ? (
 				<>
-					<RelaxmedicImagePicker key={pickerVersion} previewUrl={previewUrl} fileName={imageName} disabled={processing} error={imageError} onSelect={selectImage} />
-					{previewUrl ? <button type="button" disabled={!imageFile || processing} onClick={processImage} className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{processing ? 'Processando imagem...' : imageFile ? 'Enviar e processar imagem' : 'Selecione novamente para tentar'}</button> : null}
+					<RelaxmedicImagePicker key={pickerVersion} previewUrl={previewUrl} fileName={imageName} disabled={processing || !isOnline} error={imageError} onSelect={selectImage} />
+					{previewUrl ? <button type="button" disabled={!imageFile || processing || !isOnline} onClick={processImage} className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{processing ? 'Processando imagem...' : imageFile ? 'Enviar e processar imagem' : 'Selecione novamente para tentar'}</button> : null}
 				</>
 			) : (
-				<RelaxmedicReview previewUrl={previewUrl} form={form} extraction={extraction} confirmed={confirmed} errors={errors} saving={saving} onUpdate={update} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />
+				<RelaxmedicReview previewUrl={previewUrl} form={form} extraction={extraction} confirmed={confirmed} errors={errors} saving={saving} online={isOnline} onUpdate={update} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />
 			)}
 			{generalError ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{generalError}</p> : null}
 		</div>

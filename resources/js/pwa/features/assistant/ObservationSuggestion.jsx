@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function ObservationSuggestion({ assistant, draft, saving, error, onDraftChange, onApprove, onDiscard }) {
+export default function ObservationSuggestion({ assistant, draft, saving, online, error, onDraftChange, onApprove, onDiscard }) {
 	const generated = assistant.status === 'generated' && assistant.validation_status === 'passed';
 
 	return (
@@ -48,7 +48,7 @@ export default function ObservationSuggestion({ assistant, draft, saving, error,
 
 			<div className="mt-5 grid gap-3 sm:grid-cols-2">
 				<button type="button" onClick={onDiscard} disabled={saving} className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 disabled:opacity-50">Descartar</button>
-				{generated ? <button type="button" onClick={onApprove} disabled={saving || draft.trim().length < 20} className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'Adicionando...' : 'Aprovar e adicionar'}</button> : null}
+				{generated ? <button type="button" onClick={onApprove} disabled={saving || !online || draft.trim().length < 20} className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'Adicionando...' : 'Aprovar e adicionar'}</button> : null}
 			</div>
 		</section>
 	);

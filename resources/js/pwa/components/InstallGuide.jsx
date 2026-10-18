@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-const DISMISSED_KEY = 'ricosty:pwa-install-guide-dismissed';
+const DISMISSED_KEY = 'ricosty:pwa-install-guide-security-v2-dismissed';
 
 function wasDismissed() {
 	try {
@@ -22,6 +22,7 @@ export default function InstallGuide() {
 	const [installPrompt, setInstallPrompt] = useState(null);
 	const [installed, setInstalled] = useState(isStandalone);
 	const [dismissed, setDismissed] = useState(wasDismissed);
+	const [personalDeviceConfirmed, setPersonalDeviceConfirmed] = useState(false);
 
 	useEffect(() => {
 		const handleBeforeInstall = (event) => {
@@ -43,7 +44,7 @@ export default function InstallGuide() {
 	}, []);
 
 	async function requestInstall() {
-		if (!installPrompt) return;
+		if (!installPrompt || !personalDeviceConfirmed) return;
 
 		await installPrompt.prompt();
 		const choice = await installPrompt.userChoice;
@@ -73,8 +74,17 @@ export default function InstallGuide() {
 				</div>
 				<button type="button" onClick={dismiss} aria-label="Fechar orientação de instalação" className="rounded-lg px-2 py-1 text-lg leading-none text-slate-500">×</button>
 			</div>
+			<div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
+				<strong>Atenção:</strong> não instale a PWA em celular compartilhado. A instalação mantém acesso rápido à tela de login e pode expor a sessão se você permanecer conectado.
+			</div>
+			<label className="mt-3 flex items-start gap-2 text-xs font-semibold leading-5 text-slate-700">
+				<input type="checkbox" checked={personalDeviceConfirmed} onChange={(event) => setPersonalDeviceConfirmed(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-rose-300 text-[#b96f7d]" />
+				<span>Confirmo que este é um aparelho pessoal e protegido por senha ou biometria.</span>
+			</label>
 
-			{installPrompt ? (
+			{!personalDeviceConfirmed ? (
+				<p className="mt-3 text-xs font-semibold text-amber-800">Confirme que o aparelho é pessoal para visualizar as instruções de instalação.</p>
+			) : installPrompt ? (
 				<>
 					<p className="mt-2 leading-5">Instale a área operacional na tela inicial para abrir em modo aplicativo.</p>
 					<button type="button" onClick={requestInstall} className="mt-3 rounded-xl bg-[#b96f7d] px-4 py-2 font-bold text-white">Instalar agora</button>

@@ -68,6 +68,10 @@ export async function logout() {
 }
 
 export function apiErrorMessage(error, fallback = 'Não foi possível concluir a operação.') {
+	if (error?.response?.status === 429) return 'Limite de tentativas atingido. Aguarde um minuto antes de tentar novamente.';
+	if (typeof navigator !== 'undefined' && !navigator.onLine) return 'A conexão caiu. Nenhum novo envio será feito até a internet voltar.';
+	if (!error?.response) return 'Não foi possível confirmar a resposta do servidor. Verifique a conexão e o histórico antes de repetir a operação.';
+
 	return error?.response?.data?.message ?? fallback;
 }
 

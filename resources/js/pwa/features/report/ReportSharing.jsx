@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { formatDate } from '../../../shared/formatters';
 import { apiErrorMessage, createAssessmentShare, revokeAssessmentShare } from '../../../services/bioimpedanceApi';
+import useOnlineStatus from '../../hooks/useOnlineStatus';
 
 export default function ReportSharing({ assessment, canCreate, canRevoke, onAssessmentUpdated }) {
 	const [expiresInDays, setExpiresInDays] = useState('7');
@@ -9,9 +10,10 @@ export default function ReportSharing({ assessment, canCreate, canRevoke, onAsse
 	const [shareResult, setShareResult] = useState(null);
 	const [feedback, setFeedback] = useState('');
 	const [error, setError] = useState('');
+	const isOnline = useOnlineStatus();
 
 	async function createLink() {
-		if (!canCreate || creating) return;
+		if (!canCreate || creating || !isOnline) return;
 		setCreating(true);
 		setError('');
 		setFeedback('');
@@ -59,7 +61,7 @@ export default function ReportSharing({ assessment, canCreate, canRevoke, onAsse
 	}
 
 	async function revoke(share) {
-		if (!canRevoke || !share.is_active || revokingId) return;
+		if (!canRevoke || !share.is_active || revokingId || !isOnline) return;
 		setRevokingId(share.id);
 		setError('');
 
@@ -82,9 +84,10 @@ export default function ReportSharing({ assessment, canCreate, canRevoke, onAsse
 			</div>
 
 			<h2 className="mt-5 text-lg font-bold text-slate-950">Compartilhamento temporário</h2>
+			{!isOnline ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-700">Sem conexão. Novos links e revogações ficam bloqueados até a internet voltar.</p> : null}
 			<div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
-				<label className="text-sm font-semibold text-slate-700">Validade do link<select value={expiresInDays} onChange={(event) => setExpiresInDays(event.target.value)} disabled={!canCreate || creating} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-3"><option value="1">1 dia</option><option value="3">3 dias</option><option value="7">7 dias</option><option value="15">15 dias</option><option value="30">30 dias</option></select></label>
-				<button type="button" onClick={createLink} disabled={!canCreate || creating} className="self-end rounded-xl bg-sky-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{creating ? 'Criando...' : 'Criar link temporário'}</button>
+				<label className="text-sm font-semibold text-slate-700">Validade do link<select value={expiresInDays} onChange={(event) => setExpiresInDays(event.target.value)} disabled={!canCreate || creating || !isOnline} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-3"><option value="1">1 dia</option><option value="3">3 dias</option><option value="7">7 dias</option><option value="15">15 dias</option><option value="30">30 dias</option></select></label>
+				<button type="button" onClick={createLink} disabled={!canCreate || creating || !isOnline} className="self-end rounded-xl bg-sky-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{creating ? 'Criando...' : 'Criar link temporário'}</button>
 			</div>
 			{!canCreate ? <p className="mt-2 text-xs font-semibold text-amber-700">Seu perfil não pode criar links de compartilhamento.</p> : null}
 
@@ -92,7 +95,7 @@ export default function ReportSharing({ assessment, canCreate, canRevoke, onAsse
 			{feedback ? <p role="status" className="mt-3 text-sm font-semibold text-emerald-700">{feedback}</p> : null}
 			{error ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
 
-			{assessment.shares?.length ? <div className="mt-5"><h3 className="text-sm font-bold text-slate-900">Links criados</h3><div className="mt-2 space-y-2">{assessment.shares.map((share) => <div key={share.id} className="rounded-xl border border-slate-200 p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold text-slate-700">Expira em {formatDate(share.expires_at)}</p><p className="mt-1 text-xs text-slate-500">{share.is_active ? 'Ativo' : 'Revogado ou expirado'} · {share.view_count} visualização(ões)</p></div>{share.is_active && canRevoke ? <button type="button" onClick={() => revoke(share)} disabled={revokingId === share.id} className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 disabled:opacity-50">{revokingId === share.id ? 'Revogando...' : 'Revogar'}</button> : null}</div></div>)}</div></div> : null}
+			{assessment.shares?.length ? <div className="mt-5"><h3 className="text-sm font-bold text-slate-900">Links criados</h3><div className="mt-2 space-y-2">{assessment.shares.map((share) => <div key={share.id} className="rounded-xl border border-slate-200 p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold text-slate-700">Expira em {formatDate(share.expires_at)}</p><p className="mt-1 text-xs text-slate-500">{share.is_active ? 'Ativo' : 'Revogado ou expirado'} · {share.view_count} visualização(ões)</p></div>{share.is_active && canRevoke ? <button type="button" onClick={() => revoke(share)} disabled={revokingId === share.id || !isOnline} className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 disabled:opacity-50">{revokingId === share.id ? 'Revogando...' : 'Revogar'}</button> : null}</div></div>)}</div></div> : null}
 		</section>
 	);
 }

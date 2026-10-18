@@ -30,6 +30,14 @@ self.addEventListener('activate', (event) => {
     );
 });
 
+self.addEventListener('message', (event) => {
+    if (event.data?.type !== 'CLEAR_OPERATIONAL_CACHES') return;
+
+    event.waitUntil(
+        caches.keys().then((keys) => Promise.all(keys.filter((key) => key.startsWith('ricosty-pwa-')).map((key) => caches.delete(key)))),
+    );
+});
+
 self.addEventListener('fetch', (event) => {
     const { request } = event;
     if (request.method !== 'GET') return;

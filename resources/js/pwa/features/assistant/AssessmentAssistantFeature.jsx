@@ -5,6 +5,7 @@ import { canUseClinicalFeatures } from '../clients/clientAccess';
 import AssistantProgress from './AssistantProgress';
 import ObservationSuggestion from './ObservationSuggestion';
 import { assistantProcessingSteps } from './assistantSteps';
+import useOnlineStatus from '../../hooks/useOnlineStatus';
 
 export default function AssessmentAssistantFeature({ client, assessment, currentUser, onBackToClients, onApproved, onOpenReport }) {
 	const [assistant, setAssistant] = useState(null);
@@ -14,6 +15,7 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 	const [processingStep, setProcessingStep] = useState(0);
 	const [error, setError] = useState('');
 	const [approved, setApproved] = useState(false);
+	const isOnline = useOnlineStatus();
 
 	useEffect(() => {
 		if (!generating) return undefined;
@@ -26,7 +28,7 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 	}, [generating]);
 
 	async function generate() {
-		if (!assessment || assessment.is_canceled || generating) return;
+		if (!assessment || assessment.is_canceled || generating || !isOnline) return;
 		setGenerating(true);
 		setProcessingStep(0);
 		setAssistant(null);
@@ -46,7 +48,7 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 	}
 
 	async function approve() {
-		if (!assistant || draft.trim().length < 20 || saving) return;
+		if (!assistant || draft.trim().length < 20 || saving || !isOnline) return;
 		setSaving(true);
 		setError('');
 
@@ -94,6 +96,7 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 				<h2 className="mt-2 text-lg font-bold">{client.full_name}</h2>
 				<p className="mt-1 text-sm text-slate-300">{formatDate(assessment.evaluated_at)} · {assessment.device_model} · {numberBr(assessment.weight_kg, 1)} kg</p>
 			</section>
+			{!isOnline ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">Sem conexão. A geração e a aprovação permanecem bloqueadas até a reconexão.</p> : null}
 
 			{approved ? (
 				<section className="rounded-2xl border border-emerald-200 bg-white p-5 text-center shadow-sm">
@@ -105,14 +108,14 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 			) : generating ? (
 				<AssistantProgress currentStep={processingStep} />
 			) : assistant ? (
-				<ObservationSuggestion assistant={assistant} draft={draft} saving={saving} error={error} onDraftChange={setDraft} onApprove={approve} onDiscard={discard} />
+				<ObservationSuggestion assistant={assistant} draft={draft} saving={saving} online={isOnline} error={error} onDraftChange={setDraft} onApprove={approve} onDiscard={discard} />
 			) : (
 				<section className="rounded-2xl border border-violet-200 bg-white p-5 shadow-sm">
 					<h2 className="text-lg font-bold text-slate-950">Gerar observação assistida</h2>
 					<p className="mt-2 text-sm leading-6 text-slate-600">O assistente consulta dados da avaliação e fontes aprovadas. Nada será adicionado sem sua revisão e aprovação.</p>
 					{assessment.notes ? <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-600"><strong className="text-slate-800">Observação atual:</strong><p className="mt-1 leading-6">{assessment.notes}</p></div> : null}
 					{error ? <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p> : null}
-					<button type="button" onClick={generate} className="mt-5 w-full rounded-xl bg-violet-600 px-4 py-3 text-sm font-bold text-white">Gerar observação</button>
+					<button type="button" onClick={generate} disabled={!isOnline} className="mt-5 w-full rounded-xl bg-violet-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">Gerar observação</button>
 				</section>
 			)}
 		</div>
