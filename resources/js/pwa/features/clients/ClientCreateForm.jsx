@@ -5,6 +5,7 @@ import { localDatetimeNow } from '../../../shared/formatters';
 import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import useActionLock from '../../../hooks/useActionLock';
+import ContactImportButton from './ContactImportButton';
 
 const emptyForm = {
 	full_name: '',
@@ -48,6 +49,17 @@ export default function ClientCreateForm({ onCancel, onCreated }) {
 		setErrors((current) => ({ ...current, [field]: undefined }));
 	}
 
+	function importContact(contact) {
+		setForm((current) => ({
+			...current,
+			full_name: contact.full_name || current.full_name,
+			phone: contact.phone ? phoneMask(contact.phone) : current.phone,
+			email: contact.email || current.email,
+		}));
+		setErrors((current) => ({ ...current, full_name: undefined, phone: undefined, email: undefined }));
+		setMessage('');
+	}
+
 	async function submit(event) {
 		event.preventDefault();
 		return runAction('create-client', async () => {
@@ -80,6 +92,7 @@ export default function ClientCreateForm({ onCancel, onCreated }) {
 				<p className="text-xs font-bold uppercase tracking-[0.14em] text-ricosty-600">Cadastro simplificado</p>
 				<h2 id="new-client-title" className="mt-1 text-xl font-extrabold text-ricosty-ink">Novo cliente</h2>
 				<p className="mt-2 text-sm leading-5 text-slate-500">Informe os dados essenciais para iniciar o acompanhamento.</p>
+				<div className="mt-4"><ContactImportButton onImport={importContact} /></div>
 
 				<form onSubmit={submit} className="mt-5 space-y-4">
 					<label className="block text-sm font-semibold text-slate-700">
