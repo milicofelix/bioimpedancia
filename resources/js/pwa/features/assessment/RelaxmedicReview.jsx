@@ -47,14 +47,14 @@ export default function RelaxmedicReview({ previewUrl, form, extraction, confirm
 
 			<p className="mt-2 text-sm leading-6 text-slate-600">Confira os campos sinalizados e corrija qualquer valor antes de salvar.</p>
 			{warnings.length ? (
-				<details className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm text-amber-900">
-					<summary className="flex cursor-pointer list-none items-center gap-2 font-bold"><PwaIcon name="alertTriangle" size={17} />{warnings.length} {warnings.length === 1 ? 'ponto precisa' : 'pontos precisam'} de atenção</summary>
+				<details className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-2 text-sm text-amber-950">
+					<summary className="pwa-focus flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-lg py-1 font-bold"><PwaIcon name="alertTriangle" size={17} />{warnings.length} {warnings.length === 1 ? 'ponto precisa' : 'pontos precisam'} de atenção</summary>
 					<ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5">{warnings.map((warning, index) => <li key={`${warning}-${index}`}>{warning}</li>)}</ul>
 				</details>
 			) : null}
 			<div className="mt-4 grid grid-cols-2 gap-2 lg:hidden" role="tablist" aria-label="Conferência do relatório">
-				<button type="button" role="tab" aria-selected={panel === 'image'} onClick={() => setPanel('image')} className={`pwa-focus flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold ${panel === 'image' ? 'bg-ricosty-700 text-white' : 'bg-ricosty-50 text-ricosty-700'}`}><PwaIcon name="image" size={16} />Imagem</button>
-				<button type="button" role="tab" aria-selected={panel === 'values'} onClick={() => setPanel('values')} className={`pwa-focus flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold ${panel === 'values' ? 'bg-ricosty-700 text-white' : 'bg-ricosty-50 text-ricosty-700'}`}><PwaIcon name="clipboard" size={16} />Valores extraídos</button>
+				<button type="button" role="tab" aria-selected={panel === 'image'} onClick={() => setPanel('image')} className={`pwa-focus flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold ${panel === 'image' ? 'bg-ricosty-700 text-white' : 'bg-ricosty-50 text-ricosty-800'}`}><PwaIcon name="image" size={16} />Imagem</button>
+				<button type="button" role="tab" aria-selected={panel === 'values'} onClick={() => setPanel('values')} className={`pwa-focus flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold ${panel === 'values' ? 'bg-ricosty-700 text-white' : 'bg-ricosty-50 text-ricosty-800'}`}><PwaIcon name="clipboard" size={16} />Valores extraídos</button>
 			</div>
 
 			<div className="mt-4 lg:grid lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-5">

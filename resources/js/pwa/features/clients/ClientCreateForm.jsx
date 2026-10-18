@@ -84,7 +84,7 @@ export default function ClientCreateForm({ onCancel, onCreated }) {
 						<FieldError errors={errors} field="full_name" />
 					</label>
 
-					<div className="grid grid-cols-2 gap-3">
+					<div className="grid gap-3 sm:grid-cols-2">
 						<label className="block text-sm font-semibold text-slate-700">
 							Nascimento
 							<input type="date" max={localDatetimeNow().slice(0, 10)} value={form.birth_date} onChange={(event) => update('birth_date', event.target.value)} className={fieldClass(errors.birth_date)} />

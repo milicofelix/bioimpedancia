@@ -33,7 +33,7 @@ class BioimpedanceReportSharePresenter
         $url = $plainToken ? route('bioimpedance.public-report', $plainToken) : '[link temporário enviado somente no momento da geração]';
 
         return sprintf(
-            'Olá, %s! Sua avaliação de bioimpedância realizada em %s está disponível. Acesse o relatório pelo link: %s',
+            'Olá, %s! Sua avaliação de bioimpedância realizada em %s está disponível em PDF. Acesse o relatório pelo link: %s',
             $assessment->client->full_name,
             $assessment->evaluated_at->format('d/m/Y'),
             $url

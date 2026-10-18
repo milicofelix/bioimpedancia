@@ -52,8 +52,8 @@ export default function PwaConfirmSheet({ open, title, description, detail, icon
 				<div className={`mt-3 flex h-12 w-12 items-center justify-center rounded-2xl ${tones[tone] ?? tones.warning}`}><PwaIcon name={icon} /></div>
 				<h2 id={titleId} className="mt-4 text-lg font-bold text-slate-950">{title}</h2>
 				<p id={descriptionId} className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
-				{detail ? <div className="mt-4 rounded-xl bg-ricosty-50 p-3 text-xs text-ricosty-900">{detail}</div> : null}
-				<div className="mt-5 grid grid-cols-2 gap-3">
+				{detail ? <div className="mt-4 rounded-xl bg-ricosty-50 p-3 text-sm text-ricosty-950">{detail}</div> : null}
+				<div className="mt-5 grid gap-3 sm:grid-cols-2">
 					<PwaButton ref={cancelReference} type="button" variant="secondary" onClick={onCancel}>Cancelar</PwaButton>
 					<PwaButton type="button" variant={confirmVariant} icon={confirmIcon} onClick={onConfirm}>{confirmLabel}</PwaButton>
 				</div>

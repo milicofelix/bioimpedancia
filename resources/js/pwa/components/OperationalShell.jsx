@@ -32,17 +32,17 @@ export default function OperationalShell({ activeSection, clinic, currentUser, o
 							<img src={clinic?.logo_url ?? '/images/brand/ricosty-logo.png'} alt={clinic?.display_name ?? 'Ricosty'} className="max-h-9 w-full object-contain" />
 						</div>
 						<div className="min-w-0">
-							<p className="truncate text-sm font-bold text-ricosty-950">{clinic?.display_name ?? 'Ricosty'}</p>
-							<p className="truncate text-[11px] font-medium text-slate-500">Atendimento operacional</p>
+							<p className="break-words text-sm font-bold leading-tight text-ricosty-950">{clinic?.display_name ?? 'Ricosty'}</p>
+							<p className="break-words text-[11px] font-medium leading-tight text-slate-600">Atendimento operacional</p>
 						</div>
 					</div>
 					<div className="flex items-center gap-1.5">
-						<span role="status" aria-live="polite" title={isOnline ? 'Conectado' : 'Sem conexão'} className={`pwa-status-enter flex h-9 items-center gap-1.5 rounded-full px-2.5 text-[10px] font-bold ${isOnline ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100' : 'bg-rose-50 text-rose-700 ring-1 ring-rose-100'}`}>
+						<span role="status" aria-live="polite" title={isOnline ? 'Conectado' : 'Sem conexão'} className={`pwa-status-enter flex min-h-11 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-bold ${isOnline ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200' : 'bg-rose-50 text-rose-800 ring-1 ring-rose-200'}`}>
 							<PwaIcon name={isOnline ? 'wifi' : 'wifiOff'} size={15} />
 							<span className="hidden sm:inline">{isOnline ? 'Online' : 'Offline'}</span>
 						</span>
-						<a href="/dashboard" aria-label="Abrir painel completo" title="Painel completo" className="pwa-focus flex h-10 w-10 items-center justify-center rounded-full border border-ricosty-200 bg-white text-ricosty-700 transition hover:bg-ricosty-50"><PwaIcon name="grid" size={18} /></a>
-						<button type="button" onClick={onLogout} aria-label="Sair da conta" title="Sair" className="pwa-focus flex h-10 w-10 items-center justify-center rounded-full border border-ricosty-200 bg-white text-ricosty-700 transition hover:bg-ricosty-50"><PwaIcon name="logOut" size={18} /></button>
+						<a href="/dashboard" aria-label="Abrir painel completo" title="Painel completo" className="pwa-focus flex h-11 w-11 items-center justify-center rounded-full border border-ricosty-200 bg-white text-ricosty-700 transition hover:bg-ricosty-50"><PwaIcon name="grid" size={18} /></a>
+						<button type="button" onClick={onLogout} aria-label="Sair da conta" title="Sair" className="pwa-focus flex h-11 w-11 items-center justify-center rounded-full border border-ricosty-200 bg-white text-ricosty-700 transition hover:bg-ricosty-50"><PwaIcon name="logOut" size={18} /></button>
 					</div>
 				</div>
 			</header>
@@ -57,7 +57,7 @@ export default function OperationalShell({ activeSection, clinic, currentUser, o
 						<div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/25 bg-white/15 text-lg font-black shadow-inner backdrop-blur">{userInitial(currentUser?.name)}</div>
 						<div className="min-w-0">
 							<p className="text-[11px] font-bold uppercase tracking-[0.2em] text-ricosty-100">Sua melhor versão, em cada detalhe</p>
-							<h1 className="mt-1 truncate text-xl font-bold">Olá, {currentUser?.name ?? 'profissional'}</h1>
+							<h1 className="mt-1 break-words text-xl font-bold">Olá, {currentUser?.name ?? 'profissional'}</h1>
 							<p className="mt-1 text-sm text-ricosty-100">Tudo que você precisa para conduzir o atendimento.</p>
 						</div>
 					</div>
@@ -71,7 +71,7 @@ export default function OperationalShell({ activeSection, clinic, currentUser, o
 				<div className="mx-auto grid max-w-xl grid-cols-4 gap-1 rounded-[1.35rem] border border-ricosty-200/80 bg-white/95 p-1.5 shadow-[0_14px_40px_rgba(97,38,55,0.16)] backdrop-blur-xl">
 					{navigation.map((item) => {
 						const active = item.section === activeSection;
-						return <button type="button" key={item.section} onClick={() => onNavigate(item.section)} aria-current={active ? 'page' : undefined} aria-label={`${item.label}${active ? ', seção atual' : ''}`} className={`pwa-focus pwa-pressable relative flex min-h-14 touch-manipulation flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[10px] font-bold transition ${active ? 'bg-ricosty-50 text-ricosty-700' : 'text-slate-500 hover:bg-ricosty-50/60 hover:text-ricosty-700'}`}><span className={`flex h-7 w-7 items-center justify-center rounded-xl transition ${active ? 'bg-gradient-to-br from-ricosty-500 to-ricosty-700 text-white shadow-md shadow-ricosty-200' : 'text-slate-500'}`}><PwaIcon name={item.icon} size={18} /></span><span>{item.label}</span>{active ? <span aria-hidden="true" className="absolute -bottom-0.5 h-1 w-5 rounded-full bg-ricosty-500" /> : null}</button>;
+						return <button type="button" key={item.section} onClick={() => onNavigate(item.section)} aria-current={active ? 'page' : undefined} aria-label={`${item.label}${active ? ', seção atual' : ''}`} className={`pwa-focus pwa-pressable relative flex min-h-14 touch-manipulation flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[11px] font-bold transition ${active ? 'bg-ricosty-50 text-ricosty-800' : 'text-slate-600 hover:bg-ricosty-50/60 hover:text-ricosty-800'}`}><span className={`flex h-7 w-7 items-center justify-center rounded-xl transition ${active ? 'bg-gradient-to-br from-ricosty-500 to-ricosty-700 text-white shadow-md shadow-ricosty-200' : 'text-slate-600'}`}><PwaIcon name={item.icon} size={18} /></span><span>{item.label}</span>{active ? <span aria-hidden="true" className="absolute -bottom-0.5 h-1 w-5 rounded-full bg-ricosty-500" /> : null}</button>;
 					})}
 				</div>
 			</nav>

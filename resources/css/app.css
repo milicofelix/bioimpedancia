@@ -31,6 +31,8 @@
 html,
 body {
     min-height: 100%;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 }
 
 body {
@@ -42,6 +44,11 @@ body {
 
 #app {
     min-height: 100vh;
+}
+
+:where(a, button, input, select, textarea, summary):focus-visible {
+    outline: 3px solid #8e3049;
+    outline-offset: 2px;
 }
 
 @layer components {
@@ -109,7 +116,9 @@ body {
     }
 
     .pwa-focus:focus-visible {
-        box-shadow: 0 0 0 3px rgb(238 179 191 / 70%);
+        outline: 3px solid #8e3049;
+        outline-offset: 2px;
+        box-shadow: 0 0 0 5px rgb(255 255 255 / 90%);
     }
 
     .pwa-safe-top {
@@ -141,6 +150,12 @@ body {
         background: linear-gradient(90deg, transparent, rgb(255 255 255 / 65%), transparent);
         transform: translateX(-100%);
         animation: pwa-shimmer 1.35s infinite;
+    }
+}
+
+@media (forced-colors: active) {
+    .pwa-focus:focus-visible {
+        outline: 3px solid Highlight;
     }
 }
 

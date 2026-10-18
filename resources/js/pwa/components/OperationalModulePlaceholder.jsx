@@ -1,4 +1,5 @@
 import React from 'react';
+import PwaButton from './ui/PwaButton';
 
 const content = {
 	avaliacao: {
@@ -25,7 +26,7 @@ export default function OperationalModulePlaceholder({ section, selectedClient, 
 			<p className="mt-2 text-sm leading-6 text-slate-600">{module.description}</p>
 			{selectedClient ? <p className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">Cliente selecionado: {selectedClient.full_name}</p> : null}
 			{selectedAssessment ? <p className="mt-2 text-xs font-semibold text-slate-500">Avaliação #{selectedAssessment.id} pronta para a próxima etapa.</p> : null}
-			<button type="button" onClick={onBackToClients} className="mt-5 rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">Voltar para clientes</button>
+			<PwaButton type="button" onClick={onBackToClients} icon="arrowLeft" className="mt-5">Voltar para clientes</PwaButton>
 		</section>
 	);
 }

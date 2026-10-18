@@ -24,9 +24,10 @@ export default function AssistantProgress({ currentStep }) {
 					const done = index < currentStep;
 					const active = index === currentStep;
 					return (
-						<li key={step.title} className={`flex items-center gap-2 rounded-xl px-2 py-2 text-xs font-semibold transition sm:flex-col sm:text-center ${done ? 'bg-emerald-50 text-emerald-700' : active ? 'bg-violet-100 text-violet-800 ring-1 ring-violet-200' : 'text-slate-400'}`}>
+						<li key={step.title} className={`flex items-center gap-2 rounded-xl px-2 py-2 text-xs font-semibold transition sm:flex-col sm:text-center ${done ? 'bg-emerald-50 text-emerald-800' : active ? 'bg-violet-100 text-violet-900 ring-1 ring-violet-300' : 'text-slate-600'}`}>
 							<span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${done ? 'bg-emerald-100' : active ? 'bg-white shadow-sm' : 'bg-slate-100'}`}>{done ? <PwaIcon name="check" size={13} /> : <PwaIcon name={step.icon} size={13} />}</span>
 							<span className="sm:text-[10px]">{step.title}</span>
+							<span className="sr-only">{done ? 'Concluída' : active ? 'Em andamento' : 'Aguardando'}</span>
 						</li>
 					);
 				})}

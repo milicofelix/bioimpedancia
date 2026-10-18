@@ -22,7 +22,7 @@ export default function RelaxmedicOcrProgress({ previewUrl }) {
 					<span className="pwa-skeleton block h-4 w-2/3 rounded" />
 				</div>
 			</div>
-			<div className="mt-5 flex items-center gap-2 rounded-xl bg-ricosty-50 px-3 py-2 text-xs font-semibold text-ricosty-800"><span className="h-2 w-2 animate-pulse rounded-full bg-ricosty-500" />Não feche esta tela durante a leitura.</div>
+			<div className="mt-5 flex items-center gap-2 rounded-xl bg-ricosty-50 px-3 py-2 text-xs font-semibold text-ricosty-900"><span className="h-2 w-2 animate-pulse rounded-full bg-ricosty-500" aria-hidden="true" />Processamento em andamento. Não feche esta tela durante a leitura.</div>
 		</section>
 	);
 }

@@ -26,7 +26,7 @@ export default function PwaToast({ message, tone = 'info', duration = 4000, onDi
 			<div role={tone === 'error' ? 'alert' : 'status'} aria-live={tone === 'error' ? 'assertive' : 'polite'} className={`pwa-status-enter pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl border px-4 py-3 shadow-2xl ${style.classes}`}>
 				<span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/15"><PwaIcon name={style.icon} size={16} /></span>
 				<p className="min-w-0 flex-1 text-sm font-semibold leading-6">{message}</p>
-				<button type="button" onClick={onDismiss} aria-label="Fechar mensagem" className="pwa-focus flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xl text-white/80 hover:bg-white/10">×</button>
+				<button type="button" onClick={onDismiss} aria-label="Fechar mensagem" className="pwa-focus flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-xl text-white hover:bg-white/10">×</button>
 			</div>
 		</div>,
 		document.body,

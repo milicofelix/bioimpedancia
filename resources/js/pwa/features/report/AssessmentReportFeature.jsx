@@ -4,6 +4,7 @@ import ReportSharing from './ReportSharing';
 import ResponsiveAssessmentReport from './ResponsiveAssessmentReport';
 import { previousAssessment } from './reportMetrics';
 import PwaCard from '../../components/ui/PwaCard';
+import PwaButton from '../../components/ui/PwaButton';
 
 export default function AssessmentReportFeature({ client, assessment, currentUser, onBackToClients, onAssessmentUpdated }) {
 	if (!client || !assessment) {
@@ -12,7 +13,7 @@ export default function AssessmentReportFeature({ client, assessment, currentUse
 				<p className="text-xs font-bold uppercase tracking-wide text-amber-700">Relatório</p>
 				<h2 className="mt-2 text-xl font-bold text-slate-950">Selecione uma avaliação</h2>
 				<p className="mt-2 text-sm leading-6 text-slate-600">Abra o histórico de um cliente e escolha o relatório que deseja visualizar.</p>
-				<button type="button" onClick={onBackToClients} className="mt-5 rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">Ir para clientes</button>
+				<PwaButton type="button" onClick={onBackToClients} icon="arrowLeft" className="mt-5">Ir para clientes</PwaButton>
 			</section>
 		);
 	}
