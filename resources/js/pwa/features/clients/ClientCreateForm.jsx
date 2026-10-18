@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { createBioimpedanceClient, apiErrorMessage, apiValidationErrors } from '../../../services/bioimpedanceApi';
 import { cpfMask, heightMask, phoneMask } from '../../../shared/inputMasks';
 import { localDatetimeNow } from '../../../shared/formatters';
+import PwaButton from '../../components/ui/PwaButton';
+import PwaCard from '../../components/ui/PwaCard';
 
 const emptyForm = {
 	full_name: '',
@@ -22,7 +24,7 @@ function FieldError({ errors, field }) {
 }
 
 function fieldClass(hasError) {
-	return `mt-1 min-h-12 w-full rounded-xl border bg-white px-3 text-base outline-none transition focus:ring-4 ${hasError ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-emerald-400 focus:ring-emerald-100'}`;
+	return `pwa-focus mt-1 min-h-12 w-full rounded-xl border bg-white px-3 text-base outline-none transition ${hasError ? 'border-rose-300' : 'border-ricosty-100 focus:border-ricosty-400'}`;
 }
 
 export default function ClientCreateForm({ onCancel, onCreated }) {
@@ -69,10 +71,10 @@ export default function ClientCreateForm({ onCancel, onCreated }) {
 
 	return (
 		<section aria-labelledby="new-client-title">
-			<button type="button" onClick={onCancel} className="text-sm font-bold text-emerald-700">← Voltar para clientes</button>
-			<div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-				<p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Cadastro simplificado</p>
-				<h2 id="new-client-title" className="mt-1 text-xl font-bold text-slate-950">Novo cliente</h2>
+			<PwaButton type="button" onClick={onCancel} variant="ghost" icon="arrowLeft" className="-ml-3">Voltar para clientes</PwaButton>
+			<PwaCard className="mt-3 p-5 sm:p-6">
+				<p className="text-xs font-bold uppercase tracking-[0.14em] text-ricosty-600">Cadastro simplificado</p>
+				<h2 id="new-client-title" className="mt-1 text-xl font-extrabold text-ricosty-ink">Novo cliente</h2>
 				<p className="mt-2 text-sm leading-5 text-slate-500">Informe os dados essenciais para iniciar o acompanhamento.</p>
 
 				<form onSubmit={submit} className="mt-5 space-y-4">
@@ -129,11 +131,9 @@ export default function ClientCreateForm({ onCancel, onCreated }) {
 
 					{message ? <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{message}</div> : null}
 
-					<button type="submit" disabled={saving} className="min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60">
-						{saving ? 'Cadastrando...' : 'Cadastrar cliente'}
-					</button>
+					<PwaButton type="submit" disabled={saving} icon="check" className="w-full">{saving ? 'Cadastrando...' : 'Cadastrar cliente'}</PwaButton>
 				</form>
-			</div>
+			</PwaCard>
 		</section>
 	);
 }

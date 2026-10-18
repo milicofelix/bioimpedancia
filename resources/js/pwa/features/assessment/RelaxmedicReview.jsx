@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { relaxmedicMetricLabels } from '../../../domain/bioimpedance/relaxmedic';
 import { localDatetimeNow } from '../../../shared/formatters';
 import { relaxmedicIntegerFields, relaxmedicTextFields } from './relaxmedicAssessmentForm';
+import PwaButton from '../../components/ui/PwaButton';
+import PwaIcon from '../../components/ui/PwaIcon';
 
 function fieldError(errors, field) {
 	const value = errors[field];
@@ -19,13 +21,13 @@ export default function RelaxmedicReview({ previewUrl, form, extraction, confirm
 	const warnings = (extraction?.suspicious_values ?? []).map((item) => item?.reason).filter(Boolean);
 
 	return (
-		<form onSubmit={onSubmit} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+		<form onSubmit={onSubmit} className="pwa-card p-4 sm:p-5">
 			<div className="flex items-start justify-between gap-3">
 				<div>
 					<p className="text-xs font-bold uppercase tracking-wide text-emerald-700">2. Conferência humana</p>
 					<h2 className="mt-1 text-lg font-bold text-slate-950">Compare e corrija os valores</h2>
 				</div>
-				<button type="button" onClick={onRestart} className="shrink-0 text-xs font-bold text-slate-600 underline">Trocar imagem</button>
+				<PwaButton type="button" onClick={onRestart} variant="ghost" icon="refresh" className="shrink-0 px-2 text-xs">Trocar imagem</PwaButton>
 			</div>
 
 			<p className="mt-2 text-sm leading-6 text-slate-600">Campos em amarelo não foram encontrados ou precisam de atenção. Qualquer valor pode ser corrigido antes de salvar.</p>
@@ -36,8 +38,8 @@ export default function RelaxmedicReview({ previewUrl, form, extraction, confirm
 				</div>
 			) : null}
 			<div className="mt-4 grid grid-cols-2 gap-2 lg:hidden" role="tablist" aria-label="Conferência do relatório">
-				<button type="button" role="tab" aria-selected={panel === 'image'} onClick={() => setPanel('image')} className={`rounded-xl px-3 py-2 text-sm font-bold ${panel === 'image' ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-600'}`}>Imagem</button>
-				<button type="button" role="tab" aria-selected={panel === 'values'} onClick={() => setPanel('values')} className={`rounded-xl px-3 py-2 text-sm font-bold ${panel === 'values' ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-600'}`}>Valores extraídos</button>
+				<button type="button" role="tab" aria-selected={panel === 'image'} onClick={() => setPanel('image')} className={`pwa-focus flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold ${panel === 'image' ? 'bg-ricosty-700 text-white' : 'bg-ricosty-50 text-ricosty-700'}`}><PwaIcon name="image" size={16} />Imagem</button>
+				<button type="button" role="tab" aria-selected={panel === 'values'} onClick={() => setPanel('values')} className={`pwa-focus flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold ${panel === 'values' ? 'bg-ricosty-700 text-white' : 'bg-ricosty-50 text-ricosty-700'}`}><PwaIcon name="clipboard" size={16} />Valores extraídos</button>
 			</div>
 
 			<div className="mt-4 lg:grid lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-5">
@@ -73,14 +75,14 @@ export default function RelaxmedicReview({ previewUrl, form, extraction, confirm
 				</div>
 			</div>
 
-			<div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-				<label className="flex cursor-pointer items-start gap-3 text-sm font-semibold text-emerald-950">
+			<div className="mt-5 rounded-2xl border border-ricosty-200 bg-ricosty-50 p-4">
+				<label className="flex cursor-pointer items-start gap-3 text-sm font-semibold text-ricosty-950">
 					<input type="checkbox" checked={confirmed} onChange={(event) => onConfirm(event.target.checked)} className="mt-0.5 h-5 w-5 rounded border-emerald-400 text-emerald-600 focus:ring-emerald-500" />
 					<span>Conferi a imagem e confirmo que os valores acima estão corretos.</span>
 				</label>
 			</div>
 			{generalError ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{generalError}</p> : null}
-			<button type="submit" disabled={!confirmed || saving || !online} className="mt-4 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'Criando avaliação...' : 'Confirmar e criar avaliação'}</button>
+			<PwaButton type="submit" disabled={!confirmed || saving || !online} icon="check" className="mt-4 w-full">{saving ? 'Criando avaliação...' : 'Confirmar e criar avaliação'}</PwaButton>
 		</form>
 	);
 }

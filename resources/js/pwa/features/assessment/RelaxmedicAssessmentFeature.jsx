@@ -5,6 +5,10 @@ import RelaxmedicImagePicker, { validateRelaxmedicImage } from './RelaxmedicImag
 import RelaxmedicReview from './RelaxmedicReview';
 import { assessmentFromExtraction, emptyRelaxmedicAssessment, maskRelaxmedicValue, relaxmedicAssessmentPayload } from './relaxmedicAssessmentForm';
 import useOnlineStatus from '../../hooks/useOnlineStatus';
+import PwaButton from '../../components/ui/PwaButton';
+import PwaCard from '../../components/ui/PwaCard';
+import PwaJourneyHeader from '../../components/ui/PwaJourneyHeader';
+import PwaStepIndicator from '../../components/ui/PwaStepIndicator';
 
 export default function RelaxmedicAssessmentFeature({ client, currentUser, scaleModel, onBackToClients, onCreated, onOpenAssistant }) {
 	const previewReference = useRef('');
@@ -133,31 +137,29 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 
 	if (createdAssessment) {
 		return (
-			<section className="rounded-2xl border border-emerald-200 bg-white p-6 text-center shadow-sm">
-				<div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-xl font-black text-emerald-700">✓</div>
+			<PwaCard className="p-6 text-center">
+				<PwaStepIndicator steps={['Imagem', 'Leitura', 'Conferência', 'Concluir']} current={4} />
+				<div className="mx-auto mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-ricosty-100 text-2xl font-black text-ricosty-700">✓</div>
 				<h2 className="mt-3 text-xl font-bold text-slate-950">Avaliação criada com segurança</h2>
 				<p className="mt-2 text-sm leading-6 text-slate-600">Os dados de {client.full_name} foram salvos após a confirmação. A prévia temporária foi removida da PWA.</p>
 				<div className="mt-5 grid gap-3 sm:grid-cols-2">
-					<button type="button" onClick={onBackToClients} className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700">Voltar para clientes</button>
-					<button type="button" onClick={onOpenAssistant} className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">Abrir assistente</button>
+					<PwaButton type="button" onClick={onBackToClients} variant="secondary" icon="arrowLeft">Voltar para clientes</PwaButton>
+					<PwaButton type="button" onClick={onOpenAssistant} icon="sparkles">Abrir assistente</PwaButton>
 				</div>
-			</section>
+			</PwaCard>
 		);
 	}
 
 	return (
 		<div className="space-y-4">
-			<section className="rounded-2xl bg-slate-950 p-5 text-white shadow-sm">
-				<p className="text-xs font-bold uppercase tracking-wide text-emerald-300">Nova avaliação · Relaxmedic</p>
-				<h2 className="mt-2 text-lg font-bold">{client.full_name}</h2>
-				<p className="mt-1 text-sm text-slate-300">A avaliação só será criada depois do processamento e da sua confirmação.</p>
-			</section>
+			<PwaJourneyHeader icon="camera" eyebrow="Nova avaliação · Relaxmedic" title={client.full_name} description="A avaliação só será criada depois do processamento e da sua confirmação." />
+			<PwaStepIndicator steps={['Imagem', 'Leitura', 'Conferência', 'Concluir']} current={extraction ? 3 : processing ? 2 : 1} />
 			{!isOnline ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">Sem conexão. O processamento e a criação ficam bloqueados para evitar envios incompletos ou duplicados.</p> : null}
 
 			{!extraction ? (
 				<>
 					<RelaxmedicImagePicker key={pickerVersion} previewUrl={previewUrl} fileName={imageName} disabled={processing || !isOnline} error={imageError} onSelect={selectImage} />
-					{previewUrl ? <button type="button" disabled={!imageFile || processing || !isOnline} onClick={processImage} className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{processing ? 'Processando imagem...' : imageFile ? 'Enviar e processar imagem' : 'Selecione novamente para tentar'}</button> : null}
+					{previewUrl ? <PwaButton type="button" disabled={!imageFile || processing || !isOnline} onClick={processImage} icon={processing ? 'refresh' : 'sparkles'} className="w-full">{processing ? 'Processando imagem...' : imageFile ? 'Enviar e processar imagem' : 'Selecione novamente para tentar'}</PwaButton> : null}
 				</>
 			) : (
 				<RelaxmedicReview previewUrl={previewUrl} form={form} extraction={extraction} confirmed={confirmed} errors={errors} saving={saving} online={isOnline} onUpdate={update} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />
@@ -169,11 +171,12 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 
 function BlockedState({ title, description, onBack }) {
 	return (
-		<section className="rounded-2xl border border-amber-200 bg-white p-6 text-center shadow-sm">
+		<PwaCard className="p-6 text-center">
+			<div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700"><span aria-hidden="true">!</span></div>
 			<p className="text-xs font-bold uppercase tracking-wide text-amber-700">Nova avaliação</p>
 			<h2 className="mt-2 text-xl font-bold text-slate-950">{title}</h2>
 			<p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
-			<button type="button" onClick={onBack} className="mt-5 rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">Ir para clientes</button>
-		</section>
+			<PwaButton type="button" onClick={onBack} icon="arrowLeft" className="mt-5">Ir para clientes</PwaButton>
+		</PwaCard>
 	);
 }

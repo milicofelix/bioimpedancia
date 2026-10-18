@@ -3,6 +3,7 @@ import { canCreateReportShare, canUseClinicalFeatures } from '../clients/clientA
 import ReportSharing from './ReportSharing';
 import ResponsiveAssessmentReport from './ResponsiveAssessmentReport';
 import { previousAssessment } from './reportMetrics';
+import PwaCard from '../../components/ui/PwaCard';
 
 export default function AssessmentReportFeature({ client, assessment, currentUser, onBackToClients, onAssessmentUpdated }) {
 	if (!client || !assessment) {
@@ -23,14 +24,15 @@ export default function AssessmentReportFeature({ client, assessment, currentUse
 		<div className="space-y-4">
 			<ResponsiveAssessmentReport client={client} assessment={assessment} previous={previous} />
 
-			<section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-				<h2 className="text-lg font-bold text-slate-950">Documento PDF</h2>
+			<PwaCard className="p-5">
+				<p className="text-xs font-bold uppercase tracking-[0.14em] text-ricosty-600">Documento final</p>
+				<h2 className="mt-1 text-lg font-bold text-slate-950">Relatório em PDF</h2>
 				<p className="mt-1 text-sm leading-6 text-slate-600">Abra para conferir o documento final ou faça o download no aparelho.</p>
 				<div className="mt-4 grid gap-3 sm:grid-cols-2">
-					<a href={`${pdfUrl}?inline=1`} target="_blank" rel="noreferrer" className="rounded-xl border border-slate-300 px-4 py-3 text-center text-sm font-bold text-slate-700">Abrir PDF</a>
-					<a href={pdfUrl} className="rounded-xl bg-slate-950 px-4 py-3 text-center text-sm font-bold text-white">Baixar PDF</a>
+					<a href={`${pdfUrl}?inline=1`} target="_blank" rel="noreferrer" className="pwa-button-secondary pwa-focus inline-flex min-h-12 items-center justify-center gap-2 px-4 text-center text-sm"><span aria-hidden="true">◉</span>Abrir PDF</a>
+					<a href={pdfUrl} className="pwa-button-primary pwa-focus inline-flex min-h-12 items-center justify-center gap-2 px-4 text-center text-sm"><span aria-hidden="true">↓</span>Baixar PDF</a>
 				</div>
-			</section>
+			</PwaCard>
 
 			{assessment.is_canceled ? (
 				<section className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm font-semibold leading-6 text-rose-800">O compartilhamento está desabilitado porque esta avaliação foi cancelada.</section>
