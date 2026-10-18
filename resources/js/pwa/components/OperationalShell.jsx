@@ -2,6 +2,9 @@ import React, { useEffect, useRef } from 'react';
 import InstallGuide from './InstallGuide';
 import PwaIcon from './ui/PwaIcon';
 import useOnlineStatus from '../hooks/useOnlineStatus';
+import useServiceWorkerUpdate from '../hooks/useServiceWorkerUpdate';
+import OfflineNotice from './OfflineNotice';
+import PwaUpdateNotice from './PwaUpdateNotice';
 
 const navigation = [
 	{ section: 'clientes', label: 'Clientes', icon: 'users' },
@@ -16,6 +19,7 @@ function userInitial(name) {
 
 export default function OperationalShell({ activeSection, clinic, currentUser, onLogout, onNavigate, children }) {
 	const isOnline = useOnlineStatus();
+	const update = useServiceWorkerUpdate();
 	const mainReference = useRef(null);
 
 	useEffect(() => {
@@ -23,9 +27,9 @@ export default function OperationalShell({ activeSection, clinic, currentUser, o
 	}, [activeSection]);
 
 	return (
-		<div className="pwa-shell min-h-dvh pb-28 text-ricosty-ink">
+		<div className="pwa-shell pwa-native-shell pb-28 text-ricosty-ink">
 			<a href="#operational-content" className="pwa-focus fixed left-3 top-3 z-50 -translate-y-24 rounded-xl bg-ricosty-950 px-4 py-3 text-sm font-bold text-white transition focus:translate-y-0">Pular para o conteúdo</a>
-			<header className="pwa-safe-top sticky top-0 z-20 border-b border-ricosty-200/70 bg-white/90 px-4 pb-3 backdrop-blur-xl">
+			<header className="pwa-safe-top pwa-safe-inline sticky top-0 z-20 border-b border-ricosty-200/70 bg-white/90 pb-3 backdrop-blur-xl">
 				<div className="mx-auto flex max-w-xl items-center justify-between gap-3">
 					<div className="flex min-w-0 items-center gap-3">
 						<div className="flex h-11 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-ricosty-50 px-2 ring-1 ring-ricosty-100">
@@ -47,8 +51,8 @@ export default function OperationalShell({ activeSection, clinic, currentUser, o
 				</div>
 			</header>
 
-			<main id="operational-content" ref={mainReference} tabIndex="-1" className="mx-auto max-w-xl px-4 py-5 outline-none">
-				{!isOnline ? <div role="status" className="mb-4 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800"><PwaIcon name="wifiOff" className="mt-0.5 shrink-0" />Consultas, avaliações e relatórios ficam indisponíveis até a reconexão.</div> : null}
+			<main id="operational-content" ref={mainReference} tabIndex="-1" className="pwa-safe-inline mx-auto max-w-xl py-5 outline-none">
+				{!isOnline ? <OfflineNotice detail="Consultas e ações que enviam dados ficam bloqueadas até a reconexão. Nenhum dado clínico é armazenado para uso offline." className="mb-4" /> : null}
 
 				<div className="relative mb-5 overflow-hidden rounded-[1.6rem] bg-gradient-to-br from-ricosty-800 via-ricosty-700 to-ricosty-500 p-5 text-white shadow-[0_18px_45px_rgba(114,42,62,0.22)]">
 					<div aria-hidden="true" className="absolute -right-8 -top-12 h-36 w-36 rounded-full border-[28px] border-white/10" />
@@ -67,7 +71,9 @@ export default function OperationalShell({ activeSection, clinic, currentUser, o
 				<div key={activeSection} className="pwa-screen-enter">{children}</div>
 			</main>
 
-			<nav aria-label="Navegação operacional" className="fixed inset-x-0 bottom-0 z-30 px-3 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-2">
+			<PwaUpdateNotice visible={update.available} applying={update.applying} onApply={update.apply} onDismiss={update.dismiss} />
+
+			<nav aria-label="Navegação operacional" className="pwa-bottom-navigation fixed inset-x-0 bottom-0 z-30 pt-2">
 				<div className="mx-auto grid max-w-xl grid-cols-4 gap-1 rounded-[1.35rem] border border-ricosty-200/80 bg-white/95 p-1.5 shadow-[0_14px_40px_rgba(97,38,55,0.16)] backdrop-blur-xl">
 					{navigation.map((item) => {
 						const active = item.section === activeSection;

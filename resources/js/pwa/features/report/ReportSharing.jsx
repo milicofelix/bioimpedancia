@@ -124,7 +124,6 @@ export default function ReportSharing({ assessment, canCreate, canRevoke, onAsse
 			</div>
 
 			<h2 className="mt-5 text-lg font-bold text-slate-950">Compartilhamento temporário</h2>
-			{!isOnline ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-700">Sem conexão. Novos links e revogações ficam bloqueados até a internet voltar.</p> : null}
 			<div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
 				<label className="text-sm font-semibold text-slate-700">Validade do link<select value={expiresInDays} onChange={(event) => setExpiresInDays(event.target.value)} disabled={!canCreate || creating || !isOnline} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-3"><option value="1">1 dia</option><option value="3">3 dias</option><option value="7">7 dias</option><option value="15">15 dias</option><option value="30">30 dias</option></select></label>
 				<PwaButton type="button" onClick={createLink} disabled={!canCreate || creating || !isOnline} icon="share" className="self-end">{creating ? 'Criando...' : 'Criar link temporário'}</PwaButton>

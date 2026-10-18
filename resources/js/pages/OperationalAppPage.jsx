@@ -8,6 +8,7 @@ import AssessmentReportFeature from '../pwa/features/report/AssessmentReportFeat
 import useOperationalSection from '../pwa/hooks/useOperationalSection';
 import { apiErrorMessage, loadOperationalWorkspace, logout } from '../services/bioimpedanceApi';
 import { registerOperationalServiceWorker } from '../pwa/services/registerServiceWorker';
+import { observeMobileViewport } from '../pwa/services/mobileViewport';
 import { clearOperationalCaches } from '../security/browserSession';
 import PwaButton from '../pwa/components/ui/PwaButton';
 import PwaIcon from '../pwa/components/ui/PwaIcon';
@@ -22,6 +23,7 @@ export default function OperationalAppPage() {
 
 	useEffect(() => {
 		registerOperationalServiceWorker();
+		const stopObservingViewport = observeMobileViewport();
 
 		let active = true;
 
@@ -38,6 +40,7 @@ export default function OperationalAppPage() {
 
 		return () => {
 			active = false;
+			stopObservingViewport();
 		};
 	}, []);
 
@@ -104,7 +107,7 @@ export default function OperationalAppPage() {
 
 	if (error) {
 		return (
-			<div className="pwa-shell flex min-h-dvh items-center justify-center px-6">
+			<div className="pwa-safe-inline pwa-safe-top pwa-safe-bottom pwa-shell pwa-native-shell flex items-center justify-center">
 				<div role="alert" className="pwa-card w-full max-w-sm p-6 text-center">
 					<div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 text-rose-700"><PwaIcon name="alertTriangle" /></div>
 					<h1 className="mt-3 font-bold text-slate-950">Não foi possível abrir a área operacional</h1>
@@ -164,8 +167,13 @@ export default function OperationalAppPage() {
 
 function OperationalLoading() {
 	return (
-		<div role="status" aria-live="polite" aria-label="Carregando área operacional" className="pwa-shell min-h-dvh px-4 py-5">
+		<div role="status" aria-live="polite" aria-label="Carregando área operacional" className="pwa-launch-screen pwa-shell px-4 py-5">
 			<div className="mx-auto max-w-xl">
+				<div className="mb-6 flex flex-col items-center pt-[max(1rem,env(safe-area-inset-top))] text-center">
+					<img src="/pwa/icons/icon-192.png" alt="" className="h-20 w-20 rounded-[1.4rem] shadow-[0_14px_35px_rgba(114,42,62,0.2)]" />
+					<p className="mt-3 text-lg font-extrabold text-ricosty-950">Ricosty Atendimento</p>
+					<p className="mt-1 text-sm text-slate-600">Preparando sua área operacional…</p>
+				</div>
 				<div className="flex items-center justify-between"><span className="pwa-skeleton h-11 w-28 rounded-xl" /><span className="pwa-skeleton h-10 w-24 rounded-full" /></div>
 				<div className="pwa-skeleton mt-6 h-36 rounded-[1.6rem]" />
 				<div className="mt-6 flex items-end justify-between"><div className="space-y-2"><span className="pwa-skeleton block h-3 w-20 rounded" /><span className="pwa-skeleton block h-8 w-36 rounded-lg" /></div><span className="pwa-skeleton h-11 w-24 rounded-xl" /></div>

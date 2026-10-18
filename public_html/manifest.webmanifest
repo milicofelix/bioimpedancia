@@ -7,9 +7,15 @@
     "start_url": "/app",
     "scope": "/app",
     "display": "standalone",
+    "display_override": ["standalone", "minimal-ui"],
     "orientation": "portrait-primary",
     "background_color": "#fffaf6",
     "theme_color": "#ad3f5b",
+    "categories": ["health", "medical", "productivity"],
+    "prefer_related_applications": false,
+    "launch_handler": {
+        "client_mode": "navigate-existing"
+    },
     "icons": [
         {
             "src": "/pwa/icons/icon-192.png",
@@ -28,6 +34,12 @@
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"
+        },
+        {
+            "src": "/pwa/icons/icon-monochrome.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "monochrome"
         }
     ]
 }

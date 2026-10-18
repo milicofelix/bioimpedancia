@@ -103,7 +103,6 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 				<span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">{formatDate(assessment.evaluated_at)}</span>
 				<span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">{assessment.device_model} · {numberBr(assessment.weight_kg, 1)} kg</span>
 			</PwaJourneyHeader>
-			{!isOnline ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">Sem conexão. A geração e a aprovação permanecem bloqueadas até a reconexão.</p> : null}
 
 			{approved ? (
 				<PwaCard className="p-5 text-center">
