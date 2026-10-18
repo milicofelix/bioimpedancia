@@ -18,6 +18,7 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 	const [processingStep, setProcessingStep] = useState(0);
 	const [error, setError] = useState('');
 	const [approved, setApproved] = useState(false);
+	const [approvedAsEdited, setApprovedAsEdited] = useState(false);
 	const isOnline = useOnlineStatus();
 
 	useEffect(() => {
@@ -38,6 +39,7 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 		setDraft('');
 		setError('');
 		setApproved(false);
+		setApprovedAsEdited(false);
 
 		try {
 			const result = await generateAssessmentObservation(assessment.id);
@@ -56,13 +58,15 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 		setError('');
 
 		try {
+			const editedByProfessional = assistant.suggestion !== draft;
 			const result = await approveAssessmentObservation(assessment.id, {
 				notes: draft.trim(),
-				review_action: assistant.suggestion === draft ? 'approved' : 'edited',
+				review_action: editedByProfessional ? 'edited' : 'approved',
 				assistant_output_id: assistant.output_id,
 			});
 			onApproved(result.client, result.assessment);
 			setApproved(true);
+			setApprovedAsEdited(editedByProfessional);
 			setAssistant(null);
 			setDraft('');
 		} catch (requestError) {
@@ -78,6 +82,7 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 		setDraft('');
 		setError('');
 		setApproved(false);
+		setApprovedAsEdited(false);
 	}
 
 	if (!client || !assessment) {
@@ -102,9 +107,10 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 
 			{approved ? (
 				<PwaCard className="p-5 text-center">
-					<div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-lg font-black text-emerald-700">✓</div>
+					<div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-lg font-black text-emerald-700">✓</div>
 					<h2 className="mt-3 text-lg font-bold text-slate-950">Observação adicionada</h2>
-					<p className="mt-2 text-sm leading-6 text-slate-600">A aprovação foi registrada na avaliação e na auditoria. O texto já poderá ser usado no relatório.</p>
+					<p className="mt-2 text-sm leading-6 text-slate-600">A aprovação humana foi registrada na avaliação e na auditoria. O texto já poderá ser usado no relatório.</p>
+					<div className={`mx-auto mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ${approvedAsEdited ? 'bg-violet-100 text-violet-700' : 'bg-emerald-100 text-emerald-700'}`}><span aria-hidden="true">{approvedAsEdited ? '✎' : '✓'}</span>{approvedAsEdited ? 'Versão editada aprovada' : 'Sugestão original aprovada'}</div>
 					<div className="mt-4 grid gap-3 sm:grid-cols-2"><PwaButton type="button" onClick={() => setApproved(false)} variant="secondary" icon="refresh">Gerar outra sugestão</PwaButton><PwaButton type="button" onClick={onOpenReport} icon="fileText">Abrir relatório</PwaButton></div>
 				</PwaCard>
 			) : generating ? (
@@ -113,8 +119,9 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 				<ObservationSuggestion assistant={assistant} draft={draft} saving={saving} online={isOnline} error={error} onDraftChange={setDraft} onApprove={approve} onDiscard={discard} />
 			) : (
 				<PwaCard className="p-5">
-					<div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100 text-xl">✦</span><div><p className="text-xs font-bold uppercase tracking-wide text-violet-700">IA com revisão humana</p><h2 className="text-lg font-bold text-slate-950">Gerar observação assistida</h2></div></div>
+					<div className="flex items-center gap-3"><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-ricosty-600 text-xl text-white shadow-lg shadow-violet-100">✦</span><div><p className="text-xs font-bold uppercase tracking-wide text-violet-700">IA com revisão humana</p><h2 className="text-lg font-bold text-slate-950">Gerar observação assistida</h2></div></div>
 					<p className="mt-2 text-sm leading-6 text-slate-600">O assistente consulta dados da avaliação e fontes aprovadas. Nada será adicionado sem sua revisão e aprovação.</p>
+					<div className="mt-4 grid grid-cols-3 gap-2 text-center text-[10px] font-bold text-violet-800"><span className="rounded-xl bg-violet-50 px-2 py-2">1. Gera</span><span className="rounded-xl bg-violet-50 px-2 py-2">2. Você revisa</span><span className="rounded-xl bg-violet-50 px-2 py-2">3. Você aprova</span></div>
 					{assessment.notes ? <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-600"><strong className="text-slate-800">Observação atual:</strong><p className="mt-1 leading-6">{assessment.notes}</p></div> : null}
 					{error ? <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p> : null}
 					<PwaButton type="button" onClick={generate} disabled={!isOnline} icon="sparkles" className="mt-5 w-full">Gerar observação</PwaButton>
