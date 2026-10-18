@@ -56,7 +56,7 @@ export default function ObservationSuggestion({ assistant, draft, saving, online
 
 			<div className="mt-5 grid gap-3 sm:grid-cols-2">
 				<PwaButton type="button" onClick={onDiscard} disabled={saving} variant="secondary">Descartar</PwaButton>
-				{generated ? <PwaButton type="button" onClick={onApprove} disabled={saving || !online || draft.trim().length < 20} icon="check">{saving ? 'Adicionando...' : edited ? 'Aprovar versão editada' : 'Aprovar e adicionar'}</PwaButton> : null}
+				{generated ? <PwaButton type="button" onClick={onApprove} disabled={saving || !online || draft.trim().length < 20} loading={saving} icon="check">{saving ? 'Adicionando...' : edited ? 'Aprovar versão editada' : 'Aprovar e adicionar'}</PwaButton> : null}
 			</div>
 		</section>
 	);

@@ -9,8 +9,10 @@ import useOnlineStatus from '../../hooks/useOnlineStatus';
 import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaJourneyHeader from '../../components/ui/PwaJourneyHeader';
+import useActionLock from '../../../hooks/useActionLock';
 
 export default function AssessmentAssistantFeature({ client, assessment, currentUser, onBackToClients, onApproved, onOpenReport }) {
+	const runAction = useActionLock();
 	const [assistant, setAssistant] = useState(null);
 	const [draft, setDraft] = useState('');
 	const [generating, setGenerating] = useState(false);
@@ -32,49 +34,53 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 	}, [generating]);
 
 	async function generate() {
-		if (!assessment || assessment.is_canceled || generating || !isOnline) return;
-		setGenerating(true);
-		setProcessingStep(0);
-		setAssistant(null);
-		setDraft('');
-		setError('');
-		setApproved(false);
-		setApprovedAsEdited(false);
+		return runAction('generate-observation', async () => {
+			if (!assessment || assessment.is_canceled || generating || !isOnline) return;
+			setGenerating(true);
+			setProcessingStep(0);
+			setAssistant(null);
+			setDraft('');
+			setError('');
+			setApproved(false);
+			setApprovedAsEdited(false);
 
-		try {
-			const result = await generateAssessmentObservation(assessment.id);
-			setAssistant(result);
-			setDraft(result?.suggestion ?? '');
-		} catch (requestError) {
-			setError(apiErrorMessage(requestError, 'O assistente está indisponível no momento. Tente novamente mais tarde.'));
-		} finally {
-			setGenerating(false);
-		}
+			try {
+				const result = await generateAssessmentObservation(assessment.id);
+				setAssistant(result);
+				setDraft(result?.suggestion ?? '');
+			} catch (requestError) {
+				setError(apiErrorMessage(requestError, 'O assistente está indisponível no momento. Tente novamente mais tarde.'));
+			} finally {
+				setGenerating(false);
+			}
+		});
 	}
 
 	async function approve() {
-		if (!assistant || draft.trim().length < 20 || saving || !isOnline) return;
-		setSaving(true);
-		setError('');
+		return runAction('approve-observation', async () => {
+			if (!assistant || draft.trim().length < 20 || saving || !isOnline) return;
+			setSaving(true);
+			setError('');
 
-		try {
-			const editedByProfessional = assistant.suggestion !== draft;
-			const result = await approveAssessmentObservation(assessment.id, {
-				notes: draft.trim(),
-				review_action: editedByProfessional ? 'edited' : 'approved',
-				assistant_output_id: assistant.output_id,
-			});
-			onApproved(result.client, result.assessment);
-			setApproved(true);
-			setApprovedAsEdited(editedByProfessional);
-			setAssistant(null);
-			setDraft('');
-		} catch (requestError) {
-			const validationErrors = apiValidationErrors(requestError);
-			setError(validationErrors.notes?.[0] ?? validationErrors.bioimpedance_assessment_id?.[0] ?? apiErrorMessage(requestError, 'Não foi possível adicionar a observação.'));
-		} finally {
-			setSaving(false);
-		}
+			try {
+				const editedByProfessional = assistant.suggestion !== draft;
+				const result = await approveAssessmentObservation(assessment.id, {
+					notes: draft.trim(),
+					review_action: editedByProfessional ? 'edited' : 'approved',
+					assistant_output_id: assistant.output_id,
+				});
+				onApproved(result.client, result.assessment);
+				setApproved(true);
+				setApprovedAsEdited(editedByProfessional);
+				setAssistant(null);
+				setDraft('');
+			} catch (requestError) {
+				const validationErrors = apiValidationErrors(requestError);
+				setError(validationErrors.notes?.[0] ?? validationErrors.bioimpedance_assessment_id?.[0] ?? apiErrorMessage(requestError, 'Não foi possível adicionar a observação.'));
+			} finally {
+				setSaving(false);
+			}
+		});
 	}
 
 	function discard() {

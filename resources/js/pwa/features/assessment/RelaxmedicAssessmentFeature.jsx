@@ -10,8 +10,10 @@ import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaJourneyHeader from '../../components/ui/PwaJourneyHeader';
 import PwaStepIndicator from '../../components/ui/PwaStepIndicator';
+import useActionLock from '../../../hooks/useActionLock';
 
 export default function RelaxmedicAssessmentFeature({ client, currentUser, scaleModel, onBackToClients, onCreated, onOpenAssistant }) {
+	const runAction = useActionLock();
 	const previewReference = useRef('');
 	const [imageFile, setImageFile] = useState(null);
 	const [imageName, setImageName] = useState('');
@@ -74,25 +76,27 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 	}
 
 	async function processImage() {
-		if (!imageFile || processing || !isOnline) return;
-		setProcessing(true);
-		setImageError('');
-		setGeneralError('');
-		setErrors({});
+		return runAction('process-relaxmedic-image', async () => {
+			if (!imageFile || processing || !isOnline) return;
+			setProcessing(true);
+			setImageError('');
+			setGeneralError('');
+			setErrors({});
 
-		try {
-			const result = await processRelaxmedicImage(imageFile);
-			setExtraction(result);
-			setForm(assessmentFromExtraction(result));
-			setConfirmed(false);
-		} catch (error) {
-			setImageError(apiValidationErrors(error).image?.[0] ?? apiErrorMessage(error, 'Não foi possível processar a imagem.'));
-		} finally {
-			// O arquivo deixa o estado após a tentativa. A URL temporária só permanece para a conferência visual.
-			setImageFile(null);
-			setPickerVersion((current) => current + 1);
-			setProcessing(false);
-		}
+			try {
+				const result = await processRelaxmedicImage(imageFile);
+				setExtraction(result);
+				setForm(assessmentFromExtraction(result));
+				setConfirmed(false);
+			} catch (error) {
+				setImageError(apiValidationErrors(error).image?.[0] ?? apiErrorMessage(error, 'Não foi possível processar a imagem.'));
+			} finally {
+				// O arquivo deixa o estado após a tentativa. A URL temporária só permanece para a conferência visual.
+				setImageFile(null);
+				setPickerVersion((current) => current + 1);
+				setProcessing(false);
+			}
+		});
 	}
 
 	function update(field, value) {
@@ -104,25 +108,27 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 
 	async function submit(event) {
 		event.preventDefault();
-		if (!client || !extraction || !confirmed || saving || !isOnline) return;
-		setSaving(true);
-		setGeneralError('');
-		setErrors({});
+		return runAction('create-assessment', async () => {
+			if (!client || !extraction || !confirmed || saving || !isOnline) return;
+			setSaving(true);
+			setGeneralError('');
+			setErrors({});
 
-		try {
-			const result = await createBioimpedanceAssessment(relaxmedicAssessmentPayload(form, client.id, extraction.image, confirmed));
-			setCreatedAssessment(result.assessment);
-			onCreated(result.client, result.assessment);
-			clearPreview();
-			setExtraction(null);
-			setImageFile(null);
-			setImageName('');
-		} catch (error) {
-			setErrors(apiValidationErrors(error));
-			setGeneralError(apiErrorMessage(error, 'Não foi possível criar a avaliação. Confira os campos destacados.'));
-		} finally {
-			setSaving(false);
-		}
+			try {
+				const result = await createBioimpedanceAssessment(relaxmedicAssessmentPayload(form, client.id, extraction.image, confirmed));
+				setCreatedAssessment(result.assessment);
+				onCreated(result.client, result.assessment);
+				clearPreview();
+				setExtraction(null);
+				setImageFile(null);
+				setImageName('');
+			} catch (error) {
+				setErrors(apiValidationErrors(error));
+				setGeneralError(apiErrorMessage(error, 'Não foi possível criar a avaliação. Confira os campos destacados.'));
+			} finally {
+				setSaving(false);
+			}
+		});
 	}
 
 	if (!client) {
