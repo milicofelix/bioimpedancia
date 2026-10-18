@@ -1,0 +1,40 @@
+export const relaxmedicMaxImageBytes = 10 * 1024 * 1024;
+
+export const relaxmedicMetricLabels = {
+	weight_kg: 'Peso (kg)',
+	scale_bmi: 'IMC',
+	body_fat_percentage: 'Gordura corporal (%)',
+	muscle_rate_percentage: 'Taxa muscular (%)',
+	lean_body_mass_kg: 'Massa corporal magra (kg)',
+	subcutaneous_fat_percentage: 'Gordura subcutânea (%)',
+	visceral_fat_level: 'Gordura visceral',
+	body_water_percentage: 'Água corporal (%)',
+	skeletal_muscle_percentage: 'Músculo esquelético (%)',
+	muscle_mass_kg: 'Massa muscular (kg)',
+	bone_mass_kg: 'Massa óssea (kg)',
+	protein_percentage: 'Proteína (%)',
+	resting_metabolism_kcal: 'TMB (kcal)',
+	body_age: 'Idade do corpo',
+	fat_mass_kg: 'Massa gorda (kg)',
+	water_weight_kg: 'Peso da água (kg)',
+	protein_mass_kg: 'Massa de proteína (kg)',
+	ideal_body_weight_kg: 'Peso corporal ideal (kg)',
+	obesity_level: 'Nível de obesidade',
+	body_type: 'Tipo de corpo',
+};
+
+export const relaxmedicAdditionalMetricFields = [
+	'muscle_rate_percentage',
+	'lean_body_mass_kg',
+	'subcutaneous_fat_percentage',
+	'body_water_percentage',
+	'muscle_mass_kg',
+	'bone_mass_kg',
+	'protein_percentage',
+	'fat_mass_kg',
+	'water_weight_kg',
+	'protein_mass_kg',
+	'ideal_body_weight_kg',
+	'obesity_level',
+	'body_type',
+];

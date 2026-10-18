@@ -33,22 +33,19 @@ class BioimpedanceController extends Controller
 {
     public function __construct(private readonly BioimpedanceReportSharePresenter $reportSharePresenter) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $clients = BioimpedanceClient::query()
-            ->with(['assessments' => fn ($query) => $query->with('shares')->latest('evaluated_at')])
-            ->orderBy('full_name')
-            ->get()
-            ->map(fn (BioimpedanceClient $client) => $this->clientPayload($client));
-
         return response()->json([
-            'clients' => $clients,
-            'clinic' => $this->clinicPayload(),
-            'current_user' => $this->userPayload(request()->user()),
-            'users' => request()->user()->isAdmin() ? $this->usersPayload() : [],
-            'audit_events' => request()->user()->isAdmin() ? $this->auditEventsPayload() : [],
-            'admin_dashboard' => request()->user()->isAdmin() ? $this->adminDashboardPayload() : null,
+            ...$this->operationalWorkspacePayload($request),
+            'users' => $request->user()->isAdmin() ? $this->usersPayload() : [],
+            'audit_events' => $request->user()->isAdmin() ? $this->auditEventsPayload() : [],
+            'admin_dashboard' => $request->user()->isAdmin() ? $this->adminDashboardPayload() : null,
         ]);
+    }
+
+    public function operationalIndex(Request $request): JsonResponse
+    {
+        return response()->json($this->operationalWorkspacePayload($request));
     }
 
     public function adminDashboard(Request $request): JsonResponse
@@ -1249,6 +1246,21 @@ class BioimpedanceController extends Controller
     private function loadClientAssessments(BioimpedanceClient $client): BioimpedanceClient
     {
         return $client->load(['assessments' => fn ($query) => $query->with('shares')->latest('evaluated_at')]);
+    }
+
+    private function operationalWorkspacePayload(Request $request): array
+    {
+        $clients = BioimpedanceClient::query()
+            ->with(['assessments' => fn ($query) => $query->with('shares')->latest('evaluated_at')])
+            ->orderBy('full_name')
+            ->get()
+            ->map(fn (BioimpedanceClient $client) => $this->clientPayload($client));
+
+        return [
+            'clients' => $clients,
+            'clinic' => $this->clinicPayload(),
+            'current_user' => $this->userPayload($request->user()),
+        ];
     }
 
     private function assessmentPayload(BioimpedanceAssessment $assessment): array
