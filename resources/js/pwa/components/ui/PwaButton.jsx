@@ -8,6 +8,8 @@ const variants = {
 	danger: 'min-h-11 rounded-xl border border-rose-200 bg-white font-bold text-rose-700 hover:bg-rose-50',
 };
 
-export default function PwaButton({ icon, variant = 'primary', className = '', children, ...props }) {
-	return <button className={`pwa-focus pwa-pressable inline-flex items-center justify-center gap-2 px-4 text-sm disabled:cursor-not-allowed disabled:opacity-50 ${variants[variant]} ${className}`} {...props}>{icon ? <PwaIcon name={icon} size={18} /> : null}{children}</button>;
-}
+const PwaButton = React.forwardRef(function PwaButton({ icon, variant = 'primary', className = '', children, ...props }, reference) {
+	return <button ref={reference} className={`pwa-focus pwa-pressable inline-flex items-center justify-center gap-2 px-4 text-sm disabled:cursor-not-allowed disabled:opacity-50 ${variants[variant]} ${className}`} {...props}>{icon ? <PwaIcon name={icon} size={18} /> : null}{children}</button>;
+});
+
+export default PwaButton;

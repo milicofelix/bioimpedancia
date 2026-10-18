@@ -3,6 +3,7 @@ import { apiErrorMessage, apiValidationErrors, createBioimpedanceAssessment, pro
 import { assessmentAccess } from '../clients/clientAccess';
 import RelaxmedicImagePicker, { validateRelaxmedicImage } from './RelaxmedicImagePicker';
 import RelaxmedicReview from './RelaxmedicReview';
+import RelaxmedicOcrProgress from './RelaxmedicOcrProgress';
 import { assessmentFromExtraction, emptyRelaxmedicAssessment, maskRelaxmedicValue, relaxmedicAssessmentPayload } from './relaxmedicAssessmentForm';
 import useOnlineStatus from '../../hooks/useOnlineStatus';
 import PwaButton from '../../components/ui/PwaButton';
@@ -138,7 +139,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 	if (createdAssessment) {
 		return (
 			<PwaCard className="p-6 text-center">
-				<PwaStepIndicator steps={['Imagem', 'Leitura', 'Conferência', 'Concluir']} current={4} />
+				<PwaStepIndicator steps={['Imagem', 'Processamento', 'Conferência', 'Conclusão']} current={4} />
 				<div className="mx-auto mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-ricosty-100 text-2xl font-black text-ricosty-700">✓</div>
 				<h2 className="mt-3 text-xl font-bold text-slate-950">Avaliação criada com segurança</h2>
 				<p className="mt-2 text-sm leading-6 text-slate-600">Os dados de {client.full_name} foram salvos após a confirmação. A prévia temporária foi removida da PWA.</p>
@@ -153,13 +154,13 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 	return (
 		<div className="space-y-4">
 			<PwaJourneyHeader icon="camera" eyebrow="Nova avaliação · Relaxmedic" title={client.full_name} description="A avaliação só será criada depois do processamento e da sua confirmação." />
-			<PwaStepIndicator steps={['Imagem', 'Leitura', 'Conferência', 'Concluir']} current={extraction ? 3 : processing ? 2 : 1} />
+			<PwaStepIndicator steps={['Imagem', 'Processamento', 'Conferência', 'Conclusão']} current={extraction ? 3 : processing ? 2 : 1} />
 			{!isOnline ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">Sem conexão. O processamento e a criação ficam bloqueados para evitar envios incompletos ou duplicados.</p> : null}
 
-			{!extraction ? (
+			{processing ? <RelaxmedicOcrProgress previewUrl={previewUrl} /> : !extraction ? (
 				<>
-					<RelaxmedicImagePicker key={pickerVersion} previewUrl={previewUrl} fileName={imageName} disabled={processing || !isOnline} error={imageError} onSelect={selectImage} />
-					{previewUrl ? <PwaButton type="button" disabled={!imageFile || processing || !isOnline} aria-busy={processing} onClick={processImage} icon={processing ? 'refresh' : 'sparkles'} className="w-full">{processing ? 'Processando imagem...' : imageFile ? 'Enviar e processar imagem' : 'Selecione novamente para tentar'}</PwaButton> : null}
+					<RelaxmedicImagePicker key={pickerVersion} previewUrl={previewUrl} fileName={imageName} disabled={!isOnline} error={imageError} onSelect={selectImage} />
+					{previewUrl ? <PwaButton type="button" disabled={!imageFile || !isOnline} onClick={processImage} icon="sparkles" className="w-full">{imageFile ? 'Enviar e processar imagem' : 'Selecione novamente para tentar'}</PwaButton> : null}
 				</>
 			) : (
 				<RelaxmedicReview previewUrl={previewUrl} form={form} extraction={extraction} confirmed={confirmed} errors={errors} saving={saving} online={isOnline} onUpdate={update} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />
