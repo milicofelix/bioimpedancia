@@ -48,6 +48,10 @@ class BioimpedanceAssessment extends Model
         'analysis',
         'source_metadata',
         'notes',
+        'care_guidance',
+        'care_guidance_sources',
+        'care_guidance_approved_by_user_id',
+        'care_guidance_approved_at',
         'canceled_at',
         'canceled_by_user_id',
         'cancellation_reason',
@@ -82,6 +86,8 @@ class BioimpedanceAssessment extends Model
             'visceral_fat_level' => 'decimal:1',
             'analysis' => 'array',
             'source_metadata' => 'array',
+            'care_guidance_sources' => 'array',
+            'care_guidance_approved_at' => 'datetime',
         ];
     }
 
@@ -103,6 +109,16 @@ class BioimpedanceAssessment extends Model
     public function canceledBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'canceled_by_user_id');
+    }
+
+    public function careGuidanceApprovedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'care_guidance_approved_by_user_id');
+    }
+
+    public function aiAnalysisRequests(): HasMany
+    {
+        return $this->hasMany(BioimpedanceAiAnalysisRequest::class);
     }
 
     public function audits(): HasMany

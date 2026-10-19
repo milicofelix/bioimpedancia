@@ -16,6 +16,7 @@ import {
 import { loadBioimpedanceWorkspace, logout } from '../services/bioimpedanceApi';
 import { cpfMask, heightMask, normalizeInteger, phoneMask } from '../shared/inputMasks';
 import useActionLock from '../hooks/useActionLock';
+import CareGuidanceAssistant from '../pwa/features/assistant/CareGuidanceAssistant';
 
 const emptyClient = {
 	full_name: '',
@@ -1544,6 +1545,8 @@ export default function DashboardPage({ userName }) {
 								</div>
 							) : null}
 							<AssessmentDetails assessment={selectedAssessment} />
+							{(selectedAssessment?.has_approved_ai_observation || selectedAssessment?.care_guidance) && !selectedAssessment.is_canceled && canClinicalProfessional ? <div className="mt-4"><CareGuidanceAssistant key={selectedAssessment.id} assessment={selectedAssessment} online={isOnline} onApproved={(updatedClient, updatedAssessment) => { setClients((current) => current.map((client) => (client.id === updatedClient.id ? updatedClient : client))); setSelectedAssessmentId(updatedAssessment.id); }} /></div> : null}
+
 							{selectedAssessment && !selectedAssessment.is_canceled ? (
 								<div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 p-4">
 									<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -2156,6 +2159,7 @@ function Report({ clinic, client, assessment, professional }) {
 								<p>A idade corporal estimada foi de {assessment.body_age ?? '-'} anos e a gordura visceral foi classificada como {visceralFat.classification ?? '-'}.</p>
 							</div>
 							{assessment.notes ? <p className="mt-3 text-sm text-slate-600"><strong>Observações:</strong> {assessment.notes}</p> : null}
+							{assessment.care_guidance ? <div className="mt-4 rounded-xl border border-teal-200 bg-teal-50 p-4"><p className="text-sm font-bold text-teal-900">Orientações aprovadas</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{assessment.care_guidance}</p><p className="mt-3 text-xs text-slate-600">Conteúdo educativo aprovado pelo profissional; não substitui avaliação individual de médico, nutricionista ou profissional de educação física.</p></div> : null}
 						</section>
 
 						<section className="report-protocol-grid mt-6 grid gap-4 md:grid-cols-2">

@@ -10,6 +10,7 @@ import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaJourneyHeader from '../../components/ui/PwaJourneyHeader';
 import useActionLock from '../../../hooks/useActionLock';
+import CareGuidanceAssistant from './CareGuidanceAssistant';
 
 export default function AssessmentAssistantFeature({ client, assessment, currentUser, onBackToClients, onApproved, onOpenReport }) {
 	const runAction = useActionLock();
@@ -21,7 +22,17 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 	const [error, setError] = useState('');
 	const [approved, setApproved] = useState(false);
 	const [approvedAsEdited, setApprovedAsEdited] = useState(false);
+	const [approvedAssessment, setApprovedAssessment] = useState(null);
 	const isOnline = useOnlineStatus();
+
+	useEffect(() => {
+		setAssistant(null);
+		setDraft('');
+		setError('');
+		setApproved(false);
+		setApprovedAsEdited(false);
+		setApprovedAssessment(null);
+	}, [assessment?.id]);
 
 	useEffect(() => {
 		if (!generating) return undefined;
@@ -70,6 +81,7 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 					assistant_output_id: assistant.output_id,
 				});
 				onApproved(result.client, result.assessment);
+				setApprovedAssessment(result.assessment);
 				setApproved(true);
 				setApprovedAsEdited(editedByProfessional);
 				setAssistant(null);
@@ -103,11 +115,13 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 		return <AssistantState title="Avaliação cancelada" description="Avaliações canceladas não podem receber sugestões ou observações oficiais." onBack={onBackToClients} tone="rose" />;
 	}
 
+	const currentAssessment = approvedAssessment ?? assessment;
+
 	return (
 		<div className="space-y-4">
 			<PwaJourneyHeader icon="sparkles" eyebrow="Assistente da avaliação" title={client.full_name} description="Revise a sugestão clínica antes de adicioná-la à avaliação." tone="assistant">
-				<span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">{formatDate(assessment.evaluated_at)}</span>
-				<span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">{assessment.device_model} · {numberBr(assessment.weight_kg, 1)} kg</span>
+				<span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">{formatDate(currentAssessment.evaluated_at)}</span>
+				<span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">{currentAssessment.device_model} · {numberBr(currentAssessment.weight_kg, 1)} kg</span>
 			</PwaJourneyHeader>
 
 			{approved ? (
@@ -132,6 +146,8 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 					<PwaButton type="button" onClick={generate} disabled={!isOnline} icon="sparkles" className="mt-5 w-full">Gerar observação</PwaButton>
 				</PwaCard>
 			)}
+
+			{currentAssessment.has_approved_ai_observation || currentAssessment.care_guidance ? <CareGuidanceAssistant key={currentAssessment.id} assessment={currentAssessment} online={isOnline} onApproved={(updatedClient, updatedAssessment) => { setApprovedAssessment(updatedAssessment); onApproved(updatedClient, updatedAssessment); }} /> : null}
 		</div>
 	);
 }

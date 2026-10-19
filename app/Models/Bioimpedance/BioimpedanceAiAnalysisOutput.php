@@ -12,6 +12,7 @@ class BioimpedanceAiAnalysisOutput extends Model
         'bioimpedance_ai_analysis_request_id',
         'raw_response',
         'professional_observation',
+        'care_guidance',
         'validation_status',
         'approved_by_user_id',
         'approved_at',
