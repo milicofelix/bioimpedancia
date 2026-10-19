@@ -49,6 +49,18 @@ export async function approveAssessmentObservation(assessmentId, payload) {
 	return data;
 }
 
+export async function generateAssessmentCareGuidance(assessmentId) {
+	const { data } = await window.axios.get(`/bioimpedance/assessments/${assessmentId}/care-guidance-suggestion`);
+
+	return data.assistant;
+}
+
+export async function approveAssessmentCareGuidance(assessmentId, payload) {
+	const { data } = await window.axios.patch(`/bioimpedance/assessments/${assessmentId}/care-guidance`, payload);
+
+	return data;
+}
+
 export async function createAssessmentShare(assessmentId, payload) {
 	const { data } = await window.axios.post(`/bioimpedance/assessments/${assessmentId}/shares`, payload);
 

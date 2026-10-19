@@ -17,6 +17,7 @@ class BioimpedanceAiAnalysisRequest extends Model
         'reference_version',
         'model_name',
         'status',
+        'purpose',
         'structured_context',
         'validation_errors',
     ];

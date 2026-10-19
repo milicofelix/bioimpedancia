@@ -39,6 +39,10 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:5,1')
         ->name('bioimpedance.assessments.observation-suggestion');
     Route::patch('/bioimpedance/assessments/{assessment}/observation', [BioimpedanceController::class, 'approveAssessmentObservation'])->name('bioimpedance.assessments.observation.approve');
+    Route::get('/bioimpedance/assessments/{assessment}/care-guidance-suggestion', [BioimpedanceController::class, 'suggestAssessmentCareGuidance'])
+        ->middleware('throttle:5,1')
+        ->name('bioimpedance.assessments.care-guidance.suggestion');
+    Route::patch('/bioimpedance/assessments/{assessment}/care-guidance', [BioimpedanceController::class, 'approveAssessmentCareGuidance'])->name('bioimpedance.assessments.care-guidance.approve');
     Route::post('/bioimpedance/assessments/{assessment}/shares', [BioimpedanceController::class, 'createAssessmentShare'])->name('bioimpedance.assessments.shares.store');
     Route::patch('/bioimpedance/report-shares/{share}/revoke', [BioimpedanceController::class, 'revokeAssessmentShare'])->name('bioimpedance.report-shares.revoke');
     Route::put('/bioimpedance/assessments/{assessment}', [BioimpedanceController::class, 'updateAssessment'])->name('bioimpedance.assessments.update');

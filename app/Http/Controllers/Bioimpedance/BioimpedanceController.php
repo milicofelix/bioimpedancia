@@ -12,6 +12,7 @@ use App\Models\Bioimpedance\BioimpedanceClinicSetting;
 use App\Models\Bioimpedance\BioimpedanceReportShare;
 use App\Models\User;
 use App\Services\Bioimpedance\BioimpedanceAnalyzer;
+use App\Services\Bioimpedance\BioimpedanceCareGuidanceAssistant;
 use App\Services\Bioimpedance\BioimpedanceObservationAssistant;
 use App\Services\Bioimpedance\BioimpedanceReportSharePresenter;
 use App\Services\Bioimpedance\LegacyBioimpedanceAnalysisRefresher;
@@ -465,6 +466,10 @@ class BioimpedanceController extends Controller
                 'calculated_bmi' => $analysis['calculated_bmi'],
                 'bmi_difference' => $analysis['bmi_difference'],
                 'analysis' => $analysis,
+                'care_guidance' => null,
+                'care_guidance_sources' => null,
+                'care_guidance_approved_by_user_id' => null,
+                'care_guidance_approved_at' => null,
             ]);
 
             $this->auditAssessment($assessment->refresh(), $request, 'corrected', $changeReason, $oldValues, $this->assessmentAuditValues($assessment));
@@ -610,36 +615,121 @@ class BioimpedanceController extends Controller
             'assistant_output_id' => ['nullable', 'exists:bioimpedance_ai_analysis_outputs,id'],
         ]);
 
-        $oldValues = $this->assessmentAuditValues($assessment);
-        $assessment->update([
-            'notes' => $validated['notes'],
-        ]);
+        DB::transaction(function () use ($assessment, $request, $validated): void {
+            $oldValues = $this->assessmentAuditValues($assessment);
+            $assessment->update([
+                'notes' => $validated['notes'],
+                'care_guidance' => null,
+                'care_guidance_sources' => null,
+                'care_guidance_approved_by_user_id' => null,
+                'care_guidance_approved_at' => null,
+            ]);
 
-        $this->auditAssessment(
-            $assessment->refresh(),
-            $request,
-            'observation_'.$validated['review_action'],
-            $validated['review_action'] === 'edited'
-                ? 'Sugestão do assistente editada e aprovada pelo profissional.'
-                : 'Sugestão do assistente aprovada pelo profissional.',
-            $oldValues,
-            $this->assessmentAuditValues($assessment)
-        );
+            $this->auditAssessment(
+                $assessment->refresh(),
+                $request,
+                'observation_'.$validated['review_action'],
+                $validated['review_action'] === 'edited'
+                    ? 'Sugestão do assistente editada e aprovada pelo profissional.'
+                    : 'Sugestão do assistente aprovada pelo profissional.',
+                $oldValues,
+                $this->assessmentAuditValues($assessment)
+            );
 
-        if ($validated['assistant_output_id'] ?? null) {
-            BioimpedanceAiAnalysisOutput::query()
-                ->where('id', $validated['assistant_output_id'])
-                ->whereHas('request', fn ($query) => $query->where('bioimpedance_assessment_id', $assessment->id))
-                ->update([
-                    'professional_observation' => $validated['notes'],
-                    'approved_by_user_id' => $request->user()->id,
-                    'approved_at' => now(),
-                ]);
-        }
+            if ($validated['assistant_output_id'] ?? null) {
+                BioimpedanceAiAnalysisOutput::query()
+                    ->where('id', $validated['assistant_output_id'])
+                    ->where('validation_status', 'passed')
+                    ->whereHas('request', fn ($query) => $query
+                        ->where('bioimpedance_assessment_id', $assessment->id)
+                        ->where('purpose', 'observation'))
+                    ->update([
+                        'professional_observation' => $validated['notes'],
+                        'approved_by_user_id' => $request->user()->id,
+                        'approved_at' => now(),
+                    ]);
+            }
+        });
 
         return response()->json([
             'client' => $this->clientPayload($this->loadClientAssessments($assessment->client->refresh())),
             'assessment' => $this->assessmentPayload($assessment),
+            'audit_events' => $request->user()->isAdmin() ? $this->auditEventsPayload() : [],
+        ]);
+    }
+
+    public function suggestAssessmentCareGuidance(Request $request, BioimpedanceAssessment $assessment, BioimpedanceCareGuidanceAssistant $assistant): JsonResponse
+    {
+        $this->authorizeClinicalProfessional($request);
+        abort_if($assessment->canceled_at, 422, 'Avaliação cancelada não pode receber orientações.');
+        abort_if(blank($assessment->notes), 422, 'A observação profissional precisa ser aprovada antes das orientações.');
+
+        $hasApprovedObservation = BioimpedanceAiAnalysisOutput::query()
+            ->whereNotNull('approved_at')
+            ->whereHas('request', fn ($query) => $query->where('bioimpedance_assessment_id', $assessment->id)->where('purpose', 'observation'))
+            ->exists();
+        abort_unless($hasApprovedObservation, 422, 'A observação gerada precisa ser aprovada antes das orientações.');
+
+        return response()->json(['assistant' => $assistant->suggest($assessment, $request->user())]);
+    }
+
+    public function approveAssessmentCareGuidance(Request $request, BioimpedanceAssessment $assessment): JsonResponse
+    {
+        $this->authorizeClinicalProfessional($request);
+        abort_if($assessment->canceled_at, 422, 'Avaliação cancelada não pode receber orientações.');
+
+        $validated = $request->validate([
+            'care_guidance' => ['required', 'string', 'min:100', 'max:4000'],
+            'review_action' => ['required', Rule::in(['approved', 'edited'])],
+            'assistant_output_id' => ['required', 'integer', 'exists:bioimpedance_ai_analysis_outputs,id'],
+        ]);
+
+        $output = BioimpedanceAiAnalysisOutput::query()
+            ->with(['request.sources.chunk.document'])
+            ->whereKey($validated['assistant_output_id'])
+            ->where('validation_status', 'passed')
+            ->whereHas('request', fn ($query) => $query->where('bioimpedance_assessment_id', $assessment->id)->where('purpose', 'care_guidance'))
+            ->firstOrFail();
+
+        if (data_get($output->request->structured_context, 'assessment_updated_at') !== $assessment->updated_at?->toIso8601String()) {
+            throw ValidationException::withMessages([
+                'care_guidance' => 'A avaliação foi alterada depois da geração. Gere uma nova orientação antes de aprovar.',
+            ]);
+        }
+
+        $sources = $output->request->sources->map(fn ($source) => [
+            'id' => $source->chunk?->chunk_key,
+            'document' => $source->chunk?->document?->title,
+            'section' => $source->chunk?->section,
+            'url' => $source->chunk?->document?->source_url,
+        ])->filter(fn ($source) => filled($source['id']))->values()->all();
+
+        DB::transaction(function () use ($assessment, $request, $validated, $output, $sources): void {
+            $oldValues = $this->assessmentAuditValues($assessment);
+            $assessment->update([
+                'care_guidance' => $validated['care_guidance'],
+                'care_guidance_sources' => $sources,
+                'care_guidance_approved_by_user_id' => $request->user()->id,
+                'care_guidance_approved_at' => now(),
+            ]);
+            $output->update([
+                'care_guidance' => $validated['care_guidance'],
+                'approved_by_user_id' => $request->user()->id,
+                'approved_at' => now(),
+            ]);
+            $this->auditAssessment(
+                $assessment->refresh(),
+                $request,
+                'care_guidance_'.$validated['review_action'],
+                $validated['review_action'] === 'edited' ? 'Orientações do agente editadas e aprovadas pelo profissional.' : 'Orientações do agente aprovadas pelo profissional.',
+                $oldValues,
+                $this->assessmentAuditValues($assessment)
+            );
+        });
+
+        return response()->json([
+            'client' => $this->clientPayload($this->loadClientAssessments($assessment->client->refresh())),
+            'assessment' => $this->assessmentPayload($assessment->refresh()),
             'audit_events' => $request->user()->isAdmin() ? $this->auditEventsPayload() : [],
         ]);
     }
@@ -908,6 +998,10 @@ class BioimpedanceController extends Controller
             'analysis',
             'source_metadata',
             'notes',
+            'care_guidance',
+            'care_guidance_sources',
+            'care_guidance_approved_by_user_id',
+            'care_guidance_approved_at',
             'correction_count',
             'canceled_at',
             'cancellation_reason',
@@ -1285,13 +1379,17 @@ class BioimpedanceController extends Controller
 
     private function loadClientAssessments(BioimpedanceClient $client): BioimpedanceClient
     {
-        return $client->load(['assessments' => fn ($query) => $query->with('shares')->latest('evaluated_at')]);
+        return $client->load(['assessments' => fn ($query) => $query
+            ->with(['shares', 'careGuidanceApprovedBy', 'aiAnalysisRequests.output'])
+            ->latest('evaluated_at')]);
     }
 
     private function operationalWorkspacePayload(Request $request): array
     {
         $clients = BioimpedanceClient::query()
-            ->with(['assessments' => fn ($query) => $query->with('shares')->latest('evaluated_at')])
+            ->with(['assessments' => fn ($query) => $query
+                ->with(['shares', 'careGuidanceApprovedBy', 'aiAnalysisRequests.output'])
+                ->latest('evaluated_at')])
             ->orderBy('full_name')
             ->get()
             ->map(fn (BioimpedanceClient $client) => $this->clientPayload($client));
@@ -1306,6 +1404,14 @@ class BioimpedanceController extends Controller
     private function assessmentPayload(BioimpedanceAssessment $assessment): array
     {
         $analysis = $assessment->analysis;
+        $hasApprovedAiObservation = $assessment->relationLoaded('aiAnalysisRequests')
+            ? $assessment->aiAnalysisRequests->contains(fn ($request) => $request->purpose === 'observation' && $request->output?->approved_at !== null)
+            : BioimpedanceAiAnalysisOutput::query()
+                ->whereNotNull('approved_at')
+                ->whereHas('request', fn ($query) => $query
+                    ->where('bioimpedance_assessment_id', $assessment->id)
+                    ->where('purpose', 'observation'))
+                ->exists();
 
         return [
             'id' => $assessment->id,
@@ -1344,6 +1450,11 @@ class BioimpedanceController extends Controller
             'analysis' => $analysis,
             'source_metadata' => $assessment->source_metadata,
             'notes' => $assessment->notes,
+            'care_guidance' => $assessment->care_guidance,
+            'care_guidance_sources' => $assessment->care_guidance_sources ?? [],
+            'care_guidance_approved_at' => $assessment->care_guidance_approved_at?->toIso8601String(),
+            'care_guidance_approved_by_name' => $assessment->careGuidanceApprovedBy?->name,
+            'has_approved_ai_observation' => $hasApprovedAiObservation,
             'correction_count' => $assessment->correction_count,
             'canceled_at' => $assessment->canceled_at?->toIso8601String(),
             'cancellation_reason' => $assessment->cancellation_reason,

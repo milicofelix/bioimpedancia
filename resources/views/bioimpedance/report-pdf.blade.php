@@ -17,7 +17,7 @@
         .page {
             border: 1px solid #f2c7cf;
             border-radius: 10px;
-            overflow: hidden;
+            overflow: visible;
         }
         .header {
             padding: 16px 20px 14px;
@@ -252,6 +252,16 @@
             <p>{{ $assessment['analysis']['summary'] ?? 'Síntese indisponível.' }}</p>
             @if($assessment['notes'])
                 <p><strong>Observações:</strong> {{ $assessment['notes'] }}</p>
+            @endif
+            @if($assessment['care_guidance'] ?? null)
+                <div style="margin-top: 10px; padding-top: 9px; border-top: 1px solid #b7e3dc;">
+                    <p><strong>Orientações aprovadas:</strong></p>
+                    <p style="white-space: pre-line;">{{ $assessment['care_guidance'] }}</p>
+                    @if(count($assessment['care_guidance_sources'] ?? []))
+                        <p class="muted"><strong>Referências:</strong> {{ collect($assessment['care_guidance_sources'])->map(fn ($source) => ($source['document'] ?? '').' — '.($source['section'] ?? ''))->implode('; ') }}</p>
+                    @endif
+                    <p class="muted">Orientações educativas aprovadas pelo profissional; não substituem avaliação médica, nutricional ou de educação física.</p>
+                </div>
             @endif
             <p class="muted">Equipamento {{ $reference['manufacturer'] ?? 'Omron' }} {{ $assessment['device_model'] ?? ($reference['model'] ?? 'HBF-514C') }} | Versão {{ $assessment['reference_version'] ?? ($reference['classification_version'] ?? '1.0.0') }} | {{ $isRelaxmedic ? 'Importação de imagem com conferência humana' : 'Entrada manual' }}</p>
             @if($isRelaxmedic && $sourceMetadata)
