@@ -4,22 +4,35 @@ import useActionLock from '../../../hooks/useActionLock';
 import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaIcon from '../../components/ui/PwaIcon';
+import CareGuidanceProgress, { careGuidanceProcessingSteps } from './CareGuidanceProgress';
 
 export default function CareGuidanceAssistant({ assessment, online, onApproved }) {
 	const runAction = useActionLock();
 	const [assistant, setAssistant] = useState(null);
 	const [draft, setDraft] = useState('');
 	const [generating, setGenerating] = useState(false);
+	const [processingStep, setProcessingStep] = useState(0);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState('');
 	const edited = Boolean(assistant?.suggestion && draft !== assistant.suggestion);
 	const blocked = Boolean(assistant && assistant.status !== 'generated');
 
 	useEffect(() => {
+		if (!generating) return undefined;
+
+		const interval = window.setInterval(() => {
+			setProcessingStep((current) => Math.min(current + 1, careGuidanceProcessingSteps.length - 1));
+		}, 1200);
+
+		return () => window.clearInterval(interval);
+	}, [generating]);
+
+	useEffect(() => {
 		setAssistant(null);
 		setDraft('');
 		setError('');
 		setGenerating(false);
+		setProcessingStep(0);
 		setSaving(false);
 	}, [assessment.id]);
 
@@ -27,6 +40,7 @@ export default function CareGuidanceAssistant({ assessment, online, onApproved }
 		return runAction('generate-care-guidance', async () => {
 			if (!online || generating) return;
 			setGenerating(true);
+			setProcessingStep(0);
 			setError('');
 			try {
 				const result = await generateAssessmentCareGuidance(assessment.id);
@@ -63,6 +77,8 @@ export default function CareGuidanceAssistant({ assessment, online, onApproved }
 		});
 	}
 
+	if (generating) return <CareGuidanceProgress currentStep={processingStep} />;
+
 	return (
 		<PwaCard className="border-teal-200 p-5">
 			<div className="flex items-start gap-3"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-teal-100 text-teal-800"><PwaIcon name="sparkles" size={21} /></span><div><p className="text-xs font-bold uppercase tracking-wide text-teal-700">Agente de orientações</p><h2 className="text-lg font-bold text-slate-950">Próximos cuidados</h2></div></div>
@@ -75,7 +91,7 @@ export default function CareGuidanceAssistant({ assessment, online, onApproved }
 				{edited ? <p className="text-xs font-bold text-violet-700">Texto editado pelo profissional.</p> : null}
 				<div><h3 className="text-xs font-bold uppercase text-slate-600">Fontes utilizadas</h3><div className="mt-2 space-y-2">{assistant.sources?.map((source) => <div key={source.id} className="rounded-xl bg-slate-50 p-3 text-xs"><p className="font-bold text-slate-800">{source.document}</p><p className="mt-1 text-slate-600">{source.section}</p></div>)}</div></div>
 				<div className="grid gap-2 sm:grid-cols-2"><PwaButton type="button" variant="secondary" onClick={() => { setAssistant(null); setDraft(''); }}>{blocked ? 'Voltar e tentar novamente' : 'Descartar'}</PwaButton><PwaButton type="button" icon="check" onClick={approve} disabled={blocked || saving || draft.trim().length < 100 || !online} loading={saving}>{saving ? 'Aprovando...' : 'Aprovar para o relatório'}</PwaButton></div>
-			</div> : <PwaButton type="button" icon="sparkles" onClick={generate} disabled={generating || !online} loading={generating} className="mt-4 w-full">{generating ? 'Analisando orientações...' : assessment.care_guidance ? 'Gerar nova sugestão' : 'Sugerir próximos cuidados'}</PwaButton>}
+			</div> : <PwaButton type="button" icon="sparkles" onClick={generate} disabled={!online} className="mt-4 w-full">{assessment.care_guidance ? 'Gerar nova sugestão' : 'Sugerir próximos cuidados'}</PwaButton>}
 			{error ? <p role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">{error}</p> : null}
 			<p className="mt-3 text-xs leading-5 text-slate-600">Vitaminas e suplementos dependem de avaliação individual e não são indicados automaticamente pelo agente.</p>
 		</PwaCard>
