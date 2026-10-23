@@ -17,6 +17,7 @@ use App\Services\Bioimpedance\BioimpedanceObservationAssistant;
 use App\Services\Bioimpedance\BioimpedanceReportSharePresenter;
 use App\Services\Bioimpedance\LegacyBioimpedanceAnalysisRefresher;
 use App\Services\Bioimpedance\RelaxmedicImageProcessor;
+use App\Services\Bioimpedance\RelaxmedicValueNormalizer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Client\ConnectionException;
@@ -33,7 +34,11 @@ use Illuminate\Validation\ValidationException;
 
 class BioimpedanceController extends Controller
 {
-    public function __construct(private readonly BioimpedanceReportSharePresenter $reportSharePresenter) {}
+    public function __construct(
+        private readonly BioimpedanceReportSharePresenter $reportSharePresenter,
+        private readonly RelaxmedicValueNormalizer $relaxmedicValueNormalizer,
+        private readonly BioimpedanceAnalyzer $bioimpedanceAnalyzer,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -828,6 +833,9 @@ class BioimpedanceController extends Controller
             'water_weight_kg' => $this->normalizeDecimal($request->input('water_weight_kg')),
             'protein_mass_kg' => $this->normalizeDecimal($request->input('protein_mass_kg')),
             'ideal_body_weight_kg' => $this->normalizeDecimal($request->input('ideal_body_weight_kg')),
+            'obesity_level' => $isRelaxmedic
+                ? $this->relaxmedicValueNormalizer->obesityLevel($request->input('obesity_level'))
+                : $request->input('obesity_level'),
             'visceral_fat_level' => $this->normalizeDecimal($request->input('visceral_fat_level')),
         ]);
 
@@ -1404,6 +1412,13 @@ class BioimpedanceController extends Controller
     private function assessmentPayload(BioimpedanceAssessment $assessment): array
     {
         $analysis = $assessment->analysis;
+        if ($assessment->device_model === 'Relaxmedic'
+            && ($analysis['reference']['classification_version'] ?? null) !== BioimpedanceAnalyzer::REFERENCE_VERSION) {
+            $analysis = $this->bioimpedanceAnalyzer->analyze(
+                $assessment->client->toArray(),
+                $assessment->toArray(),
+            );
+        }
         $hasApprovedAiObservation = $assessment->relationLoaded('aiAnalysisRequests')
             ? $assessment->aiAnalysisRequests->contains(fn ($request) => $request->purpose === 'observation' && $request->output?->approved_at !== null)
             : BioimpedanceAiAnalysisOutput::query()
@@ -1442,7 +1457,9 @@ class BioimpedanceController extends Controller
             'water_weight_kg' => $assessment->water_weight_kg === null ? null : (float) $assessment->water_weight_kg,
             'protein_mass_kg' => $assessment->protein_mass_kg === null ? null : (float) $assessment->protein_mass_kg,
             'ideal_body_weight_kg' => $assessment->ideal_body_weight_kg === null ? null : (float) $assessment->ideal_body_weight_kg,
-            'obesity_level' => $assessment->obesity_level,
+            'obesity_level' => $assessment->device_model === 'Relaxmedic'
+                ? $this->relaxmedicValueNormalizer->obesityLevel($assessment->obesity_level)
+                : $assessment->obesity_level,
             'body_type' => $assessment->body_type,
             'resting_metabolism_kcal' => $assessment->resting_metabolism_kcal,
             'body_age' => $assessment->body_age,

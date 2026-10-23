@@ -9,6 +9,8 @@ use RuntimeException;
 
 class RelaxmedicImageProcessor
 {
+    public function __construct(private readonly RelaxmedicValueNormalizer $valueNormalizer) {}
+
     private const METRIC_FIELDS = [
         'weight_kg',
         'scale_bmi',
@@ -188,9 +190,11 @@ class RelaxmedicImageProcessor
         $metrics = [];
         foreach (self::METRIC_FIELDS as $field) {
             $value = $rawMetrics[$field] ?? null;
-            $metrics[$field] = array_key_exists($field, self::NUMERIC_RANGES)
-                ? $this->normalizeNumber($value)
-                : $this->normalizeText($value);
+            $metrics[$field] = match (true) {
+                array_key_exists($field, self::NUMERIC_RANGES) => $this->normalizeNumber($value),
+                $field === 'obesity_level' => $this->valueNormalizer->obesityLevel($value),
+                default => $this->normalizeText($value),
+            };
         }
 
         $numericCount = collect(self::NUMERIC_RANGES)
@@ -230,6 +234,14 @@ class RelaxmedicImageProcessor
                 'value' => $item['value'] ?? null,
                 'reason' => (string) $item['reason'],
             ]);
+
+        if (filled($rawMetrics['obesity_level'] ?? null) && ! $this->valueNormalizer->recognizesObesityLevel($rawMetrics['obesity_level'])) {
+            $suspiciousValues->push([
+                'field' => 'obesity_level',
+                'value' => $rawMetrics['obesity_level'],
+                'reason' => 'Classificação não reconhecida pelo mapeamento Relaxmedic. Confira o texto na imagem.',
+            ]);
+        }
 
         foreach (self::NUMERIC_RANGES as $field => [$minimum, $maximum]) {
             $value = $metrics[$field];

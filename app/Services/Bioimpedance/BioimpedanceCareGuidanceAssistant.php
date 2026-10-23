@@ -50,7 +50,24 @@ class BioimpedanceCareGuidanceAssistant
                     'tags' => ['physical_activity', 'general_guidance'],
                     'content' => 'Para adultos, a OMS recomenda 150 a 300 minutos semanais de atividade aeróbica moderada, ou 75 a 150 minutos de atividade vigorosa, além de fortalecimento dos principais grupos musculares em dois ou mais dias por semana. A progressão deve respeitar capacidade, condições clínicas e orientação profissional.',
                 ],
+                [
+                    'chunk_key' => 'who-older-adult-functional-activity',
+                    'section' => 'Atividade física para pessoas idosas',
+                    'tags' => ['physical_activity', 'older_adult', 'function'],
+                    'content' => 'Para pessoas com 65 anos ou mais, a OMS recomenda atividade multicomponente que enfatize equilíbrio funcional e fortalecimento. Pessoas inativas devem começar com pequenas quantidades e progredir conforme capacidades, condições e orientação profissional.',
+                ],
             ],
+        ],
+        [
+            'title' => 'Saúde da Pessoa Idosa — Ministério da Saúde',
+            'version' => 'consulta-2026',
+            'source_url' => 'https://www.gov.br/saude/pt-br/assuntos/saude-de-a-a-z/s/saude-da-pessoa-idosa',
+            'chunks' => [[
+                'chunk_key' => 'brazil-older-adult-functionality',
+                'section' => 'Avaliação multidimensional e funcionalidade',
+                'tags' => ['older_adult', 'function', 'safety'],
+                'content' => 'O cuidado da pessoa idosa deve considerar funcionalidade, contexto de vida e suporte social. Força muscular, equilíbrio e mobilidade não devem ser inferidos somente por peso, IMC ou estimativas de composição corporal.',
+            ]],
         ],
         [
             'title' => 'Política de segurança das orientações Ricosty',
@@ -61,7 +78,7 @@ class BioimpedanceCareGuidanceAssistant
                     'chunk_key' => 'ricosty-care-guidance-safety',
                     'section' => 'Limites clínicos',
                     'tags' => ['safety', 'prohibited_content'],
-                    'content' => 'Não diagnosticar doenças, interpretar exames não registrados, prescrever dieta individualizada, exercício, medicamento, vitamina ou suplemento. Recomendações devem ser gerais, condicionadas à avaliação de profissional habilitado e baseadas somente nos dados disponíveis.',
+                    'content' => 'Não diagnosticar doenças, interpretar exames não registrados, prescrever dieta individualizada, exercício, medicamento, vitamina ou suplemento. Não usar apenas IMC ou peso ideal do fabricante para definir meta. Não afirmar preservação muscular a partir de percentual estimado sem avaliação de força e função. Recomendações devem ser gerais, condicionadas à avaliação de profissional habilitado e baseadas somente nos dados disponíveis.',
                 ],
             ],
         ],
@@ -154,7 +171,7 @@ class BioimpedanceCareGuidanceAssistant
     private function systemPrompt(): string
     {
         return <<<'PROMPT'
-Você é o agente de orientações educativas da Ricosty. Escreva em português do Brasil para o cliente, usando apenas o contexto e as fontes fornecidas. Relacione os hábitos somente aos pontos de atenção realmente presentes, sem inventar doença, exame, colesterol, deficiência vitamínica ou contraindicação. Não diagnostique nem prescreva dieta, exercício, medicamento, vitamina ou suplemento. Ofereça opções gerais, realistas e graduais de alimentação e movimento, sempre condicionando atividade física à capacidade e eventual liberação profissional. Inclua recomendação de procurar médico ou nutricionista quando apropriado. Não prometa resultados. Informe em source_chunk_ids os IDs que sustentam o texto. O texto final deve ser acolhedor, objetivo e adequado ao relatório. Responda apenas no schema solicitado.
+Você é o agente de orientações educativas da Ricosty. Escreva em português do Brasil para o cliente, usando apenas o contexto, a observação aprovada, o histórico e as fontes fornecidas. Relacione os hábitos somente aos pontos de atenção e tendências realmente presentes, sem inventar doença, exame, colesterol, deficiência vitamínica ou contraindicação. Não diagnostique nem prescreva dieta, exercício, medicamento, vitamina ou suplemento. Não defina objetivo somente por IMC ou peso ideal do fabricante e não afirme musculatura preservada a partir de percentual estimado. Para pessoas idosas, priorize preservação de força, função, equilíbrio e autonomia, com avaliação profissional. Ofereça opções gerais, realistas e graduais, sempre condicionando atividade física à capacidade e eventual liberação profissional. Não prometa resultados. Informe em source_chunk_ids os IDs que sustentam o texto. O texto final deve ser acolhedor, objetivo e adequado ao relatório. Responda apenas no schema solicitado.
 PROMPT;
     }
 
@@ -173,13 +190,18 @@ PROMPT;
     private function localResponse(array $context): array
     {
         $attention = collect($context['attention_points'])->implode(', ');
+        $history = collect($context['history_changes'])->implode(', ');
         $opening = $attention
             ? 'Os pontos que merecem atenção nesta avaliação são: '.$attention.'. As sugestões abaixo são gerais e devem ser adaptadas pelo profissional à sua realidade.'
             : 'A avaliação não apresentou ponto específico que justifique uma conduta individualizada. As sugestões abaixo apoiam a manutenção de hábitos saudáveis.';
+        $historyText = $history ? "\n\nHistórico: em relação à avaliação anterior, foi observada {$history}. A tendência deve ser interpretada considerando as condições de cada medição." : '';
+        $olderAdultText = ($context['age_at_assessment'] ?? 0) >= 60
+            ? "\n\nForça e função: nesta faixa etária, o objetivo não deve ser definido somente por IMC ou pelo peso de referência do fabricante. É importante preservar massa, força, equilíbrio e autonomia. Se houver liberação e supervisão adequadas, exercícios de fortalecimento e atividades de equilíbrio podem integrar o plano; a estimativa muscular da balança, isoladamente, não comprova função preservada."
+            : '';
 
         return [
-            'care_guidance' => $opening."\n\nAlimentação: priorize refeições variadas baseadas em alimentos in natura ou minimamente processados, como frutas, legumes, verduras e feijões. Reduza a frequência de ultraprocessados, bebidas açucaradas e lanches industrializados. Vitaminas e suplementos só devem ser usados quando indicados por profissional habilitado após avaliação adequada.\n\nMovimento: se estiver apto e liberado para atividade física, aumente o movimento de forma gradual. Caminhada, bicicleta, dança e exercícios de fortalecimento são opções possíveis. Como referência geral para adultos, a OMS recomenda de 150 a 300 minutos semanais de atividade moderada e fortalecimento muscular em dois ou mais dias, com adaptação à condição individual.\n\nAcompanhamento: defina metas pequenas e possíveis, acompanhe a evolução em condições semelhantes de medição e procure médico, nutricionista ou profissional de educação física para orientação individualizada.",
-            'source_chunk_ids' => ['brazil-food-guide-natural-foods', 'brazil-food-guide-ultraprocessed', 'who-adult-physical-activity', 'ricosty-care-guidance-safety'],
+            'care_guidance' => $opening.$historyText.$olderAdultText."\n\nAlimentação: priorize refeições variadas baseadas em alimentos in natura ou minimamente processados, como frutas, legumes, verduras e feijões. Reduza a frequência de ultraprocessados, bebidas açucaradas e lanches industrializados. Vitaminas e suplementos só devem ser usados quando indicados por profissional habilitado após avaliação adequada.\n\nMovimento: se estiver apto e liberado para atividade física, aumente o movimento de forma gradual. Caminhada, bicicleta, dança e exercícios de fortalecimento são opções possíveis, adaptadas à condição individual.\n\nAcompanhamento: defina metas pequenas e possíveis, compare avaliações realizadas em condições semelhantes e procure médico, nutricionista ou profissional de educação física para orientação individualizada.",
+            'source_chunk_ids' => ['brazil-food-guide-natural-foods', 'brazil-food-guide-ultraprocessed', 'who-adult-physical-activity', 'who-older-adult-functional-activity', 'brazil-older-adult-functionality', 'ricosty-care-guidance-safety'],
         ];
     }
 
@@ -209,6 +231,21 @@ PROMPT;
             return in_array($indicator['tone'] ?? null, ['warning', 'danger', 'attention'], true) && filled($indicator['classification'] ?? null)
                 ? $label.' '.mb_strtolower($indicator['classification']) : null;
         })->filter()->values()->all();
+        if ($assessment->device_model === 'Relaxmedic') {
+            $attention = [];
+        }
+        $previous = $assessment->client->assessments()
+            ->where('id', '!=', $assessment->id)
+            ->whereNull('canceled_at')
+            ->where('evaluated_at', '<', $assessment->evaluated_at)
+            ->latest('evaluated_at')
+            ->first();
+        $historyChanges = $previous ? collect([
+            $this->changeText('peso', $previous->weight_kg, $assessment->weight_kg, 'kg'),
+            $this->changeText('gordura corporal', $previous->body_fat_percentage, $assessment->body_fat_percentage, 'ponto percentual'),
+            $this->changeText('massa magra', $previous->lean_body_mass_kg, $assessment->lean_body_mass_kg, 'kg'),
+            $this->changeText('músculo esquelético estimado', $previous->skeletal_muscle_percentage, $assessment->skeletal_muscle_percentage, 'ponto percentual'),
+        ])->filter()->values()->all() : [];
 
         return [
             'assessment_id' => $assessment->id,
@@ -216,8 +253,24 @@ PROMPT;
             'age_at_assessment' => $assessment->age_at_assessment,
             'professional_observation' => $assessment->notes,
             'attention_points' => $attention,
+            'device_model' => $assessment->device_model,
+            'history_changes' => $historyChanges,
             'available_data_notice' => 'A avaliação contém composição corporal; não contém exames laboratoriais, diagnósticos, medicações, alergias ou deficiências vitamínicas.',
         ];
+    }
+
+    private function changeText(string $label, mixed $previous, mixed $current, string $unit): ?string
+    {
+        if ($previous === null || $current === null) {
+            return null;
+        }
+
+        $difference = round((float) $current - (float) $previous, 1);
+        if ($difference == 0.0) {
+            return 'estabilidade de '.$label;
+        }
+
+        return ($difference > 0 ? 'aumento' : 'redução').' de '.number_format(abs($difference), 1, ',', '.').' '.$unit.' em '.$label;
     }
 
     private function approvedChunks(User $user): Collection

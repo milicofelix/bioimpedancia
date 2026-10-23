@@ -23,6 +23,29 @@ export const relaxmedicMetricLabels = {
 	body_type: 'Tipo de corpo',
 };
 
+export const relaxmedicMetricMetadata = {
+	weight_kg: { type: 'Medida', note: 'Peso registrado pelo equipamento.' },
+	scale_bmi: { type: 'Índice calculado', note: 'Relação entre peso e altura; não deve definir objetivos isoladamente.' },
+	body_fat_percentage: { type: 'Estimativa', note: 'Estimativa de composição corporal do equipamento.' },
+	muscle_rate_percentage: { type: 'Estimativa', note: 'Estimativa proprietária; não comprova força ou função muscular.' },
+	lean_body_mass_kg: { type: 'Estimativa', note: 'Estimativa derivada pelo equipamento e sujeita às condições de medição.' },
+	subcutaneous_fat_percentage: { type: 'Estimativa', note: 'Estimativa proprietária da balança.' },
+	visceral_fat_level: { type: 'Índice do dispositivo', note: 'Não representa uma quantidade de gordura em kg.' },
+	body_water_percentage: { type: 'Estimativa', note: 'Pode variar conforme hidratação e condições da medição.' },
+	skeletal_muscle_percentage: { type: 'Estimativa', note: 'A classificação depende da referência e do modelo; não avalia força ou função.' },
+	muscle_mass_kg: { type: 'Estimativa', note: 'Não substitui avaliação de força e desempenho físico.' },
+	bone_mass_kg: { type: 'Estimativa', note: 'Não corresponde a exame de densidade mineral óssea.' },
+	protein_percentage: { type: 'Estimativa', note: 'Não diagnostica ingestão ou deficiência de proteína.' },
+	resting_metabolism_kcal: { type: 'Estimativa energética', note: 'Não corresponde ao gasto energético total nem a uma recomendação de consumo.' },
+	body_age: { type: 'Índice proprietário', note: 'Estimativa do aplicativo; não representa idade biológica ou diagnóstico clínico.' },
+	fat_mass_kg: { type: 'Estimativa', note: 'Valor derivado da estimativa de gordura corporal.' },
+	water_weight_kg: { type: 'Estimativa', note: 'Valor derivado e sensível ao estado de hidratação.' },
+	protein_mass_kg: { type: 'Estimativa', note: 'Não identifica deficiência nutricional.' },
+	ideal_body_weight_kg: { type: 'Referência do fabricante', note: 'Não representa uma meta de peso ou prescrição individual.' },
+	obesity_level: { type: 'Classificação do fabricante', note: 'Texto importado e normalizado; deve ser interpretado junto à avaliação profissional.' },
+	body_type: { type: 'Classificação do fabricante', note: 'Rótulo proprietário do aplicativo.' },
+};
+
 export const relaxmedicAdditionalMetricFields = [
 	'muscle_rate_percentage',
 	'lean_body_mass_kg',

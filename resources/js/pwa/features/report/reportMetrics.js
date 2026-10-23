@@ -1,4 +1,4 @@
-import { relaxmedicMetricLabels } from '../../../domain/bioimpedance/relaxmedic';
+import { relaxmedicMetricLabels, relaxmedicMetricMetadata } from '../../../domain/bioimpedance/relaxmedic';
 
 const omronMetrics = [
 	{ field: 'weight_kg', label: 'Peso', unit: 'kg', decimals: 1 },
@@ -42,6 +42,8 @@ export function metricsForAssessment(assessment) {
 			unit: relaxmedicUnits[field] ?? '',
 			decimals: integerFields.includes(field) ? 0 : 1,
 			text: textFields.includes(field),
+			type: relaxmedicMetricMetadata[field]?.type,
+			note: relaxmedicMetricMetadata[field]?.note,
 		}))
 		: omronMetrics;
 
@@ -52,7 +54,7 @@ export function previousAssessment(client, currentAssessment) {
 	const currentDate = new Date(currentAssessment.evaluated_at).getTime();
 
 	return (client?.assessments ?? [])
-		.filter((item) => item.id !== currentAssessment.id && !item.is_canceled && new Date(item.evaluated_at).getTime() < currentDate)
+		.filter((item) => item.id !== currentAssessment.id && !item.is_canceled && item.device_model === currentAssessment.device_model && new Date(item.evaluated_at).getTime() < currentDate)
 		.sort((left, right) => new Date(right.evaluated_at) - new Date(left.evaluated_at))[0] ?? null;
 }
 

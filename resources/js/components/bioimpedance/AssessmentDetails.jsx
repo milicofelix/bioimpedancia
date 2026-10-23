@@ -2,6 +2,7 @@ import React from 'react';
 import {
 	relaxmedicAdditionalMetricFields,
 	relaxmedicMetricLabels,
+	relaxmedicMetricMetadata,
 } from '../../domain/bioimpedance/relaxmedic';
 import { formatDate, numberBr } from '../../shared/formatters';
 
@@ -39,6 +40,8 @@ export default function AssessmentDetails({ assessment }) {
 						<div key={field} className="rounded-xl border border-slate-200 bg-white p-3">
 							<p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{relaxmedicMetricLabels[field]}</p>
 							<p className="mt-1 text-base font-semibold text-slate-950">{metricValue(field, assessment[field])}</p>
+							<p className="mt-2 text-[11px] font-bold uppercase tracking-wide text-sky-700">{relaxmedicMetricMetadata[field]?.type}</p>
+							<p className="mt-1 text-xs leading-5 text-slate-600">{relaxmedicMetricMetadata[field]?.note}</p>
 						</div>
 					))}
 				</div>

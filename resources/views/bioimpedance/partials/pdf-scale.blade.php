@@ -34,3 +34,6 @@
         </tr>
     </table>
 @endif
+@if($indicator['reference_range'] ?? null)
+    <div class="muted" style="margin-top: 5px; font-size: 7px;">{{ $indicator['reference_range'] }}</div>
+@endif

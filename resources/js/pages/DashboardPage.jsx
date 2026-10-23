@@ -4,6 +4,7 @@ import {
 	relaxmedicAdditionalMetricFields,
 	relaxmedicMaxImageBytes,
 	relaxmedicMetricLabels,
+	relaxmedicMetricMetadata,
 } from '../domain/bioimpedance/relaxmedic';
 import {
 	assessmentNumber,
@@ -2088,6 +2089,7 @@ function Report({ clinic, client, assessment, professional }) {
 										</div>
 									) : null}
 								</div>
+								{isRelaxmedic ? <p className="mt-2 text-xs leading-5 text-slate-600">Estimativa proprietária do aplicativo; não representa idade biológica real.</p> : null}
 							</div>
 						</section>
 
@@ -2104,6 +2106,7 @@ function Report({ clinic, client, assessment, professional }) {
 									labels={bodyFat.scale?.labels ?? ['Baixa', 'Normal', 'Elevada', 'Muito elevada']}
 									segments={bodyFat.scale?.segments}
 									pending={bodyFat.pending}
+									referenceText={bodyFat.reference_range}
 								/>
 								<ScaleCard
 									title="Músculo esquelético"
@@ -2115,6 +2118,7 @@ function Report({ clinic, client, assessment, professional }) {
 									labels={skeletalMuscle.scale?.labels ?? ['Baixo', 'Normal', 'Alto', 'Muito alto']}
 									segments={skeletalMuscle.scale?.segments}
 									pending={skeletalMuscle.pending}
+									referenceText={skeletalMuscle.reference_range}
 								/>
 								<ScaleCard
 									title="Gordura visceral"
@@ -2126,6 +2130,7 @@ function Report({ clinic, client, assessment, professional }) {
 									labels={visceralFat.scale?.labels ?? ['Normal', 'Alta', 'Muito alta']}
 									segments={visceralFat.scale?.segments}
 									pending={visceralFat.pending}
+									referenceText={visceralFat.reference_range}
 								/>
 								<ScaleCard
 									title="Metabolismo basal"
@@ -2133,6 +2138,7 @@ function Report({ clinic, client, assessment, professional }) {
 									unit="kcal/dia"
 									badge="Estimativa diária"
 									withoutScale
+									referenceText="Não corresponde ao gasto energético total nem a uma recomendação de consumo calórico."
 								/>
 							</div>
 						</section>
@@ -2145,6 +2151,8 @@ function Report({ clinic, client, assessment, professional }) {
 										<div key={field} className="rounded-xl border border-sky-100 bg-white p-4">
 											<p className="text-xs font-bold uppercase tracking-wide text-slate-500">{relaxmedicMetricLabels[field]}</p>
 											<p className="mt-2 text-2xl font-bold text-slate-950">{relaxmedicMetricValue(field, assessment[field])}</p>
+											<p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-sky-700">{relaxmedicMetricMetadata[field]?.type}</p>
+											<p className="mt-1 text-xs leading-5 text-slate-600">{relaxmedicMetricMetadata[field]?.note}</p>
 										</div>
 									))}
 								</div>
@@ -2155,8 +2163,9 @@ function Report({ clinic, client, assessment, professional }) {
 							<h3 className="text-base font-bold uppercase tracking-wide text-[#b96f7d]">Síntese da avaliação</h3>
 							<div className="mt-4 space-y-2 text-sm leading-6 text-slate-700">
 								<p>O IMC foi calculado automaticamente com base em peso e altura: {numberBr(assessment.calculated_bmi, 1)} kg/m², classificado como {bmiClassification}.</p>
-								<p>A gordura corporal foi classificada como {bodyFat.classification ?? '-'} e o músculo esquelético como {skeletalMuscle.classification ?? '-'}, conforme sexo e idade.</p>
-								<p>A idade corporal estimada foi de {assessment.body_age ?? '-'} anos e a gordura visceral foi classificada como {visceralFat.classification ?? '-'}.</p>
+								{isRelaxmedic ? <p>Gordura corporal, massa magra e músculo esquelético são estimativas do equipamento. A classificação Relaxmedic não é substituída por faixas de outro modelo.</p> : <p>A gordura corporal foi classificada como {bodyFat.classification ?? '-'} e o músculo esquelético como {skeletalMuscle.classification ?? '-'}, conforme sexo, idade e referência da Omron HBF-514C.</p>}
+								{isRelaxmedic ? <p>A idade corporal é um índice proprietário; a gordura visceral é um índice do dispositivo, não uma quantidade em kg; e a TMB estimada não corresponde ao gasto energético total.</p> : <p>A idade corporal estimada foi de {assessment.body_age ?? '-'} anos e a gordura visceral foi classificada como {visceralFat.classification ?? '-'}.</p>}
+								{assessmentAge >= 60 ? <p>Para pessoas com 60 anos ou mais, objetivos devem considerar preservação de massa, força e função muscular, histórico e avaliação profissional, não apenas IMC ou peso.</p> : null}
 							</div>
 							{assessment.notes ? <p className="mt-3 text-sm text-slate-600"><strong>Observações:</strong> {assessment.notes}</p> : null}
 							{assessment.care_guidance ? <div className="mt-4 rounded-xl border border-teal-200 bg-teal-50 p-4"><p className="text-sm font-bold text-teal-900">Orientações aprovadas</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{assessment.care_guidance}</p><p className="mt-3 text-xs text-slate-600">Conteúdo educativo aprovado pelo profissional; não substitui avaliação individual de médico, nutricionista ou profissional de educação física.</p></div> : null}
@@ -2217,7 +2226,7 @@ function HeroMetric({ eyebrow, value, unit, compactEyebrow = false }) {
 	);
 }
 
-function ScaleCard({ title, value, unit, badge, tone, position = 50, labels = [], segments, withoutScale = false, pending = false }) {
+function ScaleCard({ title, value, unit, badge, tone, position = 50, labels = [], segments, withoutScale = false, pending = false, referenceText = null }) {
 	const scaleSegments = segments ?? [
 		{ className: 'bg-blue-500', width: 25 },
 		{ className: 'bg-emerald-500', width: 25 },
@@ -2266,6 +2275,7 @@ function ScaleCard({ title, value, unit, badge, tone, position = 50, labels = []
 					</div>
 				</div>
 			)}
+			{referenceText ? <p className="mt-3 text-xs leading-5 text-slate-600">{referenceText}</p> : null}
 		</div>
 	);
 }
@@ -2288,15 +2298,16 @@ function EvolutionPanel({ client, selectedAssessment }) {
 	const current = selectedAssessment && !selectedAssessment.is_canceled
 		? selectedAssessment
 		: timeline[timeline.length - 1] ?? null;
-	const currentIndex = timeline.findIndex((assessment) => assessment.id === current?.id);
-	const previous = currentIndex > 0 ? timeline[currentIndex - 1] : null;
+	const comparableTimeline = timeline.filter((assessment) => assessment.device_model === current?.device_model);
+	const currentIndex = comparableTimeline.findIndex((assessment) => assessment.id === current?.id);
+	const previous = currentIndex > 0 ? comparableTimeline[currentIndex - 1] : null;
 	const selectedPeriod = evolutionPeriods.find((item) => item.key === period) ?? evolutionPeriods[evolutionPeriods.length - 1];
 	const periodStart = current && selectedPeriod.days
 		? new Date(new Date(current.evaluated_at).getTime() - selectedPeriod.days * 24 * 60 * 60 * 1000)
 		: null;
 	const visibleTimeline = periodStart
-		? timeline.filter((assessment) => new Date(assessment.evaluated_at) >= periodStart && new Date(assessment.evaluated_at) <= new Date(current.evaluated_at))
-		: timeline;
+		? comparableTimeline.filter((assessment) => new Date(assessment.evaluated_at) >= periodStart && new Date(assessment.evaluated_at) <= new Date(current.evaluated_at))
+		: comparableTimeline;
 	const first = visibleTimeline[0] ?? null;
 
 	return (
