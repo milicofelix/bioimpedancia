@@ -40,7 +40,7 @@ class LegacyBioimpedanceAnalysisRefresher
             return true;
         }
 
-        if (($analysis['reference']['classification_version'] ?? null) === null) {
+        if (($analysis['reference']['classification_version'] ?? null) !== BioimpedanceAnalyzer::REFERENCE_VERSION) {
             return true;
         }
 

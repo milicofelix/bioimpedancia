@@ -157,6 +157,21 @@
         'Nível de obesidade' => $assessment['obesity_level'] ?? null,
         'Tipo de corpo' => $assessment['body_type'] ?? null,
     ], fn ($value) => $value !== null && $value !== '');
+    $relaxmedicMetricNotes = [
+        'Taxa muscular' => ['Estimativa', 'Não comprova força ou função muscular.'],
+        'Massa corporal magra' => ['Estimativa', 'Valor derivado pelo equipamento e sujeito às condições de medição.'],
+        'Gordura subcutânea' => ['Estimativa', 'Estimativa proprietária do equipamento.'],
+        'Água corporal' => ['Estimativa', 'Pode variar conforme hidratação e condições de medição.'],
+        'Massa muscular' => ['Estimativa', 'Não substitui avaliação de força e desempenho físico.'],
+        'Massa óssea' => ['Estimativa', 'Não corresponde a exame de densidade mineral óssea.'],
+        'Proteína' => ['Estimativa', 'Não diagnostica ingestão ou deficiência nutricional.'],
+        'Massa gorda' => ['Estimativa', 'Valor derivado da estimativa de gordura corporal.'],
+        'Peso da água' => ['Estimativa', 'Valor derivado e sensível ao estado de hidratação.'],
+        'Massa de proteína' => ['Estimativa', 'Não identifica deficiência nutricional.'],
+        'Peso corporal ideal' => ['Referência do fabricante', 'Não representa meta de peso ou prescrição individual.'],
+        'Nível de obesidade' => ['Classificação do fabricante', 'Texto importado e normalizado; exige interpretação profissional.'],
+        'Tipo de corpo' => ['Classificação do fabricante', 'Rótulo proprietário do aplicativo.'],
+    ];
 @endphp
 <div class="page">
     <div class="header" style="border-bottom-color: {{ $primaryColor }};">
@@ -205,8 +220,10 @@
                 <td class="box" style="background: #f8e8eb;">
                     <div class="label" style="color: {{ $primaryColor }};">Idade corporal</div>
                     <div class="metric-value">{{ $assessment['body_age'] ?? '-' }} <span class="metric-unit">anos</span></div>
-                    @if($assessment['body_age'])
+                    @if($assessment['body_age'] && ! $isRelaxmedic)
                         <div class="muted">{{ abs($assessment['body_age'] - $assessmentAge) }} anos {{ $assessment['body_age'] > $assessmentAge ? 'acima' : 'abaixo' }} da idade cronológica</div>
+                    @elseif($assessment['body_age'] && $isRelaxmedic)
+                        <div class="muted">Índice proprietário; não representa idade biológica real.</div>
                     @endif
                 </td>
             </tr>
@@ -224,6 +241,7 @@
                     <div class="label">Metabolismo basal</div>
                     <div class="metric-value">{{ $assessment['resting_metabolism_kcal'] ? number_format($assessment['resting_metabolism_kcal'], 0, ',', '.') : '-' }} <span class="metric-unit">kcal/dia</span></div>
                     <span class="badge neutral">Estimativa diária</span>
+                    <div class="muted" style="margin-top: 5px;">Não corresponde ao gasto energético total nem a recomendação de consumo.</div>
                 </td>
             </tr>
         </table>
@@ -237,6 +255,10 @@
                             <td class="box">
                                 <div class="label">{{ $label }}</div>
                                 <div style="margin-top: 5px; font-size: 14px; font-weight: 700;">{{ $value }}</div>
+                                @if(isset($relaxmedicMetricNotes[$label]))
+                                    <div class="label" style="margin-top: 6px; color: #036b66;">{{ $relaxmedicMetricNotes[$label][0] }}</div>
+                                    <div class="muted" style="margin-top: 3px; font-size: 7px;">{{ $relaxmedicMetricNotes[$label][1] }}</div>
+                                @endif
                             </td>
                         @endforeach
                         @for($i = count($row); $i < 3; $i++)
@@ -250,6 +272,12 @@
         <div class="summary">
             <div class="section-title" style="margin-top: 0; color: {{ $primaryColor }};">Síntese da avaliação</div>
             <p>{{ $assessment['analysis']['summary'] ?? 'Síntese indisponível.' }}</p>
+            @if($isRelaxmedic)
+                <p><strong>Interpretação:</strong> composição corporal é estimada por algoritmos do equipamento. Coerência entre peso, massa gorda e massa magra não comprova precisão fisiológica. O índice de gordura visceral não representa kg; classificações de outro modelo não são aplicadas.</p>
+                @if($assessmentAge >= 60)
+                    <p><strong>Pessoa idosa:</strong> objetivos devem considerar preservação de massa, força e função muscular, histórico e avaliação profissional, não apenas IMC ou referência de peso do fabricante.</p>
+                @endif
+            @endif
             @if($assessment['notes'])
                 <p><strong>Observações:</strong> {{ $assessment['notes'] }}</p>
             @endif

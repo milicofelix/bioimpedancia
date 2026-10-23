@@ -8,7 +8,7 @@ class BioimpedanceAnalyzer
 {
     public const DEVICE_MODEL = 'HBF-514C';
 
-    public const REFERENCE_VERSION = '1.0.0';
+    public const REFERENCE_VERSION = '1.1.0';
 
     private const BODY_FAT_RANGES = [
         'female' => [
@@ -62,25 +62,31 @@ class BioimpedanceAnalyzer
             ],
             'calculated_bmi' => $calculatedBmi,
             'bmi_difference' => $bmiDifference,
-            'summary' => $this->summary($calculatedBmi, $assessment, $age, $sex),
-            'indicators' => $this->indicators($calculatedBmi, $assessment, $age, $sex),
+            'summary' => $this->summary($calculatedBmi, $assessment, $age, $sex, $isRelaxmedic),
+            'indicators' => $this->indicators($calculatedBmi, $assessment, $age, $sex, $isRelaxmedic),
+            'notices' => $isRelaxmedic ? [
+                'As classificações proprietárias da Relaxmedic não são recalculadas com faixas da Omron.',
+                'Os resultados de composição corporal são estimativas ou índices do equipamento.',
+            ] : [],
             'warnings' => $isRelaxmedic
                 ? $this->relaxmedicWarnings($calculatedBmi, $bmiDifference)
                 : $this->warnings($client, $assessment, $calculatedBmi, $bmiDifference),
         ];
     }
 
-    private function summary(float $calculatedBmi, array $assessment, int $age, string $sex): string
+    private function summary(float $calculatedBmi, array $assessment, int $age, string $sex, bool $isRelaxmedic): string
     {
         $bmi = $this->bmiClassification($calculatedBmi);
         $fat = isset($assessment['body_fat_percentage'])
-            ? 'Gordura corporal registrada em '.number_format((float) $assessment['body_fat_percentage'], 1, ',', '.').'%, classificada como '.$this->bodyFatClassification((float) $assessment['body_fat_percentage'], $sex, $age)['classification'].'.'
+            ? ($isRelaxmedic
+                ? 'Gordura corporal estimada pelo equipamento em '.number_format((float) $assessment['body_fat_percentage'], 1, ',', '.').'%; a referência de classificação Relaxmedic não está cadastrada.'
+                : 'Gordura corporal registrada em '.number_format((float) $assessment['body_fat_percentage'], 1, ',', '.').'%, classificada como '.$this->bodyFatClassification((float) $assessment['body_fat_percentage'], $sex, $age)['classification'].'.')
             : 'Gordura corporal nao informada.';
 
         return 'IMC calculado automaticamente com base em peso e altura: '.number_format($calculatedBmi, 1, ',', '.')." kg/m², classificado como {$bmi['classification']}. {$fat}";
     }
 
-    private function indicators(float $calculatedBmi, array $assessment, int $age, string $sex): array
+    private function indicators(float $calculatedBmi, array $assessment, int $age, string $sex, bool $isRelaxmedic): array
     {
         return [
             'weight' => [
@@ -94,8 +100,12 @@ class BioimpedanceAnalyzer
                 'value' => number_format($calculatedBmi, 1, ',', '.').' kg/m²',
                 ...$this->bmiClassification($calculatedBmi),
             ],
-            'body_fat' => $this->bodyFatIndicator($assessment['body_fat_percentage'] ?? null, $sex, $age),
-            'skeletal_muscle' => $this->skeletalMuscleIndicator($assessment['skeletal_muscle_percentage'] ?? null, $sex, $age),
+            'body_fat' => $isRelaxmedic
+                ? $this->manufacturerEstimateIndicator('Gordura corporal', $assessment['body_fat_percentage'] ?? null, '%')
+                : $this->bodyFatIndicator($assessment['body_fat_percentage'] ?? null, $sex, $age),
+            'skeletal_muscle' => $isRelaxmedic
+                ? $this->manufacturerEstimateIndicator('Músculo esquelético', $assessment['skeletal_muscle_percentage'] ?? null, '%')
+                : $this->skeletalMuscleIndicator($assessment['skeletal_muscle_percentage'] ?? null, $sex, $age),
             'resting_metabolism' => [
                 'label' => 'Metabolismo basal',
                 'value' => isset($assessment['resting_metabolism_kcal'])
@@ -110,7 +120,20 @@ class BioimpedanceAnalyzer
                 'classification' => null,
                 'tone' => 'neutral',
             ],
-            'visceral_fat' => $this->visceralFatIndicator($assessment['visceral_fat_level'] ?? null, $age),
+            'visceral_fat' => $isRelaxmedic
+                ? $this->manufacturerEstimateIndicator('Índice de gordura visceral', $assessment['visceral_fat_level'] ?? null, '')
+                : $this->visceralFatIndicator($assessment['visceral_fat_level'] ?? null, $age),
+        ];
+    }
+
+    private function manufacturerEstimateIndicator(string $label, mixed $value, string $suffix): array
+    {
+        return [
+            'label' => $label,
+            'value' => $this->formattedDecimal($value, $suffix),
+            ...$this->pendingClassification('Referência do fabricante não cadastrada'),
+            'reference_range' => 'Estimativa ou índice do modelo Relaxmedic/RelaxFit; faixa de referência não cadastrada.',
+            'scale' => null,
         ];
     }
 
@@ -134,6 +157,7 @@ class BioimpedanceAnalyzer
             'label' => 'Gordura corporal',
             'value' => $this->formattedDecimal($value, '%'),
             ...$this->bodyFatClassification($value, $sex, $age),
+            'reference_range' => $range ? 'Faixa normal Omron HBF-514C: '.number_format($range['normal_min'], 1, ',', '.').'% a '.number_format($range['normal_max'], 1, ',', '.').'%' : null,
             'scale' => $this->ageRangeScale((float) $value, 5, 60, $range, ['Baixa', 'Normal', 'Elevada', 'Muito elevada']),
         ];
     }
@@ -146,6 +170,7 @@ class BioimpedanceAnalyzer
             'label' => 'Musculo esqueletico',
             'value' => $this->formattedDecimal($value, '%'),
             ...$this->skeletalMuscleClassification($value, $sex, $age),
+            'reference_range' => $range ? 'Faixa normal Omron HBF-514C: '.number_format($range['normal_min'], 1, ',', '.').'% a '.number_format($range['normal_max'], 1, ',', '.').'%' : null,
             'scale' => $this->ageRangeScale((float) $value, 5, 50, $range, ['Baixo', 'Normal', 'Alto', 'Muito alto']),
         ];
     }
@@ -156,6 +181,7 @@ class BioimpedanceAnalyzer
             'label' => 'Gordura visceral',
             'value' => $this->formattedDecimal($value, ''),
             ...$this->visceralFatClassification($value, $age),
+            'reference_range' => 'Índice Omron HBF-514C: 1–9 normal; 10–14 elevado; 15–30 muito elevado. Não representa kg.',
             'scale' => $this->thresholdScale((float) $value, 1, 30, [10, 15], ['Normal', 'Elevada', 'Muito elevada'], ['bg-emerald-500', 'bg-amber-500', 'bg-rose-500']),
         ];
     }

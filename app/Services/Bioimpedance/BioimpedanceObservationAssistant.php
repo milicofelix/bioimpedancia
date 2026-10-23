@@ -293,6 +293,7 @@ Use somente o contexto estruturado e as fontes aprovadas enviadas.
 Não altere, recalcule nem questione as classificações oficiais do backend.
 Não gere diagnóstico, prescrição, dieta, medicação, suplemento ou tratamento.
 Não afirme causalidade médica. Não substitua avaliação de profissional habilitado.
+Para dados Relaxmedic, trate composição corporal e idade corporal como estimativas proprietárias, gordura visceral como índice do dispositivo e TMB como estimativa que não equivale ao gasto energético total. Não aplique faixas Omron nem conclua que força ou função muscular estão preservadas.
 Evite linguagem interna, acadêmica ou excessivamente técnica.
 Não use expressões como "Sugestão ao profissional", "considerar a combinação", "pode indicar", "fatores clínicos associados" ou "acompanhamento longitudinal".
 Prefira frases curtas, humanas e compreensíveis para o cliente.
@@ -538,6 +539,7 @@ PROMPT;
     private function structuredContext(BioimpedanceAssessment $assessment, Collection $history): array
     {
         $indicators = $assessment->analysis['indicators'] ?? [];
+        $usesManufacturerOnlyReferences = $assessment->device_model === 'Relaxmedic';
 
         return [
             'assessment_id' => $assessment->id,
@@ -548,9 +550,9 @@ PROMPT;
             'metrics' => [
                 'weight' => ['value' => (float) $assessment->weight_kg, 'unit' => 'kg'],
                 'bmi' => ['value' => (float) $assessment->calculated_bmi, 'unit' => 'kg/m²', 'classification' => $indicators['bmi']['classification'] ?? null, 'tone' => $indicators['bmi']['tone'] ?? null],
-                'body_fat' => ['value' => $assessment->body_fat_percentage === null ? null : (float) $assessment->body_fat_percentage, 'unit' => '%', 'classification' => $indicators['body_fat']['classification'] ?? null, 'tone' => $indicators['body_fat']['tone'] ?? null],
-                'skeletal_muscle' => ['value' => $assessment->skeletal_muscle_percentage === null ? null : (float) $assessment->skeletal_muscle_percentage, 'unit' => '%', 'classification' => $indicators['skeletal_muscle']['classification'] ?? null, 'tone' => $indicators['skeletal_muscle']['tone'] ?? null],
-                'visceral_fat' => ['value' => $assessment->visceral_fat_level === null ? null : (float) $assessment->visceral_fat_level, 'unit' => 'nível', 'classification' => $indicators['visceral_fat']['classification'] ?? null, 'tone' => $indicators['visceral_fat']['tone'] ?? null],
+                'body_fat' => ['value' => $assessment->body_fat_percentage === null ? null : (float) $assessment->body_fat_percentage, 'unit' => '%', 'classification' => $usesManufacturerOnlyReferences ? null : ($indicators['body_fat']['classification'] ?? null), 'tone' => $usesManufacturerOnlyReferences ? 'pending' : ($indicators['body_fat']['tone'] ?? null)],
+                'skeletal_muscle' => ['value' => $assessment->skeletal_muscle_percentage === null ? null : (float) $assessment->skeletal_muscle_percentage, 'unit' => '%', 'classification' => $usesManufacturerOnlyReferences ? null : ($indicators['skeletal_muscle']['classification'] ?? null), 'tone' => $usesManufacturerOnlyReferences ? 'pending' : ($indicators['skeletal_muscle']['tone'] ?? null)],
+                'visceral_fat' => ['value' => $assessment->visceral_fat_level === null ? null : (float) $assessment->visceral_fat_level, 'unit' => 'índice do dispositivo', 'classification' => $usesManufacturerOnlyReferences ? null : ($indicators['visceral_fat']['classification'] ?? null), 'tone' => $usesManufacturerOnlyReferences ? 'pending' : ($indicators['visceral_fat']['tone'] ?? null)],
                 'resting_metabolism' => ['value' => $assessment->resting_metabolism_kcal, 'unit' => 'kcal/dia'],
                 'body_age' => ['value' => $assessment->body_age, 'unit' => 'anos'],
             ],
@@ -625,6 +627,10 @@ PROMPT;
     {
         if ($assessment->body_age === null || $assessment->age_at_assessment === null) {
             return null;
+        }
+
+        if ($assessment->device_model === 'Relaxmedic') {
+            return 'O aplicativo registrou idade corporal estimada de '.$assessment->body_age.' anos; esse índice proprietário não representa idade biológica real.';
         }
 
         $delta = $assessment->body_age - $assessment->age_at_assessment;
