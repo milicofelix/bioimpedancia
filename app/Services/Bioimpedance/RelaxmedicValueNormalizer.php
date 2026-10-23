@@ -11,13 +11,16 @@ class RelaxmedicValueNormalizer
         'padrao' => 'Normal',
         'sobrepeso' => 'Sobrepeso',
         'alto' => 'Alto',
+        'obesidade grau i' => 'Obesidade grau I',
         'eu nivel a obesidade' => 'Obesidade grau I',
         'i nivel a obesidade' => 'Obesidade grau I',
         'nivel i de obesidade' => 'Obesidade grau I',
         'obesidade nivel i' => 'Obesidade grau I',
+        'obesidade grau ii' => 'Obesidade grau II',
         'ii nivel a obesidade' => 'Obesidade grau II',
         'nivel ii de obesidade' => 'Obesidade grau II',
         'obesidade nivel ii' => 'Obesidade grau II',
+        'obesidade grau iii' => 'Obesidade grau III',
         'iii nivel a obesidade' => 'Obesidade grau III',
         'nivel iii de obesidade' => 'Obesidade grau III',
         'obesidade nivel iii' => 'Obesidade grau III',
@@ -31,12 +34,17 @@ class RelaxmedicValueNormalizer
 
         $normalized = $this->key($value);
 
-        return self::OBESITY_LEVELS[$normalized] ?? mb_substr(trim($value), 0, 100);
+        return self::OBESITY_LEVELS[$normalized] ?? null;
     }
 
     public function recognizesObesityLevel(mixed $value): bool
     {
         return is_string($value) && array_key_exists($this->key($value), self::OBESITY_LEVELS);
+    }
+
+    public function obesityLevelOptions(): array
+    {
+        return array_values(array_unique(self::OBESITY_LEVELS));
     }
 
     private function key(string $value): string

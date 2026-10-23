@@ -20,6 +20,8 @@ export default function RelaxmedicReview({ previewUrl, form, extraction, confirm
 	]), [extraction]);
 	const generalError = fieldError(errors, 'source_metadata') ?? fieldError(errors, 'relaxmedic_review_confirmed');
 	const measuredAtSuspicious = flaggedFields.has('measured_at') || !extraction?.measured_at;
+	const unrecognizedFields = useMemo(() => new Set(extraction?.unrecognized_fields ?? []), [extraction]);
+	const unresolvedFields = [...unrecognizedFields].filter((field) => !String(form[field] ?? '').trim());
 	const warnings = useMemo(() => [...new Set([
 		...(extraction?.missing_fields ?? []).map((field) => `${field === 'measured_at' ? 'Data e hora' : relaxmedicMetricLabels[field] ?? field}: não encontrado na imagem.`),
 		...(extraction?.suspicious_values ?? []).map((item) => item?.reason).filter(Boolean),
@@ -46,6 +48,7 @@ export default function RelaxmedicReview({ previewUrl, form, extraction, confirm
 			</div>
 
 			<p className="mt-2 text-sm leading-6 text-slate-600">Confira os campos sinalizados e corrija qualquer valor antes de salvar.</p>
+			{unresolvedFields.length ? <p role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">A leitura encontrou uma classificação desconhecida. Compare com a imagem e selecione um valor reconhecido para continuar.</p> : null}
 			{warnings.length ? (
 				<details className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-2 text-sm text-amber-950">
 					<summary className="pwa-focus flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-lg py-1 font-bold"><PwaIcon name="alertTriangle" size={17} />{warnings.length} {warnings.length === 1 ? 'ponto precisa' : 'pontos precisam'} de atenção</summary>
@@ -79,7 +82,8 @@ export default function RelaxmedicReview({ previewUrl, form, extraction, confirm
 							return (
 								<label key={field} className={`rounded-xl border border-l-4 p-3 text-sm font-semibold ${error ? 'border-rose-400 bg-rose-50' : suspicious ? 'border-amber-200 border-l-amber-400 bg-amber-50/30' : 'border-slate-200 border-l-transparent bg-white'} text-slate-700`}>
 									<span className="flex items-center justify-between gap-2"><span>{label}</span>{suspicious ? <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900">Conferir</span> : null}</span>
-									<input type="text" inputMode={relaxmedicTextFields.includes(field) ? 'text' : relaxmedicIntegerFields.includes(field) ? 'numeric' : 'decimal'} required={field === 'weight_kg'} value={form[field]} onChange={(event) => onUpdate(field, event.target.value)} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal outline-none focus:ring-2 focus:ring-emerald-400" />
+									{field === 'obesity_level' ? <select value={form[field]} onChange={(event) => onUpdate(field, event.target.value)} required={unrecognizedFields.has(field)} className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal outline-none focus:ring-2 focus:ring-emerald-400"><option value="">Selecione após conferir</option>{(extraction?.allowed_values?.obesity_level ?? []).map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input type="text" inputMode={relaxmedicTextFields.includes(field) ? 'text' : relaxmedicIntegerFields.includes(field) ? 'numeric' : 'decimal'} required={field === 'weight_kg'} value={form[field]} onChange={(event) => onUpdate(field, event.target.value)} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal outline-none focus:ring-2 focus:ring-emerald-400" />}
+									{unrecognizedFields.has(field) && extraction?.raw_values?.[field] ? <span className="mt-1 block text-xs text-amber-800">Leitura bruta para conferência: “{extraction.raw_values[field]}”</span> : null}
 									{error ? <span className="mt-1 block text-xs text-rose-700">{error}</span> : null}
 								</label>
 							);
@@ -92,12 +96,12 @@ export default function RelaxmedicReview({ previewUrl, form, extraction, confirm
 
 			<div className="mt-5 rounded-2xl border border-ricosty-200 bg-ricosty-50 p-4">
 				<label className="flex cursor-pointer items-start gap-3 text-sm font-semibold text-ricosty-950">
-					<input type="checkbox" checked={confirmed} onChange={(event) => onConfirm(event.target.checked)} className="mt-0.5 h-5 w-5 rounded border-emerald-400 text-emerald-600 focus:ring-emerald-500" />
+					<input type="checkbox" checked={confirmed} disabled={unresolvedFields.length > 0} onChange={(event) => onConfirm(event.target.checked)} className="mt-0.5 h-5 w-5 rounded border-emerald-400 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-50" />
 					<span>Conferi a imagem e confirmo que os valores acima estão corretos.</span>
 				</label>
 			</div>
 			{generalError ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{generalError}</p> : null}
-			<PwaButton type="submit" disabled={!confirmed || saving || !online} loading={saving} icon="check" className="mt-4 w-full">{saving ? 'Criando avaliação...' : 'Confirmar e criar avaliação'}</PwaButton>
+			<PwaButton type="submit" disabled={unresolvedFields.length > 0 || !confirmed || saving || !online} loading={saving} icon="check" className="mt-4 w-full">{saving ? 'Criando avaliação...' : 'Confirmar e criar avaliação'}</PwaButton>
 
 			{confirmRestart ? (
 				<div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-4 backdrop-blur-sm sm:items-center" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmRestart(false); }}>

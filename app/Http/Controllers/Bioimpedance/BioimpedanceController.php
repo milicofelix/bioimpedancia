@@ -288,6 +288,12 @@ class BioimpedanceController extends Controller
                 'source_metadata.sha256' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/'],
                 'source_metadata.processed_at' => ['required', 'date'],
                 'source_metadata.processor_model' => ['required', 'string', 'max:100'],
+                'source_metadata.raw_values' => ['present', 'array'],
+                'source_metadata.raw_values.obesity_level' => ['sometimes', 'nullable', 'string', 'max:100'],
+                'source_metadata.unrecognized_fields' => ['present', 'array'],
+                'source_metadata.unrecognized_fields.*' => ['string', Rule::in(['obesity_level'])],
+                'source_metadata.field_statuses' => ['present', 'array'],
+                'source_metadata.field_statuses.obesity_level' => ['required', Rule::in(['recognized', 'unrecognized', 'missing'])],
                 'source_metadata.signature' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/'],
             ], [
                 'relaxmedic_review_confirmed.accepted' => 'Confirme que os dados foram conferidos com a imagem antes de salvar.',
@@ -300,6 +306,15 @@ class BioimpedanceController extends Controller
                 ]);
             }
 
+            $submittedObesityLevel = $request->input('obesity_level');
+            $requiresObesityLevelCorrection = in_array('obesity_level', $source['source_metadata']['unrecognized_fields'], true);
+            if (($requiresObesityLevelCorrection || filled($submittedObesityLevel))
+                && ! $this->relaxmedicValueNormalizer->recognizesObesityLevel($submittedObesityLevel)) {
+                throw ValidationException::withMessages([
+                    'obesity_level' => 'Selecione uma classificação reconhecida após conferir o texto original na imagem.',
+                ]);
+            }
+
             $sourceMetadata = [
                 'type' => 'relaxmedic_image_extraction',
                 'image_name' => $source['source_metadata']['name'],
@@ -309,6 +324,16 @@ class BioimpedanceController extends Controller
                 'image_stored' => false,
                 'processed_at' => $source['source_metadata']['processed_at'],
                 'processor_model' => $source['source_metadata']['processor_model'],
+                'ocr_raw_values' => $source['source_metadata']['raw_values'],
+                'ocr_unrecognized_fields' => $source['source_metadata']['unrecognized_fields'],
+                'ocr_field_statuses' => $source['source_metadata']['field_statuses'],
+                'ocr_reviewed_values' => collect($source['source_metadata']['unrecognized_fields'])
+                    ->mapWithKeys(fn (string $field) => [
+                        $field => $field === 'obesity_level'
+                            ? $this->relaxmedicValueNormalizer->obesityLevel($request->input($field))
+                            : $request->input($field),
+                    ])
+                    ->all(),
                 'review_confirmed_at' => now()->toIso8601String(),
                 'reviewed_by_user_id' => $request->user()->id,
             ];
