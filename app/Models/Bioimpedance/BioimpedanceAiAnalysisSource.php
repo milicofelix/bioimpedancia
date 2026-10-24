@@ -11,7 +11,13 @@ class BioimpedanceAiAnalysisSource extends Model
         'bioimpedance_ai_analysis_request_id',
         'bioimpedance_knowledge_chunk_id',
         'relevance_score',
+        'source_snapshot',
     ];
+
+    protected function casts(): array
+    {
+        return ['source_snapshot' => 'array'];
+    }
 
     public function request(): BelongsTo
     {

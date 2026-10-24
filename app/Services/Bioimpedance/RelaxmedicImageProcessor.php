@@ -134,6 +134,9 @@ class RelaxmedicImageProcessor
         $result = $this->normalize($payload, $image);
         $imageMetadata = [
             ...$result['image'],
+            'raw_values' => $result['raw_values'],
+            'unrecognized_fields' => $result['unrecognized_fields'],
+            'field_statuses' => $result['field_statuses'],
             'size_bytes' => strlen($contents),
             'sha256' => hash('sha256', $contents),
             'processed_at' => now()->toIso8601String(),
@@ -167,6 +170,9 @@ class RelaxmedicImageProcessor
             'sha256',
             'processed_at',
             'processor_model',
+            'raw_values',
+            'unrecognized_fields',
+            'field_statuses',
         ])->mapWithKeys(fn (string $key) => [$key => $metadata[$key] ?? null])->all();
 
         return hash_hmac('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), (string) config('app.key'));
@@ -187,6 +193,8 @@ class RelaxmedicImageProcessor
         );
 
         $rawMetrics = is_array($payload['metrics'] ?? null) ? $payload['metrics'] : [];
+        $rawObesityLevel = $this->normalizeText($rawMetrics['obesity_level'] ?? null);
+        $obesityLevelRecognized = $rawObesityLevel === null || $this->valueNormalizer->recognizesObesityLevel($rawObesityLevel);
         $metrics = [];
         foreach (self::METRIC_FIELDS as $field) {
             $value = $rawMetrics[$field] ?? null;
@@ -223,7 +231,8 @@ class RelaxmedicImageProcessor
         }
 
         $missingFields = collect(self::METRIC_FIELDS)
-            ->filter(fn (string $field) => $metrics[$field] === null)
+            ->filter(fn (string $field) => $metrics[$field] === null
+                && ! ($field === 'obesity_level' && $rawObesityLevel !== null))
             ->values()
             ->all();
 
@@ -235,10 +244,10 @@ class RelaxmedicImageProcessor
                 'reason' => (string) $item['reason'],
             ]);
 
-        if (filled($rawMetrics['obesity_level'] ?? null) && ! $this->valueNormalizer->recognizesObesityLevel($rawMetrics['obesity_level'])) {
+        if ($rawObesityLevel !== null && ! $obesityLevelRecognized) {
             $suspiciousValues->push([
                 'field' => 'obesity_level',
-                'value' => $rawMetrics['obesity_level'],
+                'value' => $rawObesityLevel,
                 'reason' => 'Classificação não reconhecida pelo mapeamento Relaxmedic. Confira o texto na imagem.',
             ]);
         }
@@ -261,6 +270,14 @@ class RelaxmedicImageProcessor
             'report_type' => $this->normalizeText($payload['report_type'] ?? null) ?? 'Relaxmedic/RelaxFit',
             'measured_at' => $measuredAt,
             'metrics' => $metrics,
+            'raw_values' => $rawObesityLevel !== null ? ['obesity_level' => $rawObesityLevel] : [],
+            'unrecognized_fields' => $obesityLevelRecognized ? [] : ['obesity_level'],
+            'field_statuses' => [
+                'obesity_level' => $rawObesityLevel === null ? 'missing' : ($obesityLevelRecognized ? 'recognized' : 'unrecognized'),
+            ],
+            'allowed_values' => [
+                'obesity_level' => $this->valueNormalizer->obesityLevelOptions(),
+            ],
             'missing_fields' => $missingFields,
             'suspicious_values' => $suspiciousValues->unique(fn (array $item) => $item['field'].'|'.$item['reason'])->values()->all(),
             'detected_labels' => $detectedLabels->all(),

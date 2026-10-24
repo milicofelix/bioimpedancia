@@ -13,11 +13,16 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 
 class BioimpedanceCareGuidanceAssistant
 {
-    public const PROMPT_VERSION = 'care-guidance-1.0.0';
+    public const PROMPT_VERSION = 'care-guidance-2.0.0';
+
+    public function __construct(
+        private readonly CareGuidanceSemanticValidator $semanticValidator,
+        private readonly KnowledgeSourceSnapshot $sourceSnapshot,
+        private readonly PublishedKnowledgeSourceRepository $publishedSources,
+    ) {}
 
     private const SOURCE_DEFINITIONS = [
         [
@@ -105,24 +110,67 @@ class BioimpedanceCareGuidanceAssistant
                 'bioimpedance_ai_analysis_request_id' => $request->id,
                 'bioimpedance_knowledge_chunk_id' => $chunk->id,
                 'relevance_score' => 100 - ($index * 5),
+                'source_snapshot' => $this->sourceSnapshot->fromChunk($chunk),
             ]);
         }
 
-        $response = $this->generate($context, $chunks);
-        $validationErrors = $this->validate($response, $chunks);
-        if ($validationErrors) {
-            $response = $this->localResponse($context);
-            $validationErrors = $this->validate($response, $chunks);
+        $generation = $this->generate($context, $chunks);
+        $validation = $this->semanticValidator->validate($generation['payload'], $chunks, $context);
+        $blockedClaims = $validation['blocked_claims'];
+
+        if ($validation['errors'] && $generation['provider'] === 'openai') {
+            $generation = [
+                'payload' => $this->localResponse($context),
+                'provider' => 'local_reference_engine',
+                'attempted_provider' => 'openai',
+                'fallback_used' => true,
+                'fallback_reason' => 'A resposta externa foi bloqueada pela validação semântica.',
+            ];
+            $validation = $this->semanticValidator->validate($generation['payload'], $chunks, $context);
         }
 
+        $validationErrors = $validation['errors'];
+        $blockedClaims = [...$blockedClaims, ...$validation['blocked_claims']];
         $status = $validationErrors ? 'blocked' : 'generated';
-        $request->update(['status' => $status, 'validation_errors' => $validationErrors]);
+        $request->update([
+            'status' => $status,
+            'validation_errors' => $validationErrors,
+            'provider' => $generation['provider'],
+            'attempted_provider' => $generation['attempted_provider'],
+            'fallback_used' => $generation['fallback_used'],
+            'fallback_reason' => $generation['fallback_reason'],
+            'model_name' => $generation['provider'] === 'openai' ? $this->modelName() : 'local-care-guidance-agent',
+        ]);
+        $guidance = $status === 'generated' ? $this->renderGuidance($validation['accepted_claims']) : null;
         $output = BioimpedanceAiAnalysisOutput::query()->create([
             'bioimpedance_ai_analysis_request_id' => $request->id,
-            'raw_response' => $response,
-            'care_guidance' => $status === 'generated' ? $response['care_guidance'] : null,
+            'raw_response' => [
+                'payload' => $generation['payload'],
+                'provider' => $generation['provider'],
+                'attempted_provider' => $generation['attempted_provider'],
+                'fallback_used' => $generation['fallback_used'],
+                'fallback_reason' => $generation['fallback_reason'],
+            ],
+            'structured_claims' => $validation['accepted_claims'],
+            'blocked_claims' => $blockedClaims,
+            'care_guidance' => $guidance,
             'validation_status' => $validationErrors ? 'failed' : 'passed',
         ]);
+
+        $usedSourceIds = collect($validation['accepted_claims'])->pluck('source_ids')->flatten()->unique();
+        $sources = $chunks->whereIn('chunk_key', $usedSourceIds)->map(fn ($chunk) => [
+            'id' => $chunk->chunk_key,
+            'document' => $chunk->document?->title,
+            'version' => $chunk->document?->version,
+            'publication_status' => $chunk->document?->status,
+            'published_at' => $chunk->document?->published_at?->toIso8601String(),
+            'section' => $chunk->section,
+            'url' => $chunk->document?->source_url,
+            'checksum' => $chunk->checksum,
+            'claim_ids' => collect($validation['accepted_claims'])
+                ->filter(fn (array $claim) => in_array($chunk->chunk_key, $claim['source_ids'], true))
+                ->pluck('id')->values()->all(),
+        ])->values()->all();
 
         return [
             'status' => $status,
@@ -130,20 +178,24 @@ class BioimpedanceCareGuidanceAssistant
             'suggestion' => $output->care_guidance,
             'output_id' => $output->id,
             'validation_errors' => $validationErrors,
-            'sources' => $chunks->map(fn ($chunk) => [
-                'id' => $chunk->chunk_key,
-                'document' => $chunk->document?->title,
-                'section' => $chunk->section,
-                'url' => $chunk->document?->source_url,
-            ])->values()->all(),
+            'claims' => $validation['accepted_claims'],
+            'blocked_claims' => $blockedClaims,
+            'sources' => $sources,
+            'provider' => $generation['provider'],
+            'attempted_provider' => $generation['attempted_provider'],
+            'fallback_used' => $generation['fallback_used'],
+            'fallback_reason' => $generation['fallback_reason'],
             'notice' => 'Orientação educativa, sem diagnóstico ou prescrição. Exige aprovação do profissional.',
         ];
     }
 
     private function generate(array $context, Collection $chunks): array
     {
-        if (! filled(config('services.openai.api_key')) || config('bioimpedance.assistant.provider') === 'local_reference_engine') {
-            return $this->localResponse($context);
+        if (config('bioimpedance.assistant.provider') === 'local_reference_engine') {
+            return $this->localGeneration($context);
+        }
+        if (! filled(config('services.openai.api_key'))) {
+            return $this->localGeneration($context, 'Provedor externo indisponível na configuração atual.', 'openai');
         }
 
         try {
@@ -156,22 +208,37 @@ class BioimpedanceCareGuidanceAssistant
                         ['role' => 'user', 'content' => [['type' => 'input_text', 'text' => json_encode([
                             'contexto' => $context,
                             'fontes' => $chunks->map(fn ($chunk) => ['id' => $chunk->chunk_key, 'conteudo' => $chunk->content])->values()->all(),
+                            'fontes_internas_disponiveis' => collect([
+                                'assessment:current',
+                                ! empty($context['history_changes']) ? 'assessment:history' : null,
+                                filled($context['professional_observation'] ?? null) ? 'observation:approved' : null,
+                            ])->filter()->values()->all(),
                         ], JSON_UNESCAPED_UNICODE)]]],
                     ],
                     'text' => ['format' => ['type' => 'json_schema', 'name' => 'care_guidance', 'strict' => true, 'schema' => $this->schema()]],
                 ])->throw()->json();
 
             $payload = json_decode($this->outputText($response), true);
-            return is_array($payload) ? $payload : $this->localResponse($context);
+            if (! is_array($payload)) {
+                return $this->localGeneration($context, 'A OpenAI retornou uma resposta fora do JSON esperado.', 'openai');
+            }
+
+            return [
+                'payload' => $payload,
+                'provider' => 'openai',
+                'attempted_provider' => 'openai',
+                'fallback_used' => false,
+                'fallback_reason' => null,
+            ];
         } catch (ConnectionException|RequestException) {
-            return $this->localResponse($context);
+            return $this->localGeneration($context, 'Falha de comunicação com o provedor externo.', 'openai');
         }
     }
 
     private function systemPrompt(): string
     {
         return <<<'PROMPT'
-Você é o agente de orientações educativas da Ricosty. Escreva em português do Brasil para o cliente, usando apenas o contexto, a observação aprovada, o histórico e as fontes fornecidas. Relacione os hábitos somente aos pontos de atenção e tendências realmente presentes, sem inventar doença, exame, colesterol, deficiência vitamínica ou contraindicação. Não diagnostique nem prescreva dieta, exercício, medicamento, vitamina ou suplemento. Não defina objetivo somente por IMC ou peso ideal do fabricante e não afirme musculatura preservada a partir de percentual estimado. Para pessoas idosas, priorize preservação de força, função, equilíbrio e autonomia, com avaliação profissional. Ofereça opções gerais, realistas e graduais, sempre condicionando atividade física à capacidade e eventual liberação profissional. Não prometa resultados. Informe em source_chunk_ids os IDs que sustentam o texto. O texto final deve ser acolhedor, objetivo e adequado ao relatório. Responda apenas no schema solicitado.
+Você é o agente de orientações educativas da Ricosty. Escreva em português do Brasil para o cliente, usando apenas o contexto, a observação aprovada, o histórico e as fontes fornecidas. Relacione os hábitos somente aos pontos de atenção e tendências realmente presentes, sem inventar doença, exame, colesterol, deficiência vitamínica ou contraindicação. Não diagnostique nem prescreva dieta, exercício, medicamento, vitamina ou suplemento. Não defina objetivo somente por IMC ou peso ideal do fabricante e não afirme musculatura preservada a partir de percentual estimado. Para pessoas idosas, priorize preservação de força, função, equilíbrio e autonomia, com avaliação profissional. Ofereça opções gerais, realistas e graduais, sempre condicionando atividade física à capacidade e eventual liberação profissional. Não prometa resultados. Divida a resposta em afirmações independentes. Cada afirmação deve informar categoria, texto, nível de segurança, revisão profissional obrigatória e todas as fontes que a sustentam. Use os IDs das fontes fornecidas e, para dados internos, somente assessment:current, assessment:history ou observation:approved quando disponíveis. Não esconda incertezas elevando o nível de segurança. Responda apenas no schema solicitado.
 PROMPT;
     }
 
@@ -179,47 +246,85 @@ PROMPT;
     {
         return [
             'type' => 'object', 'additionalProperties' => false,
-            'required' => ['care_guidance', 'source_chunk_ids'],
+            'required' => ['claims'],
             'properties' => [
-                'care_guidance' => ['type' => 'string'],
-                'source_chunk_ids' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'claims' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'additionalProperties' => false,
+                        'required' => ['id', 'category', 'text', 'confidence', 'requires_professional_review', 'source_ids'],
+                        'properties' => [
+                            'id' => ['type' => 'string'],
+                            'category' => ['type' => 'string', 'enum' => CareGuidanceSemanticValidator::CATEGORIES],
+                            'text' => ['type' => 'string'],
+                            'confidence' => ['type' => 'string', 'enum' => CareGuidanceSemanticValidator::CONFIDENCE_LEVELS],
+                            'requires_professional_review' => ['type' => 'boolean'],
+                            'source_ids' => ['type' => 'array', 'items' => ['type' => 'string']],
+                        ],
+                    ],
+                ],
             ],
         ];
     }
 
     private function localResponse(array $context): array
     {
+        $claims = [];
         $attention = collect($context['attention_points'])->implode(', ');
-        $history = collect($context['history_changes'])->implode(', ');
-        $opening = $attention
-            ? 'Os pontos que merecem atenção nesta avaliação são: '.$attention.'. As sugestões abaixo são gerais e devem ser adaptadas pelo profissional à sua realidade.'
-            : 'A avaliação não apresentou ponto específico que justifique uma conduta individualizada. As sugestões abaixo apoiam a manutenção de hábitos saudáveis.';
-        $historyText = $history ? "\n\nHistórico: em relação à avaliação anterior, foi observada {$history}. A tendência deve ser interpretada considerando as condições de cada medição." : '';
-        $olderAdultText = ($context['age_at_assessment'] ?? 0) >= 60
-            ? "\n\nForça e função: nesta faixa etária, o objetivo não deve ser definido somente por IMC ou pelo peso de referência do fabricante. É importante preservar massa, força, equilíbrio e autonomia. Se houver liberação e supervisão adequadas, exercícios de fortalecimento e atividades de equilíbrio podem integrar o plano; a estimativa muscular da balança, isoladamente, não comprova função preservada."
-            : '';
+        $claims[] = $this->claim('assessment-context', 'assessment_context', $attention
+            ? 'Os pontos que merecem atenção nesta avaliação são: '.$attention.'. Eles devem ser interpretados em conjunto com o histórico e a avaliação profissional.'
+            : 'Esta avaliação isolada não justifica uma conduta individualizada; os resultados devem ser interpretados pelo profissional junto ao histórico.', 'moderate', ['assessment:current', 'observation:approved']);
+        if (! empty($context['history_changes'])) {
+            $claims[] = $this->claim('assessment-history', 'assessment_context', 'Em relação à avaliação anterior, foi observada '.collect($context['history_changes'])->implode(', ').'. A tendência depende também das condições de cada medição.', 'moderate', ['assessment:history']);
+        }
+        if (($context['age_at_assessment'] ?? 0) >= 60) {
+            $claims[] = $this->claim('older-adult-function', 'movement_education', 'Nesta faixa etária, preservar força, equilíbrio, mobilidade e autonomia merece atenção; a estimativa muscular da balança, isoladamente, não comprova função preservada.', 'high', ['assessment:current', 'who-older-adult-functional-activity', 'brazil-older-adult-functionality']);
+        }
+        $claims[] = $this->claim('nutrition-general', 'nutrition_education', 'Priorize refeições variadas baseadas em alimentos in natura ou minimamente processados, incluindo frutas, legumes, verduras e feijões, e reduza a frequência de ultraprocessados e bebidas açucaradas.', 'high', ['brazil-food-guide-natural-foods', 'brazil-food-guide-ultraprocessed']);
+        $claims[] = $this->claim('movement-general', 'movement_education', 'Se estiver apto, aumente o movimento gradualmente. Caminhada, bicicleta, dança e fortalecimento são opções que devem ser adaptadas à capacidade individual e à orientação profissional.', 'high', ['who-adult-physical-activity', 'ricosty-care-guidance-safety']);
+        $claims[] = $this->claim('professional-follow-up', 'professional_follow_up', 'Defina metas pequenas com o profissional e procure avaliação individualizada antes de usar vitaminas, suplementos ou iniciar atividades incompatíveis com suas condições e limitações.', 'high', ['ricosty-care-guidance-safety']);
 
+        return ['claims' => $claims];
+    }
+
+    private function localGeneration(array $context, ?string $reason = null, ?string $attemptedProvider = null): array
+    {
         return [
-            'care_guidance' => $opening.$historyText.$olderAdultText."\n\nAlimentação: priorize refeições variadas baseadas em alimentos in natura ou minimamente processados, como frutas, legumes, verduras e feijões. Reduza a frequência de ultraprocessados, bebidas açucaradas e lanches industrializados. Vitaminas e suplementos só devem ser usados quando indicados por profissional habilitado após avaliação adequada.\n\nMovimento: se estiver apto e liberado para atividade física, aumente o movimento de forma gradual. Caminhada, bicicleta, dança e exercícios de fortalecimento são opções possíveis, adaptadas à condição individual.\n\nAcompanhamento: defina metas pequenas e possíveis, compare avaliações realizadas em condições semelhantes e procure médico, nutricionista ou profissional de educação física para orientação individualizada.",
-            'source_chunk_ids' => ['brazil-food-guide-natural-foods', 'brazil-food-guide-ultraprocessed', 'who-adult-physical-activity', 'who-older-adult-functional-activity', 'brazil-older-adult-functionality', 'ricosty-care-guidance-safety'],
+            'payload' => $this->localResponse($context),
+            'provider' => 'local_reference_engine',
+            'attempted_provider' => $attemptedProvider,
+            'fallback_used' => $attemptedProvider !== null,
+            'fallback_reason' => $reason,
         ];
     }
 
-    private function validate(array $response, Collection $chunks): array
+    private function claim(string $id, string $category, string $text, string $confidence, array $sourceIds): array
     {
-        $errors = [];
-        $text = Str::lower((string) ($response['care_guidance'] ?? ''));
-        if (mb_strlen($text) < 100 || mb_strlen($text) > 4000) $errors[] = 'Orientação fora do tamanho permitido.';
-        foreach (['diagnóstico de', 'prescrevo', 'tome ', 'dose de', 'mg por', 'colesterol alto', 'diabetes', 'hipertensão'] as $forbidden) {
-            if (str_contains($text, $forbidden)) $errors[] = 'Conteúdo clínico não sustentado detectado.';
-        }
-        $allowed = $chunks->pluck('chunk_key')->all();
-        foreach ($response['source_chunk_ids'] ?? [] as $key) {
-            if (! in_array($key, $allowed, true)) $errors[] = 'Fonte não aprovada informada.';
-        }
-        if (empty($response['source_chunk_ids'])) $errors[] = 'Orientação sem fontes.';
+        return [
+            'id' => $id,
+            'category' => $category,
+            'text' => $text,
+            'confidence' => $confidence,
+            'requires_professional_review' => true,
+            'source_ids' => $sourceIds,
+        ];
+    }
 
-        return array_values(array_unique($errors));
+    private function renderGuidance(array $claims): string
+    {
+        $labels = [
+            'assessment_context' => 'Contexto da avaliação',
+            'nutrition_education' => 'Alimentação',
+            'movement_education' => 'Movimento e função',
+            'professional_follow_up' => 'Acompanhamento',
+            'safety_limit' => 'Cuidados importantes',
+        ];
+
+        return collect($claims)
+            ->groupBy('category')
+            ->map(fn (Collection $items, string $category) => ($labels[$category] ?? 'Orientação').': '.$items->pluck('text')->implode(' '))
+            ->implode("\n\n");
     }
 
     private function context(BioimpedanceAssessment $assessment): array
@@ -276,12 +381,21 @@ PROMPT;
     private function approvedChunks(User $user): Collection
     {
         foreach (self::SOURCE_DEFINITIONS as $definition) {
-            $document = BioimpedanceKnowledgeDocument::query()->updateOrCreate(
+            $document = BioimpedanceKnowledgeDocument::query()->firstOrCreate(
                 ['title' => $definition['title'], 'version' => $definition['version']],
-                ['document_type' => 'clinical_reference', 'source_url' => $definition['source_url'], 'approved' => true, 'approved_by_user_id' => $user->id, 'approved_at' => now()]
+                [
+                    'document_type' => 'clinical_reference',
+                    'source_url' => $definition['source_url'],
+                    'status' => BioimpedanceKnowledgeDocument::STATUS_PUBLISHED,
+                    'approved' => true,
+                    'approved_by_user_id' => $user->id,
+                    'approved_at' => now(),
+                    'published_by_user_id' => $user->id,
+                    'published_at' => now(),
+                ]
             );
             foreach ($definition['chunks'] as $chunk) {
-                BioimpedanceKnowledgeChunk::query()->updateOrCreate(['chunk_key' => $chunk['chunk_key']], [
+                BioimpedanceKnowledgeChunk::query()->firstOrCreate(['chunk_key' => $chunk['chunk_key']], [
                     'bioimpedance_knowledge_document_id' => $document->id,
                     'section' => $chunk['section'], 'language' => 'pt-BR', 'tags' => $chunk['tags'],
                     'content' => $chunk['content'], 'checksum' => hash('sha256', $chunk['content']),
@@ -289,8 +403,17 @@ PROMPT;
             }
         }
 
-        $keys = collect(self::SOURCE_DEFINITIONS)->pluck('chunks')->flatten(1)->pluck('chunk_key');
-        return BioimpedanceKnowledgeChunk::query()->with('document')->whereIn('chunk_key', $keys)->get();
+        $keys = collect(self::SOURCE_DEFINITIONS)->pluck('chunks')->flatten(1)->pluck('chunk_key')->all();
+
+        return $this->publishedSources->matching([
+            'food',
+            'physical_activity',
+            'older_adult',
+            'function',
+            'safety',
+            'general_guidance',
+            'prohibited_content',
+        ], $keys);
     }
 
     private function modelName(): string

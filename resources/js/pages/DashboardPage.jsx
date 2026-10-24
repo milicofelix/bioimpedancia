@@ -18,6 +18,7 @@ import { loadBioimpedanceWorkspace, logout } from '../services/bioimpedanceApi';
 import { cpfMask, heightMask, normalizeInteger, phoneMask } from '../shared/inputMasks';
 import useActionLock from '../hooks/useActionLock';
 import CareGuidanceAssistant from '../pwa/features/assistant/CareGuidanceAssistant';
+import KnowledgeDocumentsPanel from '../components/bioimpedance/KnowledgeDocumentsPanel';
 
 const emptyClient = {
 	full_name: '',
@@ -168,12 +169,16 @@ function FieldError({ errors, field }) {
 }
 
 function RelaxmedicReview({ extraction, imagePreview, form, errors, flaggedFields, confirmed, onConfirmedChange, onUpdate, onSubmit, saving, canSave }) {
+	const unrecognizedFields = new Set(extraction.unrecognized_fields ?? []);
+	const unresolvedFields = [...unrecognizedFields].filter((field) => !String(form[field] ?? '').trim());
+
 	return (
 		<form onSubmit={onSubmit} className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
 			<div>
 				<p className="text-sm font-bold text-emerald-900">Conferência obrigatória</p>
 				<p className="mt-1 text-xs text-emerald-800">Compare cada campo com a imagem antes de salvar. Relatório reconhecido como {extraction.report_type}.</p>
 			</div>
+			{unresolvedFields.length ? <p role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">Uma classificação não foi reconhecida. Confira a leitura bruta na imagem e selecione um valor válido antes de salvar.</p> : null}
 
 			<div className="mt-4 grid gap-5 lg:grid-cols-[minmax(280px,360px)_1fr]">
 				<div>
@@ -201,8 +206,9 @@ function RelaxmedicReview({ extraction, imagePreview, form, errors, flaggedField
 							return (
 								<div key={field} className={`rounded-xl border p-3 ${isFlagged ? 'border-amber-300 bg-amber-50' : 'border-emerald-100 bg-white'}`}>
 									<Field label={label}>
-										<input inputMode={isText ? undefined : 'decimal'} value={form[field] ?? ''} onChange={(event) => onUpdate(field, event.target.value)} className={inputClass()} />
+									{field === 'obesity_level' ? <select value={form[field] ?? ''} required={unrecognizedFields.has(field)} onChange={(event) => onUpdate(field, event.target.value)} className={inputClass()}><option value="">Selecione após conferir</option>{(extraction.allowed_values?.obesity_level ?? []).map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input inputMode={isText ? undefined : 'decimal'} value={form[field] ?? ''} onChange={(event) => onUpdate(field, event.target.value)} className={inputClass()} />}
 										<FieldError errors={errors} field={field} />
+									{unrecognizedFields.has(field) && extraction.raw_values?.[field] ? <p className="mt-2 text-xs font-semibold text-amber-800">Leitura bruta para conferência: “{extraction.raw_values[field]}”</p> : null}
 									</Field>
 									{isFlagged ? <p className="mt-2 text-xs font-semibold text-amber-700">{warning ?? 'Não encontrado na imagem. Preencha se estiver visível.'}</p> : null}
 								</div>
@@ -216,7 +222,7 @@ function RelaxmedicReview({ extraction, imagePreview, form, errors, flaggedField
 					</Field>
 
 					<label className={`flex items-start gap-3 rounded-xl border p-4 ${confirmed ? 'border-emerald-300 bg-emerald-50' : 'border-slate-300 bg-white'}`}>
-						<input type="checkbox" checked={confirmed} onChange={(event) => onConfirmedChange(event.target.checked)} className="mt-0.5 h-5 w-5 rounded border-slate-300 text-emerald-600" />
+						<input type="checkbox" checked={confirmed} disabled={unresolvedFields.length > 0} onChange={(event) => onConfirmedChange(event.target.checked)} className="mt-0.5 h-5 w-5 rounded border-slate-300 text-emerald-600 disabled:cursor-not-allowed disabled:opacity-50" />
 						<span className="text-sm leading-6 text-slate-700"><strong>Confirmo que conferi todos os dados com a imagem original</strong> e corrigi valores, unidades e casas decimais quando necessário.</span>
 					</label>
 
@@ -227,7 +233,7 @@ function RelaxmedicReview({ extraction, imagePreview, form, errors, flaggedField
 						</div>
 					) : null}
 
-					<button type="submit" disabled={!confirmed || !canSave || saving} className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">
+					<button type="submit" disabled={unresolvedFields.length > 0 || !confirmed || !canSave || saving} className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">
 						{saving ? 'Salvando avaliação...' : 'Confirmar dados e salvar avaliação'}
 					</button>
 				</div>
@@ -1409,6 +1415,8 @@ export default function DashboardPage({ userName }) {
 						</section>
 					) : null}
 
+					{currentUser?.is_admin ? <KnowledgeDocumentsPanel /> : null}
+
 					{currentUser?.is_admin ? (
 						<section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
 							<div>
@@ -1570,7 +1578,7 @@ export default function DashboardPage({ userName }) {
 															<ul className="mt-2 space-y-1 text-xs leading-5 text-slate-500">
 																{observationAssistant.sources?.map((source) => (
 																	<li key={source.id}>
-																		{source.document} • {source.section}{source.page ? ` • pág. ${source.page}` : ''}
+																							{source.document}{source.version ? ` • versão ${source.version}` : ''} • {source.section}{source.page ? ` • pág. ${source.page}` : ''}
 																	</li>
 																))}
 															</ul>

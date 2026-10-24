@@ -79,7 +79,7 @@ class BioimpedanceAnalyzer
         $bmi = $this->bmiClassification($calculatedBmi);
         $fat = isset($assessment['body_fat_percentage'])
             ? ($isRelaxmedic
-                ? 'Gordura corporal estimada pelo equipamento em '.number_format((float) $assessment['body_fat_percentage'], 1, ',', '.').'%; a referência de classificação Relaxmedic não está cadastrada.'
+                ? 'Gordura corporal estimada pelo equipamento em '.number_format((float) $assessment['body_fat_percentage'], 1, ',', '.').'%; sem classificação disponível para este indicador.'
                 : 'Gordura corporal registrada em '.number_format((float) $assessment['body_fat_percentage'], 1, ',', '.').'%, classificada como '.$this->bodyFatClassification((float) $assessment['body_fat_percentage'], $sex, $age)['classification'].'.')
             : 'Gordura corporal nao informada.';
 

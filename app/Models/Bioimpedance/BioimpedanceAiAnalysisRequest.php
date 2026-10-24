@@ -16,6 +16,10 @@ class BioimpedanceAiAnalysisRequest extends Model
         'prompt_version',
         'reference_version',
         'model_name',
+        'provider',
+        'attempted_provider',
+        'fallback_used',
+        'fallback_reason',
         'status',
         'purpose',
         'structured_context',
@@ -27,6 +31,7 @@ class BioimpedanceAiAnalysisRequest extends Model
         return [
             'structured_context' => 'array',
             'validation_errors' => 'array',
+            'fallback_used' => 'boolean',
         ];
     }
 

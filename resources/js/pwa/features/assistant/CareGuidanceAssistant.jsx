@@ -5,6 +5,7 @@ import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaIcon from '../../components/ui/PwaIcon';
 import CareGuidanceProgress, { careGuidanceProcessingSteps } from './CareGuidanceProgress';
+import CareGuidanceEvidence from './CareGuidanceEvidence';
 
 export default function CareGuidanceAssistant({ assessment, online, onApproved }) {
 	const runAction = useActionLock();
@@ -89,7 +90,7 @@ export default function CareGuidanceAssistant({ assessment, online, onApproved }
 				{assistant.validation_errors?.length ? <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"><strong>A sugestão foi bloqueada:</strong><ul className="mt-1 list-disc pl-5">{assistant.validation_errors.map((message) => <li key={message}>{message}</li>)}</ul></div> : null}
 				<label className="block text-sm font-bold text-slate-800">Orientações sugeridas<textarea rows="14" maxLength={4000} value={draft} onChange={(event) => setDraft(event.target.value)} disabled={blocked} className="pwa-focus mt-2 w-full rounded-xl border border-teal-200 bg-white p-3 font-normal leading-6 disabled:bg-slate-100" /></label>
 				{edited ? <p className="text-xs font-bold text-violet-700">Texto editado pelo profissional.</p> : null}
-				<div><h3 className="text-xs font-bold uppercase text-slate-600">Fontes utilizadas</h3><div className="mt-2 space-y-2">{assistant.sources?.map((source) => <div key={source.id} className="rounded-xl bg-slate-50 p-3 text-xs"><p className="font-bold text-slate-800">{source.document}</p><p className="mt-1 text-slate-600">{source.section}</p></div>)}</div></div>
+				<CareGuidanceEvidence assistant={assistant} />
 				<div className="grid gap-2 sm:grid-cols-2"><PwaButton type="button" variant="secondary" onClick={() => { setAssistant(null); setDraft(''); }}>{blocked ? 'Voltar e tentar novamente' : 'Descartar'}</PwaButton><PwaButton type="button" icon="check" onClick={approve} disabled={blocked || saving || draft.trim().length < 100 || !online} loading={saving}>{saving ? 'Aprovando...' : 'Aprovar para o relatório'}</PwaButton></div>
 			</div> : <PwaButton type="button" icon="sparkles" onClick={generate} disabled={!online} className="mt-4 w-full">{assessment.care_guidance ? 'Gerar nova sugestão' : 'Sugerir próximos cuidados'}</PwaButton>}
 			{error ? <p role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">{error}</p> : null}

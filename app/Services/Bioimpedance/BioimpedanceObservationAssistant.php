@@ -21,6 +21,11 @@ class BioimpedanceObservationAssistant
 
     public const MODEL_NAME = 'local-validated-rag-agent';
 
+    public function __construct(
+        private readonly KnowledgeSourceSnapshot $sourceSnapshot,
+        private readonly PublishedKnowledgeSourceRepository $publishedSources,
+    ) {}
+
     private const DEFAULT_DOCUMENTS = [
         [
             'title' => 'Manual Omron HBF-514C',
@@ -126,6 +131,7 @@ class BioimpedanceObservationAssistant
                 'bioimpedance_ai_analysis_request_id' => $request->id,
                 'bioimpedance_knowledge_chunk_id' => $chunk->id,
                 'relevance_score' => 100 - ($index * 5),
+                'source_snapshot' => $this->sourceSnapshot->fromChunk($chunk),
             ]);
         }
 
@@ -526,13 +532,16 @@ PROMPT;
             }
         }
 
-        return BioimpedanceKnowledgeChunk::query()
-            ->with('document')
-            ->whereIn('chunk_key', $keys->unique()->values())
-            ->where('language', 'pt-BR')
-            ->whereHas('document', fn ($query) => $query->where('approved', true))
-            ->get()
-            ->sortBy(fn (BioimpedanceKnowledgeChunk $chunk) => $keys->search($chunk->chunk_key))
+        $tags = collect(['measurement_protocol', 'safety_policy', 'prohibited_content']);
+        foreach (array_keys(self::METRIC_CHUNKS) as $metric) {
+            if (filled($context['metrics'][$metric]['classification'] ?? null)) {
+                $tags->push($metric, 'classification');
+            }
+        }
+
+        return $this->publishedSources
+            ->matching($tags->unique()->values()->all(), $keys->unique()->values()->all())
+            ->sortBy(fn (BioimpedanceKnowledgeChunk $chunk) => ($position = $keys->search($chunk->chunk_key)) === false ? 999 : $position)
             ->values();
     }
 
@@ -694,22 +703,17 @@ PROMPT;
                 ['title' => $documentData['title'], 'version' => $documentData['version']],
                 [
                     ...$documentData,
+                    'status' => BioimpedanceKnowledgeDocument::STATUS_PUBLISHED,
                     'approved' => true,
                     'approved_by_user_id' => $approvedBy?->id,
                     'approved_at' => now(),
+                    'published_by_user_id' => $approvedBy?->id,
+                    'published_at' => now(),
                 ]
             );
 
-            if (! $document->approved) {
-                $document->update([
-                    'approved' => true,
-                    'approved_by_user_id' => $approvedBy?->id,
-                    'approved_at' => now(),
-                ]);
-            }
-
             foreach ($chunks as $chunkData) {
-                BioimpedanceKnowledgeChunk::query()->updateOrCreate(
+                BioimpedanceKnowledgeChunk::query()->firstOrCreate(
                     ['chunk_key' => $chunkData['chunk_key']],
                     [
                         ...$chunkData,
@@ -732,6 +736,8 @@ PROMPT;
                 'manufacturer' => $chunk->document?->manufacturer,
                 'device_model' => $chunk->document?->device_model,
                 'version' => $chunk->document?->version,
+                'publication_status' => $chunk->document?->status,
+                'published_at' => $chunk->document?->published_at?->toIso8601String(),
                 'section' => $chunk->section,
                 'page' => $chunk->page,
                 'checksum' => $chunk->checksum,
