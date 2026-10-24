@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\Bioimpedance\BioimpedanceAnalyzer;
 use App\Services\Bioimpedance\BioimpedanceCareGuidanceAssistant;
 use App\Services\Bioimpedance\BioimpedanceObservationAssistant;
+use App\Services\Bioimpedance\BioimpedanceReportComparison;
 use App\Services\Bioimpedance\BioimpedanceReportSharePresenter;
 use App\Services\Bioimpedance\LegacyBioimpedanceAnalysisRefresher;
 use App\Services\Bioimpedance\RelaxmedicImageProcessor;
@@ -36,6 +37,7 @@ class BioimpedanceController extends Controller
 {
     public function __construct(
         private readonly BioimpedanceReportSharePresenter $reportSharePresenter,
+        private readonly BioimpedanceReportComparison $reportComparison,
         private readonly RelaxmedicValueNormalizer $relaxmedicValueNormalizer,
         private readonly BioimpedanceAnalyzer $bioimpedanceAnalyzer,
     ) {}
@@ -573,6 +575,7 @@ class BioimpedanceController extends Controller
             ],
             'client' => $this->clientPayload($assessment->client->setRelation('assessments', collect([$assessment]))),
             'assessment' => $this->assessmentPayload($assessment),
+            'comparison' => $this->reportComparison->for($assessment),
             'issuedAt' => $assessment->report_issued_at,
         ])->setPaper('a4');
 
@@ -833,6 +836,7 @@ class BioimpedanceController extends Controller
             ],
             'client' => $this->clientPayload($assessment->client->setRelation('assessments', collect([$assessment]))),
             'assessment' => $this->assessmentPayload($assessment),
+            'comparison' => $this->reportComparison->for($assessment),
             'issuedAt' => $assessment->report_issued_at ?? $assessment->evaluated_at,
         ])->setPaper('a4');
 
