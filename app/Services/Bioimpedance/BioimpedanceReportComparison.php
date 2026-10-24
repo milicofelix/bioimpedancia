@@ -3,9 +3,15 @@
 namespace App\Services\Bioimpedance;
 
 use App\Models\Bioimpedance\BioimpedanceAssessment;
+use Illuminate\Support\Collection;
 
 class BioimpedanceReportComparison
 {
+    private const TREND_METRICS = [
+        'weight_kg' => ['label' => 'Peso', 'unit' => 'kg', 'decimals' => 1],
+        'body_fat_percentage' => ['label' => 'Gordura corporal', 'unit' => '%', 'decimals' => 1],
+    ];
+
     private const METRICS = [
         'weight_kg' => ['label' => 'Peso', 'unit' => 'kg', 'decimals' => 1],
         'body_fat_percentage' => ['label' => 'Gordura corporal', 'unit' => '%', 'decimals' => 1],
@@ -17,16 +23,31 @@ class BioimpedanceReportComparison
 
     public function for(BioimpedanceAssessment $assessment): array
     {
-        $previous = $assessment->client->assessments()
+        if ($assessment->canceled_at) {
+            return ['previous' => null, 'metrics' => [], 'trends' => [], 'history_count' => 0];
+        }
+
+        $history = $assessment->client->assessments()
             ->where('id', '!=', $assessment->id)
             ->where('device_model', $assessment->device_model)
             ->whereNull('canceled_at')
             ->where('evaluated_at', '<', $assessment->evaluated_at)
             ->latest('evaluated_at')
-            ->first();
+            ->limit(5)
+            ->get()
+            ->sortBy('evaluated_at')
+            ->values()
+            ->push($assessment);
+
+        $previous = $history->slice(0, -1)->last();
 
         if (! $previous) {
-            return ['previous' => null, 'metrics' => []];
+            return [
+                'previous' => null,
+                'metrics' => [],
+                'trends' => $this->trends($assessment, $history),
+                'history_count' => $history->count(),
+            ];
         }
 
         $metrics = collect(self::METRICS)
@@ -60,6 +81,59 @@ class BioimpedanceReportComparison
                 'device_model' => $previous->device_model,
             ],
             'metrics' => $metrics,
+            'trends' => $this->trends($assessment, $history),
+            'history_count' => $history->count(),
         ];
+    }
+
+    private function trends(BioimpedanceAssessment $assessment, Collection $history): array
+    {
+        $definitions = self::TREND_METRICS;
+        $muscleField = $assessment->device_model === 'Relaxmedic' ? 'muscle_mass_kg' : 'skeletal_muscle_percentage';
+        $definitions[$muscleField] = [
+            'label' => $assessment->device_model === 'Relaxmedic' ? 'Massa muscular' : 'Músculo esquelético',
+            'unit' => $assessment->device_model === 'Relaxmedic' ? 'kg' : '%',
+            'decimals' => 1,
+        ];
+
+        return collect($definitions)
+            ->map(function (array $definition, string $field) use ($history): ?array {
+                $points = $history
+                    ->filter(fn (BioimpedanceAssessment $item) => $item->{$field} !== null)
+                    ->values()
+                    ->map(fn (BioimpedanceAssessment $item) => [
+                        'assessment_id' => $item->id,
+                        'date' => $item->evaluated_at?->format('d/m/y'),
+                        'value' => (float) $item->{$field},
+                    ]);
+
+                if ($points->isEmpty()) {
+                    return null;
+                }
+
+                $minimum = (float) $points->min('value');
+                $maximum = (float) $points->max('value');
+                $isFlat = abs($maximum - $minimum) < 0.0001;
+                $range = max($maximum - $minimum, 0.1);
+                $lastIndex = max($points->count() - 1, 1);
+                $chartPoints = $points->map(fn (array $point, int $index) => [
+                    ...$point,
+                    'x' => round(12 + (($index / $lastIndex) * 276), 1),
+                    'y' => $isFlat ? 45 : round(72 - ((($point['value'] - $minimum) / $range) * 54), 1),
+                ])->all();
+
+                return [
+                    ...$definition,
+                    'field' => $field,
+                    'points' => $chartPoints,
+                    'polyline' => collect($chartPoints)->map(fn (array $point) => $point['x'].','.$point['y'])->implode(' '),
+                    'minimum' => $minimum,
+                    'maximum' => $maximum,
+                    'has_evolution' => count($chartPoints) >= 2,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 }

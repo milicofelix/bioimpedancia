@@ -47,10 +47,12 @@
         .pointer { position: absolute; top: 0; width: 0; height: 0; margin-left: -4px; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 7px solid #111827; }
         .legend { width: 100%; border-collapse: collapse; margin-top: 2px; }
         .legend td { color: #667085; font-size: 6px; text-align: center; }
-        .comparison { width: 100%; border-collapse: collapse; background: #fff; }
-        .comparison th, .comparison td { padding: 7px 8px; border-bottom: 1px solid #eef0f3; text-align: left; }
-        .comparison th { background: #fbf2f4; color: #7f4150; font-size: 7px; text-transform: uppercase; }
-        .delta-up { color: #7a4c00; font-weight: 700; } .delta-down { color: #315a70; font-weight: 700; } .delta-flat { color: #667085; font-weight: 700; }
+        .trend-grid { width: 100%; border-collapse: separate; border-spacing: 5px; table-layout: fixed; }
+        .trend-card { padding: 7px; border: 1px solid #e4e7ec; border-radius: 7px; background: #fff; vertical-align: top; page-break-inside: avoid; }
+        .trend-current { margin-top: 2px; font-size: 12px; font-weight: 700; }
+        .trend-chart { display: block; width: 100%; height: 62px; margin-top: 3px; }
+        .trend-dates { width: 100%; color: #667085; font-size: 6px; }
+        .trend-dates td:last-child { text-align: right; }
         .source-list { margin: 5px 0 0; padding-left: 16px; }
         .source-list li { margin-bottom: 4px; }
         .validation { width: 100%; border-collapse: collapse; margin-top: 8px; }
@@ -147,7 +149,6 @@
         'Nível de obesidade' => 'Origem: RelaxFit. Classificação importada, normalizada e revisada.',
         'Tipo de corpo' => 'Origem: RelaxFit. Classificação proprietária importada da imagem.',
     ];
-    $formatComparison = fn ($value, $metric) => $br($value, $metric['decimals']).($metric['unit'] ? ' '.$metric['unit'] : '');
 @endphp
 
 <section class="report-page">
@@ -198,18 +199,38 @@
             </table>
             <div class="notice"><strong>Por que as classificações podem ser diferentes?</strong> O IMC é calculado pelo sistema usando peso e altura. “Nível de obesidade” e “Tipo de corpo” são classificações distintas importadas do RelaxFit; o tipo corporal é proprietário do aplicativo e não equivale à classificação do IMC.</div>
         @endif
-        <div class="section-title" style="color: {{ $secondaryColor }};">Comparação com a avaliação anterior</div>
-        @if($comparison['previous'] && count($comparison['metrics']))
-            <p class="muted">Comparação com {{ \Illuminate\Support\Carbon::parse($comparison['previous']['evaluated_at'])->format('d/m/Y') }}, realizada no mesmo modelo de equipamento.</p>
-            <table class="comparison"><thead><tr><th>Indicador</th><th>Anterior</th><th>Atual</th><th>Variação</th></tr></thead><tbody>
-                @foreach($comparison['metrics'] as $metric)
-                    @php $deltaClass = $metric['delta'] > 0 ? 'delta-up' : ($metric['delta'] < 0 ? 'delta-down' : 'delta-flat'); @endphp
-                    <tr><td><strong>{{ $metric['label'] }}</strong></td><td>{{ $formatComparison($metric['previous'], $metric) }}</td><td>{{ $formatComparison($metric['current'], $metric) }}</td><td class="{{ $deltaClass }}">{{ $metric['delta'] > 0 ? '+' : '' }}{{ $formatComparison($metric['delta'], $metric) }}</td></tr>
+        <div class="section-title" style="color: {{ $secondaryColor }};">Evolução</div>
+        @if(($comparison['history_count'] ?? 0) >= 2 && count($comparison['trends'] ?? []))
+            <p class="muted">Até seis avaliações não canceladas, realizadas no mesmo modelo de equipamento.</p>
+            <table class="trend-grid"><tr>
+                @foreach($comparison['trends'] as $trend)
+                    @php
+                        $firstTrendPoint = $trend['points'][0];
+                        $lastTrendPoint = $trend['points'][count($trend['points']) - 1];
+                        $trendDelta = round($lastTrendPoint['value'] - $firstTrendPoint['value'], $trend['decimals']);
+                    @endphp
+                    <td class="trend-card" style="width: 33.33%;">
+                        <div class="label">{{ $trend['label'] }}</div>
+                        <div class="trend-current">{{ $br($lastTrendPoint['value'], $trend['decimals']) }} {{ $trend['unit'] }}</div>
+                        @if($trend['has_evolution'])
+                            <svg class="trend-chart" viewBox="0 0 300 84" preserveAspectRatio="none" aria-label="Evolução de {{ $trend['label'] }}">
+                                <line x1="10" y1="72" x2="290" y2="72" stroke="#d0d5dd" stroke-width="1" />
+                                <polyline points="{{ $trend['polyline'] }}" fill="none" stroke="#667085" stroke-width="2.5" />
+                                @foreach($trend['points'] as $point)<circle cx="{{ $point['x'] }}" cy="{{ $point['y'] }}" r="3.5" fill="{{ $primaryColor }}" />@endforeach
+                            </svg>
+                            <table class="trend-dates"><tr><td>{{ $firstTrendPoint['date'] }}</td><td>{{ $lastTrendPoint['date'] }}</td></tr></table>
+                            <div class="muted" style="margin-top: 2px;">Variação no período: {{ $trendDelta > 0 ? '+' : '' }}{{ $br($trendDelta, $trend['decimals']) }} {{ $trend['unit'] }}</div>
+                        @else
+                            <div class="muted" style="margin-top: 8px;">Linha de base: ainda sem segundo valor comparável.</div>
+                        @endif
+                    </td>
                 @endforeach
-            </tbody></table>
-            <p class="muted">Variações mostram apenas mudança numérica. Cores e sinais não indicam melhora ou piora isoladamente.</p>
+            </tr></table>
+            <p class="muted">As linhas mostram apenas tendências numéricas e não indicam melhora ou piora isoladamente.</p>
+        @elseif($assessment['is_canceled'])
+            <div class="summary muted">Avaliações canceladas não participam de comparações ou gráficos evolutivos.</div>
         @else
-            <div class="summary muted">Ainda não há avaliação anterior compatível para comparação.</div>
+            <div class="summary muted"><strong>Linha de base.</strong> Esta é a primeira avaliação não cancelada neste modelo de equipamento. Os gráficos serão exibidos quando houver uma nova medição comparável.</div>
         @endif
     </div>
     @include('bioimpedance.partials.report-footer')
