@@ -52,6 +52,13 @@
         .source-list li { margin-bottom: 4px; }
         .validation { width: 100%; border-collapse: collapse; margin-top: 8px; }
         .validation td { padding: 7px 8px; border: 1px solid #e5e7eb; background: #fff; vertical-align: top; }
+        .keep-together { page-break-inside: avoid; }
+        .page-guidance .content { padding-top: 10px; padding-bottom: 8px; }
+        .page-guidance .section-title { margin-top: 8px; margin-bottom: 4px; }
+        .page-guidance .summary, .page-guidance .notice, .page-guidance .guidance { margin-top: 5px; padding: 7px 10px; }
+        .page-guidance .summary p, .page-guidance .notice p, .page-guidance .guidance p { margin-top: 3px; margin-bottom: 3px; }
+        .page-guidance .validation { margin-top: 5px; }
+        .page-guidance .validation td { padding: 5px 7px; }
         .footer { padding: 9px 18px; border-top: 1px solid #ead5da; color: #667085; font-size: 7px; background: #fff; }
         .footer-right { float: right; }
     </style>
@@ -73,6 +80,20 @@
     $primaryColor = $clinic['primary_color'] ?? '#d88b9a';
     $secondaryColor = $clinic['secondary_color'] ?? '#4a4a4a';
     $isRelaxmedic = ($assessment['device_model'] ?? null) === 'Relaxmedic';
+    $manufacturer = trim((string) ($reference['manufacturer'] ?? ($isRelaxmedic ? 'Relaxmedic' : 'Omron')));
+    $deviceModel = trim((string) ($reference['model'] ?? $assessment['device_model'] ?? ''));
+    $genericDeviceModels = ['relaxmedic', 'relaxmedic/relaxfit'];
+    $hasSpecificDeviceModel = $deviceModel !== ''
+        && mb_strtolower($deviceModel) !== mb_strtolower($manufacturer)
+        && ! in_array(mb_strtolower($deviceModel), $genericDeviceModels, true);
+    $displayClassification = fn ($indicator, $fallback = '-') => ($indicator['pending'] ?? false)
+        ? 'Sem classificação disponível'
+        : ($indicator['classification'] ?? $fallback);
+    $executiveSummary = str_replace(
+        'a referência de classificação Relaxmedic não está cadastrada',
+        'sem classificação disponível para este indicador',
+        $assessment['analysis']['summary'] ?? 'Síntese indisponível.',
+    );
     $relaxmedicMetrics = array_filter([
         'Taxa muscular' => isset($assessment['muscle_rate_percentage']) ? $br($assessment['muscle_rate_percentage']).' %' : null,
         'Massa corporal magra' => isset($assessment['lean_body_mass_kg']) ? $br($assessment['lean_body_mass_kg']).' kg' : null,
@@ -114,11 +135,11 @@
         <div class="section-title" style="color: {{ $secondaryColor }};">Resultados principais</div>
         <table class="grid"><tr>
             <td class="box hero" style="width: 25%;"><div class="label">Peso</div><div class="metric-value">{{ $br($assessment['weight_kg']) }} <span class="metric-unit">kg</span></div></td>
-            <td class="box hero" style="width: 25%;"><div class="label">IMC calculado</div><div class="metric-value">{{ $br($assessment['calculated_bmi']) }}</div><span class="badge {{ $tone($bmi) }}">{{ $bmi['classification'] ?? '-' }}</span></td>
-            <td class="box hero" style="width: 25%;"><div class="label">Gordura corporal</div><div class="metric-value">{{ $br($assessment['body_fat_percentage']) }} <span class="metric-unit">%</span></div><span class="badge {{ $tone($bodyFat) }}">{{ $bodyFat['classification'] ?? 'Estimativa' }}</span></td>
-            <td class="box hero" style="width: 25%;"><div class="label">Músculo esquelético</div><div class="metric-value">{{ $br($assessment['skeletal_muscle_percentage']) }} <span class="metric-unit">%</span></div><span class="badge {{ $tone($muscle) }}">{{ $muscle['classification'] ?? 'Estimativa' }}</span></td>
+            <td class="box hero" style="width: 25%;"><div class="label">IMC calculado</div><div class="metric-value">{{ $br($assessment['calculated_bmi']) }}</div><span class="badge {{ $tone($bmi) }}">{{ $displayClassification($bmi) }}</span></td>
+            <td class="box hero" style="width: 25%;"><div class="label">Gordura corporal</div><div class="metric-value">{{ $br($assessment['body_fat_percentage']) }} <span class="metric-unit">%</span></div><span class="badge {{ $tone($bodyFat) }}">{{ $displayClassification($bodyFat, 'Estimativa') }}</span></td>
+            <td class="box hero" style="width: 25%;"><div class="label">Músculo esquelético</div><div class="metric-value">{{ $br($assessment['skeletal_muscle_percentage']) }} <span class="metric-unit">%</span></div><span class="badge {{ $tone($muscle) }}">{{ $displayClassification($muscle, 'Estimativa') }}</span></td>
         </tr></table>
-        <div class="summary"><div class="section-title" style="margin-top: 0; color: {{ $primaryColor }};">Síntese da avaliação</div><p>{{ $assessment['analysis']['summary'] ?? 'Síntese indisponível.' }}</p></div>
+        <div class="summary"><div class="section-title" style="margin-top: 0; color: {{ $primaryColor }};">Síntese da avaliação</div><p>{{ $executiveSummary }}</p></div>
         @if($isRelaxmedic)
             <div class="notice"><strong>Como interpretar este relatório.</strong> Os resultados Relaxmedic são estimativas e índices proprietários do equipamento. A coerência matemática entre medidas não comprova precisão fisiológica e não substitui avaliação clínica ou funcional.</div>
             @if($assessmentAge >= 60)<div class="notice"><strong>Atenção à pessoa idosa.</strong> Objetivos devem priorizar preservação de massa, força, equilíbrio, mobilidade e autonomia, sem usar isoladamente IMC ou peso de referência do fabricante.</div>@endif
@@ -126,7 +147,7 @@
         <table class="grid"><tr>
             <td class="box"><div class="label">Idade corporal</div><div class="metric-small">{{ $assessment['body_age'] ?? '-' }} anos</div><div class="muted">{{ $isRelaxmedic ? 'Estimativa proprietária; não representa idade biológica real.' : 'Indicador estimado pelo equipamento.' }}</div></td>
             <td class="box"><div class="label">Metabolismo basal</div><div class="metric-small">{{ $assessment['resting_metabolism_kcal'] ? number_format($assessment['resting_metabolism_kcal'], 0, ',', '.') : '-' }} kcal/dia</div><div class="muted">Não corresponde ao gasto energético total nem à recomendação de consumo.</div></td>
-            <td class="box"><div class="label">Modelo do equipamento</div><div class="metric-small">{{ $reference['manufacturer'] ?? ($isRelaxmedic ? 'Relaxmedic' : 'Omron') }} {{ $assessment['device_model'] ?? ($reference['model'] ?? '') }}</div><div class="muted">Referência {{ $assessment['reference_version'] ?? ($reference['classification_version'] ?? '1.0.0') }}</div></td>
+            <td class="box"><div class="label">Equipamento</div><div class="metric-small">{{ $manufacturer }}</div><div class="muted">@if($hasSpecificDeviceModel)Modelo {{ $deviceModel }} · @endif Referência {{ $assessment['reference_version'] ?? ($reference['classification_version'] ?? '1.0.0') }}</div></td>
         </tr></table>
     </div>
     @include('bioimpedance.partials.report-footer')
@@ -138,7 +159,7 @@
         <div class="section-title" style="color: {{ $secondaryColor }};">Composição corporal detalhada</div>
         <table class="grid">
             <tr><td class="box" style="width: 50%;">@include('bioimpedance.partials.pdf-scale', ['title' => 'Gordura corporal', 'value' => $br($assessment['body_fat_percentage']).' %', 'indicator' => $bodyFat])</td><td class="box">@include('bioimpedance.partials.pdf-scale', ['title' => 'Músculo esquelético', 'value' => $br($assessment['skeletal_muscle_percentage']).' %', 'indicator' => $muscle])</td></tr>
-            <tr><td class="box">@include('bioimpedance.partials.pdf-scale', ['title' => 'Gordura visceral', 'value' => $br($assessment['visceral_fat_level'], $isRelaxmedic ? 1 : 0).' nível', 'indicator' => $visceral])<div class="muted" style="margin-top: 5px;">Índice do dispositivo; não representa quantidade em kg.</div></td><td class="box"><div class="label">IMC calculado</div><div class="metric-value">{{ $br($assessment['calculated_bmi']) }}</div><span class="badge {{ $tone($bmi) }}">{{ $bmi['classification'] ?? '-' }}</span><div class="muted" style="margin-top: 5px;">Deve ser interpretado com composição corporal, histórico e contexto individual.</div></td></tr>
+            <tr><td class="box">@include('bioimpedance.partials.pdf-scale', ['title' => 'Gordura visceral', 'value' => $br($assessment['visceral_fat_level'], $isRelaxmedic ? 1 : 0).' nível', 'indicator' => $visceral])<div class="muted" style="margin-top: 5px;">Índice do dispositivo; não representa quantidade em kg.</div></td><td class="box"><div class="label">IMC calculado</div><div class="metric-value">{{ $br($assessment['calculated_bmi']) }}</div><span class="badge {{ $tone($bmi) }}">{{ $displayClassification($bmi) }}</span><div class="muted" style="margin-top: 5px;">Deve ser interpretado com composição corporal, histórico e contexto individual.</div></td></tr>
         </table>
         @if($isRelaxmedic && count($relaxmedicMetrics))
             <div class="section-title" style="color: {{ $secondaryColor }};">Indicadores Relaxmedic</div>
@@ -165,7 +186,7 @@
     @include('bioimpedance.partials.report-footer')
 </section>
 
-<section class="report-page">
+<section class="report-page page-guidance">
     @include('bioimpedance.partials.report-header', ['pageTitle' => 'Orientações e validação', 'pageNumber' => 3])
     <div class="content">
         <div class="section-title" style="color: {{ $secondaryColor }};">Interpretação profissional</div>
@@ -184,8 +205,10 @@
             <tr><td><div class="label">Origem dos dados</div><strong>{{ $isRelaxmedic ? 'Imagem processada com conferência humana' : 'Entrada manual pelo profissional' }}</strong></td><td><div class="label">Correções registradas</div><strong>{{ $assessment['correction_count'] ?? 0 }}</strong></td></tr>
         </table>
         @if($isRelaxmedic)<div class="notice"><strong>Origem auditável preservada.</strong> Os identificadores técnicos da imagem permanecem no registro interno de auditoria e não são exibidos no relatório entregue ao cliente. A imagem original não foi armazenada.</div>@endif
-        <div class="section-title" style="color: {{ $secondaryColor }};">Limites do relatório</div>
-        <div class="summary"><p>{{ $clinic['technical_notice'] }}</p><p class="muted">Resultados de bioimpedância podem variar com hidratação, alimentação, exercício, horário e condições de medição. Compare avaliações feitas em condições semelhantes e utilize este documento como apoio à avaliação profissional.</p></div>
+        <div class="keep-together">
+            <div class="section-title" style="color: {{ $secondaryColor }};">Limites do relatório</div>
+            <div class="summary"><p>{{ $clinic['technical_notice'] }}</p></div>
+        </div>
     </div>
     @include('bioimpedance.partials.report-footer')
 </section>

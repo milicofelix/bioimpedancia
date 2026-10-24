@@ -14,7 +14,7 @@
 @endphp
 <div class="label">{{ $title }}</div>
 <div class="metric-value">{{ $value }}</div>
-<span class="badge {{ $indicator['tone'] ?? 'neutral' }}">{{ $indicator['classification'] ?? '-' }}</span>
+<span class="badge {{ $indicator['tone'] ?? 'neutral' }}">{{ $pending ? 'Sem classificação disponível' : ($indicator['classification'] ?? '-') }}</span>
 @if($scale)
     <div class="pointer-row">
         @unless($pending)
