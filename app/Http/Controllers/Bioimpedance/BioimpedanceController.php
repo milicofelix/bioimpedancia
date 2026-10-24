@@ -33,6 +33,11 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * Internal compatibility workflow.
+ *
+ * HTTP routes must use the domain-specific controllers in this namespace.
+ */
 class BioimpedanceController extends Controller
 {
     public function __construct(

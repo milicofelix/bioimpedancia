@@ -2,16 +2,23 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Bioimpedance\AdminDashboardController;
+use App\Http\Controllers\Bioimpedance\AiAnalysisController;
+use App\Http\Controllers\Bioimpedance\AssessmentController;
 use App\Http\Controllers\Bioimpedance\AssessmentImportController;
-use App\Http\Controllers\Bioimpedance\BioimpedanceController;
+use App\Http\Controllers\Bioimpedance\AssessmentReportController;
+use App\Http\Controllers\Bioimpedance\AssessmentShareController;
+use App\Http\Controllers\Bioimpedance\ClientController;
+use App\Http\Controllers\Bioimpedance\ClinicSettingsController;
 use App\Http\Controllers\Bioimpedance\KnowledgeDocumentController;
+use App\Http\Controllers\Bioimpedance\UserController;
+use App\Http\Controllers\Bioimpedance\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return redirect()->route('login');
 });
 
-Route::get('/r/{token}', [BioimpedanceController::class, 'publicReport'])->name('bioimpedance.public-report');
+Route::get('/r/{token}', [AssessmentShareController::class, 'publicReport'])->name('bioimpedance.public-report');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
@@ -21,37 +28,37 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::view('/dashboard', 'dashboard')->name('dashboard');
     Route::view('/app', 'operational-app')->name('operational-app');
-    Route::get('/bioimpedance', [BioimpedanceController::class, 'index'])->name('bioimpedance.index');
-    Route::get('/bioimpedance/operational', [BioimpedanceController::class, 'operationalIndex'])->name('bioimpedance.operational.index');
+    Route::get('/bioimpedance', [WorkspaceController::class, 'index'])->name('bioimpedance.index');
+    Route::get('/bioimpedance/operational', [WorkspaceController::class, 'operational'])->name('bioimpedance.operational.index');
     Route::get('/bioimpedance/admin-dashboard', AdminDashboardController::class)->name('bioimpedance.admin-dashboard');
     Route::get('/bioimpedance/knowledge-documents', [KnowledgeDocumentController::class, 'index'])->name('bioimpedance.knowledge-documents.index');
     Route::post('/bioimpedance/knowledge-documents', [KnowledgeDocumentController::class, 'store'])->name('bioimpedance.knowledge-documents.store');
     Route::patch('/bioimpedance/knowledge-documents/{document}/transition', [KnowledgeDocumentController::class, 'transition'])->name('bioimpedance.knowledge-documents.transition');
-    Route::patch('/bioimpedance/clinic', [BioimpedanceController::class, 'updateClinicSettings'])->name('bioimpedance.clinic.update');
-    Route::post('/bioimpedance/users', [BioimpedanceController::class, 'storeUser'])->name('bioimpedance.users.store');
-    Route::put('/bioimpedance/users/{user}', [BioimpedanceController::class, 'updateUser'])->name('bioimpedance.users.update');
-    Route::patch('/bioimpedance/users/{user}/inactivate', [BioimpedanceController::class, 'inactivateUser'])->name('bioimpedance.users.inactivate');
-    Route::post('/bioimpedance/clients', [BioimpedanceController::class, 'storeClient'])->name('bioimpedance.clients.store');
-    Route::put('/bioimpedance/clients/{client}', [BioimpedanceController::class, 'updateClient'])->name('bioimpedance.clients.update');
-    Route::patch('/bioimpedance/clients/{client}/inactivate', [BioimpedanceController::class, 'inactivateClient'])->name('bioimpedance.clients.inactivate');
-    Route::get('/bioimpedance/clients/{client}/privacy-export', [BioimpedanceController::class, 'exportClientPrivacyData'])->name('bioimpedance.clients.privacy-export');
-    Route::patch('/bioimpedance/clients/{client}/anonymize', [BioimpedanceController::class, 'anonymizeClient'])->name('bioimpedance.clients.anonymize');
-    Route::post('/bioimpedance/assessments', [BioimpedanceController::class, 'storeAssessment'])->name('bioimpedance.assessments.store');
+    Route::patch('/bioimpedance/clinic', [ClinicSettingsController::class, 'update'])->name('bioimpedance.clinic.update');
+    Route::post('/bioimpedance/users', [UserController::class, 'store'])->name('bioimpedance.users.store');
+    Route::put('/bioimpedance/users/{user}', [UserController::class, 'update'])->name('bioimpedance.users.update');
+    Route::patch('/bioimpedance/users/{user}/inactivate', [UserController::class, 'inactivate'])->name('bioimpedance.users.inactivate');
+    Route::post('/bioimpedance/clients', [ClientController::class, 'store'])->name('bioimpedance.clients.store');
+    Route::put('/bioimpedance/clients/{client}', [ClientController::class, 'update'])->name('bioimpedance.clients.update');
+    Route::patch('/bioimpedance/clients/{client}/inactivate', [ClientController::class, 'inactivate'])->name('bioimpedance.clients.inactivate');
+    Route::get('/bioimpedance/clients/{client}/privacy-export', [ClientController::class, 'exportPrivacyData'])->name('bioimpedance.clients.privacy-export');
+    Route::patch('/bioimpedance/clients/{client}/anonymize', [ClientController::class, 'anonymize'])->name('bioimpedance.clients.anonymize');
+    Route::post('/bioimpedance/assessments', [AssessmentController::class, 'store'])->name('bioimpedance.assessments.store');
     Route::post('/bioimpedance/relaxmedic/process-image', [AssessmentImportController::class, 'processRelaxmedicImage'])
         ->middleware('throttle:5,1')
         ->name('bioimpedance.relaxmedic.process-image');
-    Route::get('/bioimpedance/assessments/{assessment}/pdf', [BioimpedanceController::class, 'downloadAssessmentPdf'])->name('bioimpedance.assessments.pdf');
-    Route::get('/bioimpedance/assessments/{assessment}/observation-suggestion', [BioimpedanceController::class, 'suggestAssessmentObservation'])
+    Route::get('/bioimpedance/assessments/{assessment}/pdf', [AssessmentReportController::class, 'download'])->name('bioimpedance.assessments.pdf');
+    Route::get('/bioimpedance/assessments/{assessment}/observation-suggestion', [AiAnalysisController::class, 'suggestObservation'])
         ->middleware('throttle:5,1')
         ->name('bioimpedance.assessments.observation-suggestion');
-    Route::patch('/bioimpedance/assessments/{assessment}/observation', [BioimpedanceController::class, 'approveAssessmentObservation'])->name('bioimpedance.assessments.observation.approve');
-    Route::get('/bioimpedance/assessments/{assessment}/care-guidance-suggestion', [BioimpedanceController::class, 'suggestAssessmentCareGuidance'])
+    Route::patch('/bioimpedance/assessments/{assessment}/observation', [AiAnalysisController::class, 'approveObservation'])->name('bioimpedance.assessments.observation.approve');
+    Route::get('/bioimpedance/assessments/{assessment}/care-guidance-suggestion', [AiAnalysisController::class, 'suggestCareGuidance'])
         ->middleware('throttle:5,1')
         ->name('bioimpedance.assessments.care-guidance.suggestion');
-    Route::patch('/bioimpedance/assessments/{assessment}/care-guidance', [BioimpedanceController::class, 'approveAssessmentCareGuidance'])->name('bioimpedance.assessments.care-guidance.approve');
-    Route::post('/bioimpedance/assessments/{assessment}/shares', [BioimpedanceController::class, 'createAssessmentShare'])->name('bioimpedance.assessments.shares.store');
-    Route::patch('/bioimpedance/report-shares/{share}/revoke', [BioimpedanceController::class, 'revokeAssessmentShare'])->name('bioimpedance.report-shares.revoke');
-    Route::put('/bioimpedance/assessments/{assessment}', [BioimpedanceController::class, 'updateAssessment'])->name('bioimpedance.assessments.update');
-    Route::patch('/bioimpedance/assessments/{assessment}/cancel', [BioimpedanceController::class, 'cancelAssessment'])->name('bioimpedance.assessments.cancel');
+    Route::patch('/bioimpedance/assessments/{assessment}/care-guidance', [AiAnalysisController::class, 'approveCareGuidance'])->name('bioimpedance.assessments.care-guidance.approve');
+    Route::post('/bioimpedance/assessments/{assessment}/shares', [AssessmentShareController::class, 'store'])->name('bioimpedance.assessments.shares.store');
+    Route::patch('/bioimpedance/report-shares/{share}/revoke', [AssessmentShareController::class, 'revoke'])->name('bioimpedance.report-shares.revoke');
+    Route::put('/bioimpedance/assessments/{assessment}', [AssessmentController::class, 'update'])->name('bioimpedance.assessments.update');
+    Route::patch('/bioimpedance/assessments/{assessment}/cancel', [AssessmentController::class, 'cancel'])->name('bioimpedance.assessments.cancel');
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 });
