@@ -727,12 +727,18 @@ class BioimpedanceController extends Controller
             ]);
         }
 
-        $sources = $output->request->sources->map(fn ($source) => [
-            'id' => $source->chunk?->chunk_key,
-            'document' => $source->chunk?->document?->title,
-            'section' => $source->chunk?->section,
-            'url' => $source->chunk?->document?->source_url,
-        ])->filter(fn ($source) => filled($source['id']))->values()->all();
+        $usedSourceIds = collect($output->structured_claims ?? [])->pluck('source_ids')->flatten()->unique();
+        $sources = $output->request->sources
+            ->filter(fn ($source) => $usedSourceIds->contains($source->chunk?->chunk_key))
+            ->map(fn ($source) => [
+                'id' => $source->chunk?->chunk_key,
+                'document' => $source->chunk?->document?->title,
+                'section' => $source->chunk?->section,
+                'url' => $source->chunk?->document?->source_url,
+                'claim_ids' => collect($output->structured_claims ?? [])
+                    ->filter(fn (array $claim) => in_array($source->chunk?->chunk_key, $claim['source_ids'] ?? [], true))
+                    ->pluck('id')->values()->all(),
+            ])->filter(fn ($source) => filled($source['id']))->values()->all();
 
         DB::transaction(function () use ($assessment, $request, $validated, $output, $sources): void {
             $oldValues = $this->assessmentAuditValues($assessment);
