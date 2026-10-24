@@ -4,21 +4,26 @@
     <meta charset="utf-8">
     <title>Relatório de Bioimpedância</title>
     <style>
-        @page { margin: 18px; }
+        @page { margin: 76px 18px 42px; }
         * { box-sizing: border-box; }
         body { margin: 0; color: #172033; font-family: DejaVu Sans, Arial, sans-serif; font-size: 9px; line-height: 1.4; }
-        .report-page { min-height: 1050px; border: 1px solid #f2c7cf; border-radius: 10px; page-break-after: always; overflow: hidden; background: #fffafa; }
-        .report-page:last-child { page-break-after: auto; }
-        .header { padding: 14px 18px 12px; background: #fbf2f4; border-bottom: 2px solid #d88b9a; }
-        .brand, .report-title { display: inline-block; width: 49%; vertical-align: middle; }
-        .logo { width: 205px; max-height: 68px; object-fit: contain; }
-        .brand-name { font-size: 22px; }
-        .report-title { text-align: right; }
-        .report-title h1 { margin: 3px 0 5px; font-size: 17px; }
+        .document-header { position: fixed; top: -63px; left: 0; right: 0; height: 52px; padding: 6px 12px; border-bottom: 1px solid #ead5da; background: #fff; }
+        .document-brand, .document-identification { display: inline-block; width: 49%; vertical-align: middle; }
+        .document-logo { width: 150px; max-height: 40px; object-fit: contain; }
+        .document-brand-name { font-size: 16px; }
+        .document-identification { color: #667085; font-size: 7px; text-align: right; }
+        .document-identification strong { color: #172033; font-size: 9px; }
+        .document-footer { position: fixed; bottom: -31px; left: 0; right: 0; height: 24px; padding: 6px 12px; border-top: 1px solid #ead5da; color: #667085; font-size: 7px; background: #fff; }
+        .footer-right { float: right; }
+        .report-section { page-break-before: always; }
+        .report-section-first { page-break-before: auto; }
+        .section-header { padding: 10px 18px 9px; border: 1px solid #f2c7cf; border-bottom: 2px solid #d88b9a; border-radius: 8px 8px 0 0; background: #fbf2f4; page-break-after: avoid; }
+        .section-heading h1 { margin: 2px 0 3px; font-size: 17px; }
         .eyebrow, .label, .section-title { font-size: 7px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
-        .content { padding: 14px 18px 12px; }
-        .section-title { margin: 12px 0 6px; font-size: 10px; letter-spacing: .7px; }
+        .content { padding: 12px 18px; border-right: 1px solid #f2c7cf; border-bottom: 1px solid #f2c7cf; border-left: 1px solid #f2c7cf; background: #fffafa; }
+        .section-title { margin: 12px 0 6px; font-size: 10px; letter-spacing: .7px; page-break-after: avoid; }
         .grid { width: 100%; border-collapse: separate; border-spacing: 6px; }
+        .grid tr { page-break-inside: avoid; }
         .box { padding: 9px; border: 1px solid #f2d6dc; border-radius: 8px; background: #fff; vertical-align: top; page-break-inside: avoid; }
         .hero { background: #f8e8eb; }
         .client-name { margin-top: 3px; font-size: 16px; font-weight: 700; }
@@ -32,12 +37,12 @@
         .danger { background: #ffe4e8; color: #9f1c13; }
         .attention { background: #e0f2fe; color: #075985; }
         .neutral, .pending { background: #f2f4f7; color: #475467; }
-        .summary, .notice, .guidance { margin-top: 8px; padding: 10px 12px; border-radius: 8px; page-break-inside: avoid; }
+        .summary, .notice, .guidance { margin-top: 8px; padding: 10px 12px; border-radius: 8px; }
         .summary { border: 1px solid #f2d6dc; background: #fff; }
         .notice { border-left: 3px solid #d88b9a; background: #fff4f6; }
         .guidance { border: 1px solid #b7e3dc; background: #f1fbf8; }
-        .guidance-section { margin-top: 5px; padding: 7px 10px; border: 1px solid #b7e3dc; border-radius: 7px; background: #f7fcfa; page-break-inside: avoid; }
-        .guidance-section-title { margin-bottom: 3px; color: #176b5b; font-size: 8px; font-weight: 700; }
+        .guidance-section { margin-top: 5px; padding: 7px 10px; border: 1px solid #b7e3dc; border-radius: 7px; background: #f7fcfa; page-break-inside: auto; }
+        .guidance-section-title { margin-bottom: 3px; color: #176b5b; font-size: 8px; font-weight: 700; page-break-after: avoid; }
         .origin-note { margin-top: 5px; padding: 5px 7px; border-left: 3px solid #d88b9a; background: #fff7f8; color: #475467; font-size: 7px; }
         .canceled { margin-bottom: 8px; padding: 8px; border: 1px solid #fecdd3; border-radius: 8px; background: #fff1f2; color: #9f1239; }
         .scale { width: 100%; height: 7px; margin-top: 7px; border-radius: 3px; overflow: hidden; background: #e5e7eb; }
@@ -54,8 +59,9 @@
         .trend-dates { width: 100%; color: #667085; font-size: 6px; }
         .trend-dates td:last-child { text-align: right; }
         .source-list { margin: 5px 0 0; padding-left: 16px; }
-        .source-list li { margin-bottom: 4px; }
+        .source-list li { margin-bottom: 4px; page-break-inside: avoid; }
         .validation { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        .validation tr { page-break-inside: avoid; }
         .validation td { padding: 7px 8px; border: 1px solid #e5e7eb; background: #fff; vertical-align: top; }
         .keep-together { page-break-inside: avoid; }
         .page-guidance .content { padding-top: 10px; padding-bottom: 8px; }
@@ -64,8 +70,6 @@
         .page-guidance .summary p, .page-guidance .notice p, .page-guidance .guidance p { margin-top: 3px; margin-bottom: 3px; }
         .page-guidance .validation { margin-top: 5px; }
         .page-guidance .validation td { padding: 5px 7px; }
-        .footer { padding: 9px 18px; border-top: 1px solid #ead5da; color: #667085; font-size: 7px; background: #fff; }
-        .footer-right { float: right; }
     </style>
 </head>
 <body>
@@ -151,7 +155,10 @@
     ];
 @endphp
 
-<section class="report-page">
+@include('bioimpedance.partials.report-document-header')
+@include('bioimpedance.partials.report-footer')
+
+<section class="report-section report-section-first">
     @include('bioimpedance.partials.report-header', ['pageTitle' => 'Visão executiva', 'pageNumber' => 1])
     <div class="content">
         @if($assessment['is_canceled'])<div class="canceled"><strong>Avaliação cancelada.</strong> {{ $assessment['cancellation_reason'] }}</div>@endif
@@ -179,10 +186,9 @@
             <td class="box"><div class="label">Equipamento</div><div class="metric-small">{{ $manufacturer }}</div><div class="muted">@if($hasSpecificDeviceModel)Modelo {{ $deviceModel }} · @endif Referência {{ $assessment['reference_version'] ?? ($reference['classification_version'] ?? '1.0.0') }}</div></td>
         </tr></table>
     </div>
-    @include('bioimpedance.partials.report-footer')
 </section>
 
-<section class="report-page">
+<section class="report-section">
     @include('bioimpedance.partials.report-header', ['pageTitle' => 'Análise e evolução', 'pageNumber' => 2])
     <div class="content">
         <div class="section-title" style="color: {{ $secondaryColor }};">Composição corporal detalhada</div>
@@ -233,10 +239,9 @@
             <div class="summary muted"><strong>Linha de base.</strong> Esta é a primeira avaliação não cancelada neste modelo de equipamento. Os gráficos serão exibidos quando houver uma nova medição comparável.</div>
         @endif
     </div>
-    @include('bioimpedance.partials.report-footer')
 </section>
 
-<section class="report-page page-guidance">
+<section class="report-section page-guidance">
     @include('bioimpedance.partials.report-header', ['pageTitle' => 'Orientações e validação', 'pageNumber' => 3])
     <div class="content">
         <div class="section-title" style="color: {{ $secondaryColor }};">Interpretação profissional</div>
@@ -263,7 +268,6 @@
             <div class="summary"><p>{{ $clinic['technical_notice'] }}</p></div>
         </div>
     </div>
-    @include('bioimpedance.partials.report-footer')
 </section>
 </body>
 </html>
