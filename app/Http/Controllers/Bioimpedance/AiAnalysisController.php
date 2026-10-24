@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Bioimpedance;
 use App\Http\Controllers\Controller;
 use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Services\Bioimpedance\BioimpedanceCareGuidanceAssistant;
+use App\Services\Bioimpedance\BioimpedanceWorkflow;
 use App\Services\Bioimpedance\BioimpedanceObservationAssistant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,7 +13,7 @@ use Illuminate\Http\Request;
 class AiAnalysisController extends Controller
 {
     public function __construct(
-        private readonly BioimpedanceController $workflow,
+        private readonly BioimpedanceWorkflow $workflow,
         private readonly BioimpedanceObservationAssistant $observationAssistant,
         private readonly BioimpedanceCareGuidanceAssistant $careGuidanceAssistant,
     ) {}

@@ -4,12 +4,13 @@ namespace App\Http\Controllers\Bioimpedance;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Bioimpedance\BioimpedanceWorkflow;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
-    public function __construct(private readonly BioimpedanceController $workflow) {}
+    public function __construct(private readonly BioimpedanceWorkflow $workflow) {}
 
     public function store(Request $request): JsonResponse
     {
