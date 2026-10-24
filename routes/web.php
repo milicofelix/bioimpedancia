@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Bioimpedance\BioimpedanceController;
+use App\Http\Controllers\Bioimpedance\KnowledgeDocumentController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -21,6 +22,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/bioimpedance', [BioimpedanceController::class, 'index'])->name('bioimpedance.index');
     Route::get('/bioimpedance/operational', [BioimpedanceController::class, 'operationalIndex'])->name('bioimpedance.operational.index');
     Route::get('/bioimpedance/admin-dashboard', [BioimpedanceController::class, 'adminDashboard'])->name('bioimpedance.admin-dashboard');
+    Route::get('/bioimpedance/knowledge-documents', [KnowledgeDocumentController::class, 'index'])->name('bioimpedance.knowledge-documents.index');
+    Route::post('/bioimpedance/knowledge-documents', [KnowledgeDocumentController::class, 'store'])->name('bioimpedance.knowledge-documents.store');
+    Route::patch('/bioimpedance/knowledge-documents/{document}/transition', [KnowledgeDocumentController::class, 'transition'])->name('bioimpedance.knowledge-documents.transition');
     Route::patch('/bioimpedance/clinic', [BioimpedanceController::class, 'updateClinicSettings'])->name('bioimpedance.clinic.update');
     Route::post('/bioimpedance/users', [BioimpedanceController::class, 'storeUser'])->name('bioimpedance.users.store');
     Route::put('/bioimpedance/users/{user}', [BioimpedanceController::class, 'updateUser'])->name('bioimpedance.users.update');

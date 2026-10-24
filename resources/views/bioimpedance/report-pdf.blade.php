@@ -173,7 +173,7 @@
         <div class="section-title" style="color: {{ $secondaryColor }};">Orientações aprovadas</div>
         @if($assessment['care_guidance'] ?? null)
             <div class="guidance"><p style="white-space: pre-line;">{{ $assessment['care_guidance'] }}</p><p class="muted">Conteúdo educativo revisado pelo profissional; não substitui avaliação médica, nutricional ou de educação física.</p></div>
-            @if(count($assessment['care_guidance_sources'] ?? []))<div class="summary"><div class="label">Referências utilizadas</div><ul class="source-list">@foreach($assessment['care_guidance_sources'] as $source)<li>{{ $source['document'] ?? 'Documento de referência' }} · {{ $source['section'] ?? 'Seção não informada' }}</li>@endforeach</ul></div>@endif
+            @if(count($assessment['care_guidance_sources'] ?? []))<div class="summary"><div class="label">Referências utilizadas</div><ul class="source-list">@foreach($assessment['care_guidance_sources'] as $source)<li>{{ $source['document'] ?? 'Documento de referência' }}@if($source['version'] ?? null) · versão {{ $source['version'] }}@endif · {{ $source['section'] ?? 'Seção não informada' }}</li>@endforeach</ul></div>@endif
         @else
             <div class="summary muted">Nenhuma orientação educativa foi aprovada para esta avaliação.</div>
         @endif

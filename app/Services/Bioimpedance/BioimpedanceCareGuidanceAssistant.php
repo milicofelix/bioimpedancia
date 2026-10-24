@@ -18,7 +18,11 @@ class BioimpedanceCareGuidanceAssistant
 {
     public const PROMPT_VERSION = 'care-guidance-2.0.0';
 
-    public function __construct(private readonly CareGuidanceSemanticValidator $semanticValidator) {}
+    public function __construct(
+        private readonly CareGuidanceSemanticValidator $semanticValidator,
+        private readonly KnowledgeSourceSnapshot $sourceSnapshot,
+        private readonly PublishedKnowledgeSourceRepository $publishedSources,
+    ) {}
 
     private const SOURCE_DEFINITIONS = [
         [
@@ -106,6 +110,7 @@ class BioimpedanceCareGuidanceAssistant
                 'bioimpedance_ai_analysis_request_id' => $request->id,
                 'bioimpedance_knowledge_chunk_id' => $chunk->id,
                 'relevance_score' => 100 - ($index * 5),
+                'source_snapshot' => $this->sourceSnapshot->fromChunk($chunk),
             ]);
         }
 
@@ -156,8 +161,12 @@ class BioimpedanceCareGuidanceAssistant
         $sources = $chunks->whereIn('chunk_key', $usedSourceIds)->map(fn ($chunk) => [
             'id' => $chunk->chunk_key,
             'document' => $chunk->document?->title,
+            'version' => $chunk->document?->version,
+            'publication_status' => $chunk->document?->status,
+            'published_at' => $chunk->document?->published_at?->toIso8601String(),
             'section' => $chunk->section,
             'url' => $chunk->document?->source_url,
+            'checksum' => $chunk->checksum,
             'claim_ids' => collect($validation['accepted_claims'])
                 ->filter(fn (array $claim) => in_array($chunk->chunk_key, $claim['source_ids'], true))
                 ->pluck('id')->values()->all(),
@@ -372,12 +381,21 @@ PROMPT;
     private function approvedChunks(User $user): Collection
     {
         foreach (self::SOURCE_DEFINITIONS as $definition) {
-            $document = BioimpedanceKnowledgeDocument::query()->updateOrCreate(
+            $document = BioimpedanceKnowledgeDocument::query()->firstOrCreate(
                 ['title' => $definition['title'], 'version' => $definition['version']],
-                ['document_type' => 'clinical_reference', 'source_url' => $definition['source_url'], 'approved' => true, 'approved_by_user_id' => $user->id, 'approved_at' => now()]
+                [
+                    'document_type' => 'clinical_reference',
+                    'source_url' => $definition['source_url'],
+                    'status' => BioimpedanceKnowledgeDocument::STATUS_PUBLISHED,
+                    'approved' => true,
+                    'approved_by_user_id' => $user->id,
+                    'approved_at' => now(),
+                    'published_by_user_id' => $user->id,
+                    'published_at' => now(),
+                ]
             );
             foreach ($definition['chunks'] as $chunk) {
-                BioimpedanceKnowledgeChunk::query()->updateOrCreate(['chunk_key' => $chunk['chunk_key']], [
+                BioimpedanceKnowledgeChunk::query()->firstOrCreate(['chunk_key' => $chunk['chunk_key']], [
                     'bioimpedance_knowledge_document_id' => $document->id,
                     'section' => $chunk['section'], 'language' => 'pt-BR', 'tags' => $chunk['tags'],
                     'content' => $chunk['content'], 'checksum' => hash('sha256', $chunk['content']),
@@ -385,8 +403,17 @@ PROMPT;
             }
         }
 
-        $keys = collect(self::SOURCE_DEFINITIONS)->pluck('chunks')->flatten(1)->pluck('chunk_key');
-        return BioimpedanceKnowledgeChunk::query()->with('document')->whereIn('chunk_key', $keys)->get();
+        $keys = collect(self::SOURCE_DEFINITIONS)->pluck('chunks')->flatten(1)->pluck('chunk_key')->all();
+
+        return $this->publishedSources->matching([
+            'food',
+            'physical_activity',
+            'older_adult',
+            'function',
+            'safety',
+            'general_guidance',
+            'prohibited_content',
+        ], $keys);
     }
 
     private function modelName(): string

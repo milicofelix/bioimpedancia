@@ -35,7 +35,7 @@ export default function CareGuidanceEvidence({ assistant }) {
 							<ul className="mt-2 space-y-1 text-slate-600">
 								{claim.source_ids.map((sourceId) => {
 									const source = sourcesById[sourceId];
-									return <li key={sourceId}>Fonte: {source ? `${source.document} — ${source.section}` : internalSourceLabel(sourceId)}</li>;
+					return <li key={sourceId}>Fonte: {source ? `${source.document}${source.version ? ` · versão ${source.version}` : ''} — ${source.section}` : internalSourceLabel(sourceId)}</li>;
 								})}
 							</ul>
 						</details>

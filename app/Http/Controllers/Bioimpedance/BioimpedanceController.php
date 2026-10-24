@@ -734,10 +734,12 @@ class BioimpedanceController extends Controller
         $sources = $output->request->sources
             ->filter(fn ($source) => $usedSourceIds->contains($source->chunk?->chunk_key))
             ->map(fn ($source) => [
-                'id' => $source->chunk?->chunk_key,
-                'document' => $source->chunk?->document?->title,
-                'section' => $source->chunk?->section,
-                'url' => $source->chunk?->document?->source_url,
+                'id' => data_get($source->source_snapshot, 'chunk_key', $source->chunk?->chunk_key),
+                'document' => data_get($source->source_snapshot, 'document_title', $source->chunk?->document?->title),
+                'version' => data_get($source->source_snapshot, 'document_version', $source->chunk?->document?->version),
+                'section' => data_get($source->source_snapshot, 'section', $source->chunk?->section),
+                'url' => data_get($source->source_snapshot, 'source_url', $source->chunk?->document?->source_url),
+                'checksum' => data_get($source->source_snapshot, 'chunk_checksum', $source->chunk?->checksum),
                 'claim_ids' => collect($output->structured_claims ?? [])
                     ->filter(fn (array $claim) => in_array($source->chunk?->chunk_key, $claim['source_ids'] ?? [], true))
                     ->pluck('id')->values()->all(),

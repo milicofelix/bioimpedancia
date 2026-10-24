@@ -18,6 +18,7 @@ import { loadBioimpedanceWorkspace, logout } from '../services/bioimpedanceApi';
 import { cpfMask, heightMask, normalizeInteger, phoneMask } from '../shared/inputMasks';
 import useActionLock from '../hooks/useActionLock';
 import CareGuidanceAssistant from '../pwa/features/assistant/CareGuidanceAssistant';
+import KnowledgeDocumentsPanel from '../components/bioimpedance/KnowledgeDocumentsPanel';
 
 const emptyClient = {
 	full_name: '',
@@ -1414,6 +1415,8 @@ export default function DashboardPage({ userName }) {
 						</section>
 					) : null}
 
+					{currentUser?.is_admin ? <KnowledgeDocumentsPanel /> : null}
+
 					{currentUser?.is_admin ? (
 						<section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
 							<div>
@@ -1575,7 +1578,7 @@ export default function DashboardPage({ userName }) {
 															<ul className="mt-2 space-y-1 text-xs leading-5 text-slate-500">
 																{observationAssistant.sources?.map((source) => (
 																	<li key={source.id}>
-																		{source.document} • {source.section}{source.page ? ` • pág. ${source.page}` : ''}
+																							{source.document}{source.version ? ` • versão ${source.version}` : ''} • {source.section}{source.page ? ` • pág. ${source.page}` : ''}
 																	</li>
 																))}
 															</ul>
