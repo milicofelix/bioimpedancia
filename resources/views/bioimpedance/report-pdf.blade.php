@@ -36,6 +36,9 @@
         .summary { border: 1px solid #f2d6dc; background: #fff; }
         .notice { border-left: 3px solid #d88b9a; background: #fff4f6; }
         .guidance { border: 1px solid #b7e3dc; background: #f1fbf8; }
+        .guidance-section { margin-top: 5px; padding: 7px 10px; border: 1px solid #b7e3dc; border-radius: 7px; background: #f7fcfa; page-break-inside: avoid; }
+        .guidance-section-title { margin-bottom: 3px; color: #176b5b; font-size: 8px; font-weight: 700; }
+        .origin-note { margin-top: 5px; padding: 5px 7px; border-left: 3px solid #d88b9a; background: #fff7f8; color: #475467; font-size: 7px; }
         .canceled { margin-bottom: 8px; padding: 8px; border: 1px solid #fecdd3; border-radius: 8px; background: #fff1f2; color: #9f1239; }
         .scale { width: 100%; height: 7px; margin-top: 7px; border-radius: 3px; overflow: hidden; background: #e5e7eb; }
         .segment { height: 7px; float: left; }
@@ -94,6 +97,31 @@
         'sem classificação disponível para este indicador',
         $assessment['analysis']['summary'] ?? 'Síntese indisponível.',
     );
+    $observationOriginLabels = [
+        'professional' => 'Interpretação redigida pelo profissional responsável.',
+        'ai_approved' => 'Sugestão gerada pela IA e aprovada pelo profissional sem alterações.',
+        'ai_edited_and_approved' => 'Sugestão gerada pela IA, editada e aprovada pelo profissional.',
+        'none' => 'Nenhuma interpretação profissional registrada.',
+    ];
+    $guidanceTitles = [
+        'Contexto da avaliação',
+        'Alimentação',
+        'Movimento e função',
+        'Acompanhamento',
+        'Cuidados importantes',
+    ];
+    $guidanceSections = collect(preg_split('/\R{2,}/u', trim((string) ($assessment['care_guidance'] ?? ''))) ?: [])
+        ->filter()
+        ->map(function (string $paragraph) use ($guidanceTitles): array {
+            foreach ($guidanceTitles as $title) {
+                if (str_starts_with($paragraph, $title.':')) {
+                    return ['title' => $title, 'text' => trim(mb_substr($paragraph, mb_strlen($title) + 1))];
+                }
+            }
+
+            return ['title' => 'Orientação', 'text' => trim($paragraph)];
+        })
+        ->values();
     $relaxmedicMetrics = array_filter([
         'Taxa muscular' => isset($assessment['muscle_rate_percentage']) ? $br($assessment['muscle_rate_percentage']).' %' : null,
         'Massa corporal magra' => isset($assessment['lean_body_mass_kg']) ? $br($assessment['lean_body_mass_kg']).' kg' : null,
@@ -116,8 +144,8 @@
         'Proteína' => 'Não identifica ingestão ou deficiência nutricional.',
         'Massa de proteína' => 'Não identifica deficiência nutricional.',
         'Peso corporal ideal' => 'Referência do fabricante, não uma meta prescrita.',
-        'Nível de obesidade' => 'Classificação proprietária normalizada e revisada.',
-        'Tipo de corpo' => 'Classificação proprietária do aplicativo.',
+        'Nível de obesidade' => 'Origem: RelaxFit. Classificação importada, normalizada e revisada.',
+        'Tipo de corpo' => 'Origem: RelaxFit. Classificação proprietária importada da imagem.',
     ];
     $formatComparison = fn ($value, $metric) => $br($value, $metric['decimals']).($metric['unit'] ? ' '.$metric['unit'] : '');
 @endphp
@@ -159,7 +187,7 @@
         <div class="section-title" style="color: {{ $secondaryColor }};">Composição corporal detalhada</div>
         <table class="grid">
             <tr><td class="box" style="width: 50%;">@include('bioimpedance.partials.pdf-scale', ['title' => 'Gordura corporal', 'value' => $br($assessment['body_fat_percentage']).' %', 'indicator' => $bodyFat])</td><td class="box">@include('bioimpedance.partials.pdf-scale', ['title' => 'Músculo esquelético', 'value' => $br($assessment['skeletal_muscle_percentage']).' %', 'indicator' => $muscle])</td></tr>
-            <tr><td class="box">@include('bioimpedance.partials.pdf-scale', ['title' => 'Gordura visceral', 'value' => $br($assessment['visceral_fat_level'], $isRelaxmedic ? 1 : 0).' nível', 'indicator' => $visceral])<div class="muted" style="margin-top: 5px;">Índice do dispositivo; não representa quantidade em kg.</div></td><td class="box"><div class="label">IMC calculado</div><div class="metric-value">{{ $br($assessment['calculated_bmi']) }}</div><span class="badge {{ $tone($bmi) }}">{{ $displayClassification($bmi) }}</span><div class="muted" style="margin-top: 5px;">Deve ser interpretado com composição corporal, histórico e contexto individual.</div></td></tr>
+            <tr><td class="box">@include('bioimpedance.partials.pdf-scale', ['title' => 'Gordura visceral', 'value' => $br($assessment['visceral_fat_level'], $isRelaxmedic ? 1 : 0).' nível', 'indicator' => $visceral])<div class="muted" style="margin-top: 5px;">Índice do dispositivo; não representa quantidade em kg.</div></td><td class="box"><div class="label">IMC calculado</div><div class="metric-value">{{ $br($assessment['calculated_bmi']) }}</div><span class="badge {{ $tone($bmi) }}">{{ $displayClassification($bmi) }}</span><div class="muted" style="margin-top: 5px;">Origem: cálculo do sistema com peso e altura. Deve ser interpretado com composição corporal, histórico e contexto individual.</div></td></tr>
         </table>
         @if($isRelaxmedic && count($relaxmedicMetrics))
             <div class="section-title" style="color: {{ $secondaryColor }};">Indicadores Relaxmedic</div>
@@ -168,6 +196,7 @@
                     <tr>@foreach($row as $label => $value)<td class="box" style="width: 33.33%;"><div class="label">{{ $label }}</div><div class="metric-small">{{ $value }}</div>@if(isset($metricNotes[$label]))<div class="muted" style="margin-top: 3px; font-size: 7px;">{{ $metricNotes[$label] }}</div>@else<div class="muted" style="margin-top: 3px; font-size: 7px;">Estimativa do equipamento.</div>@endif</td>@endforeach @for($i = count($row); $i < 3; $i++)<td></td>@endfor</tr>
                 @endforeach
             </table>
+            <div class="notice"><strong>Por que as classificações podem ser diferentes?</strong> O IMC é calculado pelo sistema usando peso e altura. “Nível de obesidade” e “Tipo de corpo” são classificações distintas importadas do RelaxFit; o tipo corporal é proprietário do aplicativo e não equivale à classificação do IMC.</div>
         @endif
         <div class="section-title" style="color: {{ $secondaryColor }};">Comparação com a avaliação anterior</div>
         @if($comparison['previous'] && count($comparison['metrics']))
@@ -190,10 +219,13 @@
     @include('bioimpedance.partials.report-header', ['pageTitle' => 'Orientações e validação', 'pageNumber' => 3])
     <div class="content">
         <div class="section-title" style="color: {{ $secondaryColor }};">Interpretação profissional</div>
-        <div class="summary">@if($assessment['notes'])<p style="white-space: pre-line;">{{ $assessment['notes'] }}</p>@else<p class="muted">Nenhuma observação profissional foi registrada.</p>@endif</div>
+        <div class="summary">@if($assessment['notes'])<p style="white-space: pre-line;">{{ $assessment['notes'] }}</p>@else<p class="muted">Nenhuma observação profissional foi registrada.</p>@endif<div class="origin-note">{{ $observationOriginLabels[$assessment['observation_origin'] ?? 'professional'] }}</div></div>
         <div class="section-title" style="color: {{ $secondaryColor }};">Orientações aprovadas</div>
         @if($assessment['care_guidance'] ?? null)
-            <div class="guidance"><p style="white-space: pre-line;">{{ $assessment['care_guidance'] }}</p><p class="muted">Conteúdo educativo revisado pelo profissional; não substitui avaliação médica, nutricional ou de educação física.</p></div>
+            @foreach($guidanceSections as $section)
+                <div class="guidance-section"><div class="guidance-section-title">{{ $section['title'] }}</div><div>{{ $section['text'] }}</div></div>
+            @endforeach
+            <p class="muted" style="margin: 5px 2px 0;">Conteúdo educativo revisado pelo profissional; não substitui avaliação médica, nutricional ou de educação física.</p>
             @if(count($assessment['care_guidance_sources'] ?? []))<div class="summary"><div class="label">Referências utilizadas</div><ul class="source-list">@foreach($assessment['care_guidance_sources'] as $source)<li>{{ $source['document'] ?? 'Documento de referência' }}@if($source['version'] ?? null) · versão {{ $source['version'] }}@endif · {{ $source['section'] ?? 'Seção não informada' }}</li>@endforeach</ul></div>@endif
         @else
             <div class="summary muted">Nenhuma orientação educativa foi aprovada para esta avaliação.</div>

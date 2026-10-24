@@ -117,14 +117,30 @@ class BioimpedanceWorkspacePresenter
             );
         }
 
-        $hasApprovedAiObservation = $assessment->relationLoaded('aiAnalysisRequests')
-            ? $assessment->aiAnalysisRequests->contains(fn ($request) => $request->purpose === 'observation' && $request->output?->approved_at !== null)
+        $approvedObservationOutput = $assessment->relationLoaded('aiAnalysisRequests')
+            ? $assessment->aiAnalysisRequests
+                ->filter(fn ($request) => $request->purpose === 'observation' && $request->output?->approved_at !== null)
+                ->sortByDesc(fn ($request) => $request->output->approved_at)
+                ->first()?->output
             : BioimpedanceAiAnalysisOutput::query()
+                ->with('request')
                 ->whereNotNull('approved_at')
                 ->whereHas('request', fn ($query) => $query
                     ->where('bioimpedance_assessment_id', $assessment->id)
                     ->where('purpose', 'observation'))
-                ->exists();
+                ->latest('approved_at')
+                ->first();
+        $hasApprovedAiObservation = $approvedObservationOutput !== null;
+        $generatedObservation = data_get($approvedObservationOutput?->raw_response, 'professional_observation');
+        $observationWasEdited = $hasApprovedAiObservation
+            && filled($generatedObservation)
+            && trim((string) $generatedObservation) !== trim((string) $assessment->notes);
+        $observationOrigin = match (true) {
+            blank($assessment->notes) => 'none',
+            ! $hasApprovedAiObservation => 'professional',
+            $observationWasEdited => 'ai_edited_and_approved',
+            default => 'ai_approved',
+        };
 
         return [
             'id' => $assessment->id,
@@ -170,6 +186,7 @@ class BioimpedanceWorkspacePresenter
             'care_guidance_approved_at' => $assessment->care_guidance_approved_at?->toIso8601String(),
             'care_guidance_approved_by_name' => $assessment->careGuidanceApprovedBy?->name,
             'has_approved_ai_observation' => $hasApprovedAiObservation,
+            'observation_origin' => $observationOrigin,
             'correction_count' => $assessment->correction_count,
             'canceled_at' => $assessment->canceled_at?->toIso8601String(),
             'cancellation_reason' => $assessment->cancellation_reason,
