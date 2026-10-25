@@ -55,6 +55,8 @@
         .trend-grid { width: 100%; border-collapse: separate; border-spacing: 5px; table-layout: fixed; }
         .trend-card { padding: 7px; border: 1px solid #e4e7ec; border-radius: 7px; background: #fff; vertical-align: top; page-break-inside: avoid; }
         .trend-current { margin-top: 2px; font-size: 12px; font-weight: 700; }
+        .trend-comparison { margin-top: 4px; color: #475467; font-size: 7px; }
+        .trend-comparison strong { color: #172033; }
         .trend-chart { display: block; width: 100%; height: 62px; margin-top: 3px; }
         .trend-dates { width: 100%; color: #667085; font-size: 6px; }
         .trend-dates td:last-child { text-align: right; }
@@ -213,19 +215,23 @@
                     @php
                         $firstTrendPoint = $trend['points'][0];
                         $lastTrendPoint = $trend['points'][count($trend['points']) - 1];
-                        $trendDelta = round($lastTrendPoint['value'] - $firstTrendPoint['value'], $trend['decimals']);
+                        $previousTrendPoint = $trend['points'][count($trend['points']) - 2] ?? null;
+                        $trendDelta = $previousTrendPoint
+                            ? round($lastTrendPoint['value'] - $previousTrendPoint['value'], $trend['decimals'])
+                            : null;
                     @endphp
                     <td class="trend-card" style="width: 33.33%;">
                         <div class="label">{{ $trend['label'] }}</div>
                         <div class="trend-current">{{ $br($lastTrendPoint['value'], $trend['decimals']) }} {{ $trend['unit'] }}</div>
                         @if($trend['has_evolution'])
+                            <div class="trend-comparison">Anterior: {{ $br($previousTrendPoint['value'], $trend['decimals']) }} {{ $trend['unit'] }} → <strong>Atual: {{ $br($lastTrendPoint['value'], $trend['decimals']) }} {{ $trend['unit'] }}</strong></div>
                             <svg class="trend-chart" viewBox="0 0 300 84" preserveAspectRatio="none" aria-label="Evolução de {{ $trend['label'] }}">
                                 <line x1="10" y1="72" x2="290" y2="72" stroke="#d0d5dd" stroke-width="1" />
                                 <polyline points="{{ $trend['polyline'] }}" fill="none" stroke="#667085" stroke-width="2.5" />
                                 @foreach($trend['points'] as $point)<circle cx="{{ $point['x'] }}" cy="{{ $point['y'] }}" r="3.5" fill="{{ $primaryColor }}" />@endforeach
                             </svg>
                             <table class="trend-dates"><tr><td>{{ $firstTrendPoint['date'] }}</td><td>{{ $lastTrendPoint['date'] }}</td></tr></table>
-                            <div class="muted" style="margin-top: 2px;">Variação no período: {{ $trendDelta > 0 ? '+' : '' }}{{ $br($trendDelta, $trend['decimals']) }} {{ $trend['unit'] }}</div>
+                            <div class="muted" style="margin-top: 2px;">Desde a avaliação anterior: {{ $trendDelta > 0 ? '+' : '' }}{{ $br($trendDelta, $trend['decimals']) }} {{ $trend['unit'] }}</div>
                         @else
                             <div class="muted" style="margin-top: 8px;">Linha de base: ainda sem segundo valor comparável.</div>
                         @endif
