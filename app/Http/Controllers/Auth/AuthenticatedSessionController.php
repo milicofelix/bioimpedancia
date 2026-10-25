@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\AppAudit;
+use App\Services\Auth\PostLoginRedirector;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class AuthenticatedSessionController extends Controller
 {
+    public function __construct(private readonly PostLoginRedirector $postLoginRedirector) {}
+
     public function create(): View
     {
         return view('auth.login');
@@ -36,13 +39,15 @@ class AuthenticatedSessionController extends Controller
             'user_agent' => (string) $request->userAgent(),
         ]);
 
+        $redirectTo = $this->postLoginRedirector->destination($request);
+
         if ($request->wantsJson()) {
             return response()->json([
-                'redirectTo' => route('dashboard'),
+                'redirectTo' => $redirectTo,
             ]);
         }
 
-        return redirect()->intended(route('dashboard'));
+        return redirect()->to($redirectTo);
     }
 
     public function destroy(Request $request)
