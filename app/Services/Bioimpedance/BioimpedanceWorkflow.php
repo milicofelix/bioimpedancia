@@ -1,8 +1,7 @@
 <?php
 
-namespace App\Http\Controllers\Bioimpedance;
+namespace App\Services\Bioimpedance;
 
-use App\Http\Controllers\Controller;
 use App\Models\AppAudit;
 use App\Models\Bioimpedance\BioimpedanceAiAnalysisOutput;
 use App\Models\Bioimpedance\BioimpedanceAssessment;
@@ -11,16 +10,6 @@ use App\Models\Bioimpedance\BioimpedanceClient;
 use App\Models\Bioimpedance\BioimpedanceClinicSetting;
 use App\Models\Bioimpedance\BioimpedanceReportShare;
 use App\Models\User;
-use App\Services\Bioimpedance\BioimpedanceAnalyzer;
-use App\Services\Bioimpedance\BioimpedanceAdminDashboard;
-use App\Services\Bioimpedance\BioimpedanceCareGuidanceAssistant;
-use App\Services\Bioimpedance\BioimpedanceObservationAssistant;
-use App\Services\Bioimpedance\BioimpedanceReportComparison;
-use App\Services\Bioimpedance\BioimpedanceReportSharePresenter;
-use App\Services\Bioimpedance\BioimpedanceWorkspacePresenter;
-use App\Services\Bioimpedance\LegacyBioimpedanceAnalysisRefresher;
-use App\Services\Bioimpedance\RelaxmedicImageProcessor;
-use App\Services\Bioimpedance\RelaxmedicValueNormalizer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -34,11 +23,13 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Internal compatibility workflow.
+ * Coordinates the bioimpedance application use cases.
  *
- * HTTP routes must use the domain-specific controllers in this namespace.
+ * HTTP concerns remain in the domain-specific controllers. This service keeps
+ * the existing use-case contracts stable while the domain is decomposed into
+ * focused collaborators.
  */
-class BioimpedanceController extends Controller
+class BioimpedanceWorkflow
 {
     public function __construct(
         private readonly BioimpedanceReportSharePresenter $reportSharePresenter,
