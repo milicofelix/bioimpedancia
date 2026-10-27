@@ -47,6 +47,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/bioimpedance/relaxmedic/process-image', [AssessmentImportController::class, 'processRelaxmedicImage'])
         ->middleware('throttle:5,1')
         ->name('bioimpedance.relaxmedic.process-image');
+    Route::post('/bioimpedance/bodyscan-pro/process-image', [AssessmentImportController::class, 'processBodyscanProImage'])
+        ->middleware('throttle:5,1')
+        ->name('bioimpedance.bodyscan-pro.process-image');
     Route::get('/bioimpedance/assessments/{assessment}/pdf', [AssessmentReportController::class, 'download'])->name('bioimpedance.assessments.pdf');
     Route::get('/bioimpedance/assessments/{assessment}/observation-suggestion', [AiAnalysisController::class, 'suggestObservation'])
         ->middleware('throttle:5,1')

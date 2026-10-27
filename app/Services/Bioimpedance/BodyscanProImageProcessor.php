@@ -1,0 +1,625 @@
+<?php
+
+namespace App\Services\Bioimpedance;
+
+use App\Domain\Bioimpedance\ScaleModel;
+use App\Models\Bioimpedance\BioimpedanceSegmentalMeasurement as Segment;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+use RuntimeException;
+
+class BodyscanProImageProcessor
+{
+    private const METRIC_FIELDS = [
+        'weight_kg',
+        'scale_bmi',
+        'body_fat_percentage',
+        'muscle_rate_percentage',
+        'lean_body_mass_kg',
+        'subcutaneous_fat_percentage',
+        'visceral_fat_level',
+        'body_water_percentage',
+        'skeletal_muscle_percentage',
+        'muscle_mass_kg',
+        'bone_mass_kg',
+        'protein_percentage',
+        'resting_metabolism_kcal',
+        'body_age',
+        'fat_mass_kg',
+        'water_weight_kg',
+        'protein_mass_kg',
+        'ideal_body_weight_kg',
+        'obesity_level',
+        'body_type',
+    ];
+
+    private const NUMERIC_RANGES = [
+        'weight_kg' => [2, 300],
+        'scale_bmi' => [7, 90],
+        'body_fat_percentage' => [0, 100],
+        'muscle_rate_percentage' => [0, 100],
+        'lean_body_mass_kg' => [0, 300],
+        'subcutaneous_fat_percentage' => [0, 100],
+        'visceral_fat_level' => [0, 100],
+        'body_water_percentage' => [0, 100],
+        'skeletal_muscle_percentage' => [0, 100],
+        'muscle_mass_kg' => [0, 300],
+        'bone_mass_kg' => [0, 50],
+        'protein_percentage' => [0, 100],
+        'resting_metabolism_kcal' => [100, 10000],
+        'body_age' => [1, 120],
+        'fat_mass_kg' => [0, 300],
+        'water_weight_kg' => [0, 300],
+        'protein_mass_kg' => [0, 300],
+        'ideal_body_weight_kg' => [2, 300],
+    ];
+
+    private const REQUIRED_SECTIONS = [
+        'dados de membro',
+        'analise de gordura segmentar',
+        'equilibrio muscular',
+        'indice corporal',
+    ];
+
+    public function __construct(
+        private readonly BioimpedanceJpegInspector $jpegInspector,
+        private readonly RelaxmedicValueNormalizer $valueNormalizer,
+    ) {}
+
+    public function process(UploadedFile $image): array
+    {
+        $apiKey = (string) config('services.openai.api_key');
+        if ($apiKey === '') {
+            throw new RuntimeException('A leitura de imagem não está configurada. Informe a chave da OpenAI.');
+        }
+
+        $contents = $this->jpegInspector->contents($image);
+        $processorModel = (string) config('services.openai.vision_model', config('services.openai.model', 'gpt-5.1'));
+        $response = Http::withToken($apiKey)
+            ->acceptJson()
+            ->asJson()
+            ->timeout((int) config('services.openai.timeout', 45))
+            ->post(rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/').'/responses', [
+                'model' => $processorModel,
+                'store' => false,
+                'max_output_tokens' => 6500,
+                'input' => [[
+                    'role' => 'user',
+                    'content' => [
+                        ['type' => 'input_text', 'text' => $this->prompt()],
+                        ['type' => 'input_image', 'image_url' => 'data:image/jpeg;base64,'.base64_encode($contents), 'detail' => 'high'],
+                    ],
+                ]],
+                'text' => [
+                    'format' => [
+                        'type' => 'json_schema',
+                        'name' => 'bodyscan_pro_bioimpedance_extraction',
+                        'strict' => true,
+                        'schema' => $this->responseSchema(),
+                    ],
+                ],
+            ])
+            ->throw()
+            ->json();
+
+        $payload = json_decode($this->extractOutputText($response), true);
+        if (! is_array($payload)) {
+            throw new RuntimeException('O serviço de leitura retornou uma resposta inválida.');
+        }
+
+        $result = $this->normalize($payload, $image);
+        $imageMetadata = [
+            'type' => 'bodyscan_pro_image_extraction',
+            'name' => $image->getClientOriginalName(),
+            'size_bytes' => strlen($contents),
+            'mime_type' => 'image/jpeg',
+            'stored' => false,
+            'sha256' => hash('sha256', $contents),
+            'processed_at' => now()->toIso8601String(),
+            'processor_model' => $processorModel,
+            'reference_version' => ScaleModel::BODYSCAN_REFERENCE_VERSION,
+            'measured_at' => $result['measured_at'],
+            'metrics' => $result['metrics'],
+            'segmental_measurements' => $result['segmental_measurements'],
+            'raw_values' => $result['raw_values'],
+            'detected_sections' => $result['detected_sections'],
+            'field_statuses' => $result['field_statuses'],
+            'missing_fields' => $result['missing_fields'],
+            'suspicious_values' => $result['suspicious_values'],
+            'quality_issues' => $result['quality_issues'],
+            'side_consistency' => $result['side_consistency'],
+        ];
+        $result['image'] = [
+            ...$imageMetadata,
+            'signature' => $this->signMetadata($imageMetadata),
+        ];
+
+        return $result;
+    }
+
+    public function verifyMetadata(array $metadata): bool
+    {
+        $signature = $metadata['signature'] ?? null;
+
+        return is_string($signature)
+            && preg_match('/^[a-f0-9]{64}$/', $signature) === 1
+            && hash_equals($this->signMetadata($metadata), $signature);
+    }
+
+    private function normalize(array $payload, UploadedFile $image): array
+    {
+        $detectedSections = collect($payload['detected_sections'] ?? [])
+            ->filter(fn ($section) => is_string($section) && trim($section) !== '')
+            ->map(fn (string $section) => $this->normalizedLabel($section))
+            ->unique()
+            ->values();
+        $matchedSections = collect(self::REQUIRED_SECTIONS)->filter(
+            fn (string $required) => $detectedSections->contains(
+                fn (string $detected) => str_contains($detected, $required) || str_contains($required, $detected),
+            ),
+        );
+
+        if (! ($payload['recognized'] ?? false) || $matchedSections->count() < 3) {
+            throw new RuntimeException('A imagem não foi reconhecida como um relatório completo ou parcial da Bodyscan Pro.');
+        }
+
+        $qualityIssues = collect($payload['quality_issues'] ?? [])
+            ->filter(fn ($issue) => is_string($issue) && trim($issue) !== '')
+            ->map(fn (string $issue) => trim($issue))
+            ->values();
+        $missingFields = collect(self::REQUIRED_SECTIONS)
+            ->reject(fn (string $required) => $matchedSections->contains($required))
+            ->map(fn (string $section) => 'section:'.$section)
+            ->values();
+        $suspiciousValues = collect($payload['suspicious_values'] ?? [])
+            ->filter(fn ($item) => is_array($item) && filled($item['field'] ?? null) && filled($item['reason'] ?? null))
+            ->map(fn (array $item) => [
+                'field' => mb_substr((string) $item['field'], 0, 120),
+                'value' => $item['value'] ?? null,
+                'reason' => mb_substr((string) $item['reason'], 0, 500),
+            ]);
+
+        $rawMetrics = is_array($payload['metrics'] ?? null) ? $payload['metrics'] : [];
+        $metrics = [];
+        $fieldStatuses = [];
+        foreach (self::METRIC_FIELDS as $field) {
+            $rawValue = $rawMetrics[$field] ?? null;
+            $metrics[$field] = array_key_exists($field, self::NUMERIC_RANGES)
+                ? $this->normalizeNumber($rawValue)
+                : $this->normalizeText($rawValue);
+            $fieldStatuses['metrics.'.$field] = $metrics[$field] === null ? 'missing' : 'recognized';
+            if ($metrics[$field] === null) {
+                $missingFields->push('metrics.'.$field);
+            }
+        }
+
+        if ($metrics['obesity_level'] !== null) {
+            $rawObesityLevel = $metrics['obesity_level'];
+            if ($this->valueNormalizer->recognizesObesityLevel($rawObesityLevel)) {
+                $metrics['obesity_level'] = $this->valueNormalizer->obesityLevel($rawObesityLevel);
+            } else {
+                $metrics['obesity_level'] = null;
+                $fieldStatuses['metrics.obesity_level'] = 'unrecognized';
+                $missingFields->push('metrics.obesity_level');
+                $suspiciousValues->push([
+                    'field' => 'metrics.obesity_level',
+                    'value' => $rawObesityLevel,
+                    'reason' => 'Classificação não reconhecida. Confira o texto original na imagem.',
+                ]);
+            }
+        }
+
+        foreach (self::NUMERIC_RANGES as $field => [$minimum, $maximum]) {
+            $value = $metrics[$field];
+            if ($value !== null && ($value < $minimum || $value > $maximum)) {
+                $fieldStatuses['metrics.'.$field] = 'suspicious';
+                $suspiciousValues->push([
+                    'field' => 'metrics.'.$field,
+                    'value' => $value,
+                    'reason' => "Valor fora da faixa esperada ({$minimum} a {$maximum}).",
+                ]);
+            }
+        }
+
+        $segmentalMeasurements = $this->normalizeSegments(
+            is_array($payload['segmental_measurements'] ?? null) ? $payload['segmental_measurements'] : [],
+            $missingFields,
+            $suspiciousValues,
+            $fieldStatuses,
+        );
+        $sideConsistency = $this->sideConsistency($payload['side_consistency'] ?? [], $suspiciousValues);
+        $measuredAt = $this->normalizeMeasuredAt($payload['measured_at'] ?? null, $suspiciousValues, $fieldStatuses);
+
+        if ($measuredAt === null) {
+            $missingFields->push('measured_at');
+        }
+
+        if (! ($payload['is_complete'] ?? false)) {
+            $qualityIssues->push('O serviço identificou que alguma parte do relatório está cortada, borrada ou ilegível.');
+        }
+
+        $isComplete = (bool) ($payload['is_complete'] ?? false)
+            && $missingFields->isEmpty()
+            && $suspiciousValues->isEmpty()
+            && $qualityIssues->isEmpty()
+            && ! $sideConsistency['possible_swap'];
+
+        return [
+            'recognized' => true,
+            'is_complete' => $isComplete,
+            'report_type' => 'Bodyscan Pro',
+            'reference_version' => ScaleModel::BODYSCAN_REFERENCE_VERSION,
+            'measured_at' => $measuredAt,
+            'metrics' => $metrics,
+            'segmental_measurements' => $segmentalMeasurements,
+            'side_consistency' => $sideConsistency,
+            'missing_fields' => $missingFields->unique()->values()->all(),
+            'suspicious_values' => $suspiciousValues->unique(fn (array $item) => $item['field'].'|'.$item['reason'])->values()->all(),
+            'quality_issues' => $qualityIssues->unique()->values()->all(),
+            'field_statuses' => $fieldStatuses,
+            'raw_values' => [
+                'metrics' => $rawMetrics,
+                'segmental_measurements' => $payload['segmental_measurements'] ?? [],
+            ],
+            'detected_sections' => $detectedSections->all(),
+            'image' => [
+                'name' => $image->getClientOriginalName(),
+                'size_bytes' => $image->getSize(),
+                'mime_type' => $image->getMimeType(),
+                'stored' => false,
+            ],
+        ];
+    }
+
+    private function normalizeSegments(array $rawSegments, $missingFields, $suspiciousValues, array &$fieldStatuses): array
+    {
+        $indexed = [];
+        foreach ($rawSegments as $rawSegment) {
+            if (! is_array($rawSegment)) {
+                continue;
+            }
+
+            $type = $this->normalizeText($rawSegment['type'] ?? null);
+            $region = $this->normalizeText($rawSegment['region'] ?? null);
+            $side = $this->normalizeText($rawSegment['side'] ?? null);
+            $key = $type.'|'.$region.'|'.$side;
+            if (! in_array($type, Segment::TYPES, true)
+                || ! $this->isExpectedSegment($region, $side)
+                || array_key_exists($key, $indexed)) {
+                $suspiciousValues->push([
+                    'field' => 'segmental_measurements',
+                    'value' => $rawSegment['label'] ?? $key,
+                    'reason' => array_key_exists($key, $indexed)
+                        ? 'Segmento duplicado na leitura.'
+                        : 'Região, lado ou tipo segmentar não reconhecido.',
+                ]);
+                continue;
+            }
+
+            $indexed[$key] = $rawSegment;
+        }
+
+        return collect(Segment::TYPES)->flatMap(function (string $type) use ($indexed, $missingFields, $suspiciousValues, &$fieldStatuses) {
+            return collect(Segment::EXPECTED_SEGMENTS)->map(function (array $expected) use ($type, $indexed, $missingFields, $suspiciousValues, &$fieldStatuses) {
+                $key = $type.'|'.$expected['region'].'|'.$expected['side'];
+                $fieldPrefix = 'segmental.'.$type.'.'.$expected['region'].'.'.$expected['side'];
+                $raw = $indexed[$key] ?? [];
+                $massKg = $this->normalizeNumber($raw['mass_kg'] ?? null);
+                $referencePercentage = $this->normalizeNumber($raw['reference_percentage'] ?? null);
+                $referenceMin = $this->normalizeNumber($raw['reference_min_percentage'] ?? null);
+                $referenceMax = $this->normalizeNumber($raw['reference_max_percentage'] ?? null);
+                $rawClassification = $this->normalizeText($raw['classification'] ?? null);
+                $classification = $this->normalizeClassification($rawClassification);
+                $legibility = $this->normalizeText($raw['legibility'] ?? null) ?? 'unreadable';
+
+                foreach (['mass_kg' => $massKg, 'reference_percentage' => $referencePercentage] as $field => $value) {
+                    $statusKey = $fieldPrefix.'.'.$field;
+                    $fieldStatuses[$statusKey] = $value === null ? 'missing' : ($legibility === 'clear' ? 'recognized' : 'suspicious');
+                    if ($value === null) {
+                        $missingFields->push($statusKey);
+                    }
+                }
+
+                if ($rawClassification !== null && $classification === null) {
+                    $fieldStatuses[$fieldPrefix.'.classification'] = 'unrecognized';
+                    $missingFields->push($fieldPrefix.'.classification');
+                    $suspiciousValues->push([
+                        'field' => $fieldPrefix.'.classification',
+                        'value' => $rawClassification,
+                        'reason' => 'Classificação segmentar não reconhecida.',
+                    ]);
+                } else {
+                    $fieldStatuses[$fieldPrefix.'.classification'] = $classification === null ? 'missing' : 'recognized';
+
+                    if ($classification === null) {
+                        $missingFields->push($fieldPrefix.'.classification');
+                    }
+                }
+
+                foreach (['reference_min_percentage' => $referenceMin, 'reference_max_percentage' => $referenceMax] as $field => $value) {
+                    $statusKey = $fieldPrefix.'.'.$field;
+                    $fieldStatuses[$statusKey] = $value === null ? 'missing' : 'recognized';
+
+                    if ($value === null) {
+                        $missingFields->push($statusKey);
+                    }
+                }
+
+                foreach (['mass_kg' => [$massKg, 0, 300], 'reference_percentage' => [$referencePercentage, 0, 1000]] as $field => [$value, $minimum, $maximum]) {
+                    if ($value !== null && ($value < $minimum || $value > $maximum)) {
+                        $fieldStatuses[$fieldPrefix.'.'.$field] = 'suspicious';
+                        $suspiciousValues->push([
+                            'field' => $fieldPrefix.'.'.$field,
+                            'value' => $value,
+                            'reason' => "Valor segmentar fora da faixa esperada ({$minimum} a {$maximum}).",
+                        ]);
+                    }
+                }
+
+                if ($referenceMin !== null && $referenceMax !== null && $referenceMin > $referenceMax) {
+                    $fieldStatuses[$fieldPrefix.'.reference_min_percentage'] = 'suspicious';
+                    $fieldStatuses[$fieldPrefix.'.reference_max_percentage'] = 'suspicious';
+                    $suspiciousValues->push([
+                        'field' => $fieldPrefix.'.reference_range',
+                        'value' => $referenceMin.'-'.$referenceMax,
+                        'reason' => 'O limite mínimo da referência é maior que o limite máximo.',
+                    ]);
+                }
+
+                if ($legibility !== 'clear' && ($massKg !== null || $referencePercentage !== null)) {
+                    $suspiciousValues->push([
+                        'field' => $fieldPrefix,
+                        'value' => $raw['raw_value'] ?? null,
+                        'reason' => 'A leitura deste segmento foi marcada como incerta ou ilegível.',
+                    ]);
+                }
+
+                return [
+                    'type' => $type,
+                    'region' => $expected['region'],
+                    'side' => $expected['side'],
+                    'mass_kg' => $massKg,
+                    'reference_percentage' => $referencePercentage,
+                    'classification' => $classification,
+                    'reference_min_percentage' => $referenceMin,
+                    'reference_max_percentage' => $referenceMax,
+                    'reference_version' => ScaleModel::BODYSCAN_REFERENCE_VERSION,
+                    'raw_value' => [
+                        'label' => $raw['label'] ?? null,
+                        'mass_kg' => $raw['mass_kg'] ?? null,
+                        'reference_percentage' => $raw['reference_percentage'] ?? null,
+                        'classification' => $rawClassification,
+                        'text' => $raw['raw_value'] ?? null,
+                        'legibility' => $legibility,
+                    ],
+                ];
+            });
+        })->values()->all();
+    }
+
+    private function sideConsistency(mixed $raw, $suspiciousValues): array
+    {
+        $raw = is_array($raw) ? $raw : [];
+        $leftMarkerVisible = (bool) ($raw['left_marker_visible'] ?? false);
+        $rightMarkerVisible = (bool) ($raw['right_marker_visible'] ?? false);
+        $possibleSwap = (bool) ($raw['possible_swap'] ?? false) || ! $leftMarkerVisible || ! $rightMarkerVisible;
+        $reason = $this->normalizeText($raw['reason'] ?? null);
+
+        if ($possibleSwap) {
+            $suspiciousValues->push([
+                'field' => 'segmental.side_consistency',
+                'value' => null,
+                'reason' => $reason ?? 'Não foi possível confirmar com segurança os marcadores esquerdo e direito.',
+            ]);
+        }
+
+        return [
+            'left_marker_visible' => $leftMarkerVisible,
+            'right_marker_visible' => $rightMarkerVisible,
+            'possible_swap' => $possibleSwap,
+            'reason' => $reason,
+        ];
+    }
+
+    private function isExpectedSegment(?string $region, ?string $side): bool
+    {
+        return collect(Segment::EXPECTED_SEGMENTS)->contains(
+            fn (array $segment) => $segment['region'] === $region && $segment['side'] === $side,
+        );
+    }
+
+    private function normalizeClassification(?string $classification): ?string
+    {
+        return match ($this->normalizedLabel($classification ?? '')) {
+            'baixo', 'baixa' => Segment::CLASSIFICATION_LOW,
+            'padrao', 'normal' => Segment::CLASSIFICATION_STANDARD,
+            'alto', 'alta' => Segment::CLASSIFICATION_HIGH,
+            default => null,
+        };
+    }
+
+    private function normalizeMeasuredAt(mixed $value, $suspiciousValues, array &$fieldStatuses): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            $fieldStatuses['measured_at'] = 'missing';
+
+            return null;
+        }
+
+        try {
+            $measuredAt = Carbon::parse($value, config('app.timezone'));
+            $fieldStatuses['measured_at'] = $measuredAt->isFuture() ? 'suspicious' : 'recognized';
+            if ($measuredAt->isFuture()) {
+                $suspiciousValues->push(['field' => 'measured_at', 'value' => $value, 'reason' => 'A data extraída está no futuro.']);
+            }
+
+            return $measuredAt->format('Y-m-d\TH:i');
+        } catch (\Throwable) {
+            $fieldStatuses['measured_at'] = 'unrecognized';
+            $suspiciousValues->push(['field' => 'measured_at', 'value' => $value, 'reason' => 'A data e hora não puderam ser interpretadas.']);
+
+            return null;
+        }
+    }
+
+    private function normalizeNumber(mixed $value): ?float
+    {
+        if (is_int($value) || is_float($value)) {
+            return round((float) $value, 2);
+        }
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $normalized = preg_replace('/[^0-9,.-]/', '', trim($value));
+        if ($normalized === null || $normalized === '') {
+            return null;
+        }
+        if (str_contains($normalized, ',') && str_contains($normalized, '.')) {
+            $normalized = strrpos($normalized, ',') > strrpos($normalized, '.')
+                ? str_replace(['.', ','], ['', '.'], $normalized)
+                : str_replace(',', '', $normalized);
+        } else {
+            $normalized = str_replace(',', '.', $normalized);
+        }
+
+        return is_numeric($normalized) ? round((float) $normalized, 2) : null;
+    }
+
+    private function normalizeText(mixed $value): ?string
+    {
+        return is_string($value) && trim($value) !== '' ? mb_substr(trim($value), 0, 160) : null;
+    }
+
+    private function normalizedLabel(string $value): string
+    {
+        return Str::lower(Str::ascii(trim($value)));
+    }
+
+    private function signMetadata(array $metadata): string
+    {
+        $payload = collect([
+            'type', 'name', 'size_bytes', 'mime_type', 'stored', 'sha256', 'processed_at',
+            'processor_model', 'reference_version', 'measured_at', 'metrics', 'segmental_measurements',
+            'raw_values', 'detected_sections', 'field_statuses', 'missing_fields', 'suspicious_values',
+            'quality_issues', 'side_consistency',
+        ])->mapWithKeys(fn (string $key) => [$key => $metadata[$key] ?? null])->all();
+
+        return hash_hmac('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), (string) config('app.key'));
+    }
+
+    private function prompt(): string
+    {
+        return <<<'PROMPT'
+Analise exclusivamente a imagem anexada. Ela deve ser um relatório da balança Bodyscan Pro exibido pelo aplicativo RelaxFit.
+Reconheça o modelo pelo conjunto de seções e não apenas pela aparência: "Dados de membro", "Análise de gordura segmentar", "Equilíbrio muscular" e "Índice corporal".
+Extraia cada valor pelo rótulo textual e pelo marcador L/R correspondente. Nunca determine o lado apenas pela posição na tela.
+Para os segmentos, use somente estes identificadores: type fat ou muscle; region arm, trunk ou leg; side left, center ou right. O tronco deve usar side center.
+Devem existir cinco segmentos de gordura e cinco de músculo: braço esquerdo, braço direito, tronco, perna esquerda e perna direita.
+Em cada segmento extraia massa em kg, percentual relativo à referência, classificação, limites de referência impressos e o texto bruto visível.
+Classificação deve preservar o texto impresso, como Baixo, Padrão ou Alto. Não invente classificação ausente.
+Os percentuais segmentares são índices relativos à referência, não percentuais de gordura corporal.
+Extraia as métricas gerais do bloco "Índice corporal" pelos nomes dos rótulos.
+Não calcule, estime, deduza ou complete valores ausentes. Use null quando algo não estiver legível.
+Converta a data e hora para YYYY-MM-DDTHH:MM:SS sem inventar fuso horário.
+Em detected_sections, copie os títulos realmente visíveis.
+Marque recognized=false para outro aplicativo, relatório sem análise segmentar ou imagem que não permita identificar o Bodyscan Pro.
+Marque is_complete=false quando houver corte, desfoque, valor ilegível, seção ausente ou lado não confirmável.
+Em side_consistency, confirme a visibilidade dos marcadores L e R e marque possible_swap=true diante de qualquer dúvida sobre os lados.
+Em legibility use clear, uncertain ou unreadable.
+Liste em português todos os problemas visuais e valores suspeitos, sem realizar interpretação clínica.
+PROMPT;
+    }
+
+    private function responseSchema(): array
+    {
+        $nullableNumber = ['type' => ['number', 'null']];
+        $nullableString = ['type' => ['string', 'null']];
+        $metricProperties = [];
+        foreach (self::METRIC_FIELDS as $field) {
+            $metricProperties[$field] = array_key_exists($field, self::NUMERIC_RANGES) ? $nullableNumber : $nullableString;
+        }
+
+        return [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'required' => ['recognized', 'is_complete', 'quality_issues', 'measured_at', 'detected_sections', 'metrics', 'segmental_measurements', 'side_consistency', 'suspicious_values'],
+            'properties' => [
+                'recognized' => ['type' => 'boolean'],
+                'is_complete' => ['type' => 'boolean'],
+                'quality_issues' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'measured_at' => $nullableString,
+                'detected_sections' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'metrics' => [
+                    'type' => 'object',
+                    'additionalProperties' => false,
+                    'required' => self::METRIC_FIELDS,
+                    'properties' => $metricProperties,
+                ],
+                'segmental_measurements' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'additionalProperties' => false,
+                        'required' => ['type', 'region', 'side', 'label', 'mass_kg', 'reference_percentage', 'classification', 'reference_min_percentage', 'reference_max_percentage', 'raw_value', 'legibility'],
+                        'properties' => [
+                            'type' => ['type' => 'string', 'enum' => Segment::TYPES],
+                            'region' => ['type' => 'string', 'enum' => Segment::REGIONS],
+                            'side' => ['type' => 'string', 'enum' => Segment::SIDES],
+                            'label' => $nullableString,
+                            'mass_kg' => $nullableNumber,
+                            'reference_percentage' => $nullableNumber,
+                            'classification' => $nullableString,
+                            'reference_min_percentage' => $nullableNumber,
+                            'reference_max_percentage' => $nullableNumber,
+                            'raw_value' => $nullableString,
+                            'legibility' => ['type' => 'string', 'enum' => ['clear', 'uncertain', 'unreadable']],
+                        ],
+                    ],
+                ],
+                'side_consistency' => [
+                    'type' => 'object',
+                    'additionalProperties' => false,
+                    'required' => ['left_marker_visible', 'right_marker_visible', 'possible_swap', 'reason'],
+                    'properties' => [
+                        'left_marker_visible' => ['type' => 'boolean'],
+                        'right_marker_visible' => ['type' => 'boolean'],
+                        'possible_swap' => ['type' => 'boolean'],
+                        'reason' => $nullableString,
+                    ],
+                ],
+                'suspicious_values' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'additionalProperties' => false,
+                        'required' => ['field', 'value', 'reason'],
+                        'properties' => [
+                            'field' => ['type' => 'string'],
+                            'value' => ['type' => ['string', 'number', 'null']],
+                            'reason' => ['type' => 'string'],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    private function extractOutputText(array $response): string
+    {
+        if (filled($response['output_text'] ?? null)) {
+            return (string) $response['output_text'];
+        }
+        foreach ($response['output'] ?? [] as $output) {
+            foreach ($output['content'] ?? [] as $content) {
+                if (($content['type'] ?? null) === 'output_text' && filled($content['text'] ?? null)) {
+                    return (string) $content['text'];
+                }
+            }
+        }
+
+        return '';
+    }
+}
