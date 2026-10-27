@@ -2,13 +2,14 @@
 
 namespace App\Services\Bioimpedance;
 
+use App\Domain\Bioimpedance\ScaleModel;
 use Carbon\CarbonImmutable;
 
 class BioimpedanceAnalyzer
 {
-    public const DEVICE_MODEL = 'HBF-514C';
+    public const DEVICE_MODEL = ScaleModel::OMRON_NAME;
 
-    public const REFERENCE_VERSION = '1.1.0';
+    public const REFERENCE_VERSION = ScaleModel::OMRON_REFERENCE_VERSION;
 
     private const BODY_FAT_RANGES = [
         'female' => [

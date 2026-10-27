@@ -942,7 +942,7 @@ class BioimpedanceWorkflow
             'height_cm_at_assessment' => (float) $client->height_cm,
             'biological_sex_at_assessment' => $client->biological_sex,
             'device_model' => $settings->scaleModelName(),
-            'reference_version' => BioimpedanceAnalyzer::REFERENCE_VERSION,
+            'reference_version' => $settings->scaleReferenceVersion(),
         ];
     }
 

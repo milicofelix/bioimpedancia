@@ -85,7 +85,7 @@ class BioimpedanceWorkspacePresenter
     public function loadClientAssessments(BioimpedanceClient $client): BioimpedanceClient
     {
         return $client->load(['assessments' => fn ($query) => $query
-            ->with(['shares', 'careGuidanceApprovedBy', 'aiAnalysisRequests.output'])
+            ->with(['shares', 'careGuidanceApprovedBy', 'aiAnalysisRequests.output', 'segmentalMeasurements'])
             ->latest('evaluated_at')]);
     }
 
@@ -93,7 +93,7 @@ class BioimpedanceWorkspacePresenter
     {
         $clients = BioimpedanceClient::query()
             ->with(['assessments' => fn ($query) => $query
-                ->with(['shares', 'careGuidanceApprovedBy', 'aiAnalysisRequests.output'])
+                ->with(['shares', 'careGuidanceApprovedBy', 'aiAnalysisRequests.output', 'segmentalMeasurements'])
                 ->latest('evaluated_at')])
             ->orderBy('full_name')
             ->get()
@@ -154,6 +154,22 @@ class BioimpedanceWorkspacePresenter
             'biological_sex_at_assessment' => $assessment->biological_sex_at_assessment,
             'device_model' => $assessment->device_model,
             'reference_version' => $assessment->reference_version,
+            'segmental_measurements' => $assessment->segmentalMeasurements
+                ->sortBy(fn ($measurement) => $measurement->type.'|'.$measurement->region.'|'.$measurement->side)
+                ->values()
+                ->map(fn ($measurement) => [
+                    'id' => $measurement->id,
+                    'type' => $measurement->type,
+                    'region' => $measurement->region,
+                    'side' => $measurement->side,
+                    'mass_kg' => $measurement->mass_kg === null ? null : (float) $measurement->mass_kg,
+                    'reference_percentage' => $measurement->reference_percentage === null ? null : (float) $measurement->reference_percentage,
+                    'classification' => $measurement->classification,
+                    'reference_min_percentage' => $measurement->reference_min_percentage === null ? null : (float) $measurement->reference_min_percentage,
+                    'reference_max_percentage' => $measurement->reference_max_percentage === null ? null : (float) $measurement->reference_max_percentage,
+                    'reference_version' => $measurement->reference_version,
+                    'raw_value' => $measurement->raw_value,
+                ])->all(),
             'weight_kg' => (float) $assessment->weight_kg,
             'scale_bmi' => $assessment->scale_bmi === null ? null : (float) $assessment->scale_bmi,
             'calculated_bmi' => (float) $assessment->calculated_bmi,

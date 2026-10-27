@@ -2,27 +2,20 @@
 
 namespace App\Models\Bioimpedance;
 
+use App\Domain\Bioimpedance\ScaleModel;
 use Illuminate\Database\Eloquent\Model;
 
 class BioimpedanceClinicSetting extends Model
 {
-    public const SCALE_MODEL_OMRON_HBF_514C = 'omron_hbf_514c';
+    public const SCALE_MODEL_OMRON_HBF_514C = ScaleModel::OMRON_HBF_514C;
 
-    public const SCALE_MODEL_RELAXMEDIC = 'relaxmedic';
+    public const SCALE_MODEL_RELAXMEDIC = ScaleModel::RELAXMEDIC;
 
-    public const SCALE_MODEL_BODYSCAN_PRO = 'relaxmedic_bodyscan_pro';
+    public const SCALE_MODEL_BODYSCAN_PRO = ScaleModel::BODYSCAN_PRO;
 
-    public const SCALE_MODELS = [
-        self::SCALE_MODEL_OMRON_HBF_514C,
-        self::SCALE_MODEL_RELAXMEDIC,
-        self::SCALE_MODEL_BODYSCAN_PRO,
-    ];
+    public const SCALE_MODELS = ScaleModel::MODELS;
 
-    public const SCALE_MODEL_NAMES = [
-        self::SCALE_MODEL_OMRON_HBF_514C => 'HBF-514C',
-        self::SCALE_MODEL_RELAXMEDIC => 'Relaxmedic',
-        self::SCALE_MODEL_BODYSCAN_PRO => 'Bodyscan Pro',
-    ];
+    public const SCALE_MODEL_NAMES = ScaleModel::NAMES;
 
     public const DEFAULTS = [
         'display_name' => 'Ricosty Emagrecimento e Estética',
@@ -73,13 +66,31 @@ class BioimpedanceClinicSetting extends Model
             ...self::DEFAULTS,
             ...$this->only($this->fillable),
             'logo_initials' => $this->initials(),
+            'scale_model_name' => $this->scaleModelName(),
+            'scale_capabilities' => $this->scaleCapabilities(),
+            'scale_reference_version' => $this->scaleReferenceVersion(),
         ];
     }
 
     public function scaleModelName(): string
     {
-        return self::SCALE_MODEL_NAMES[$this->scale_model]
-            ?? self::SCALE_MODEL_NAMES[self::SCALE_MODEL_BODYSCAN_PRO];
+        return ScaleModel::name($this->scale_model);
+    }
+
+    /** @return list<string> */
+    public function scaleCapabilities(): array
+    {
+        return ScaleModel::capabilities($this->scale_model);
+    }
+
+    public function scaleSupports(string $capability): bool
+    {
+        return ScaleModel::supports($this->scale_model, $capability);
+    }
+
+    public function scaleReferenceVersion(): string
+    {
+        return ScaleModel::referenceVersion($this->scale_model);
     }
 
     private function initials(): string
