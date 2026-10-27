@@ -264,9 +264,17 @@ class BioimpedanceWorkflow
     public function storeAssessment(Request $request, BioimpedanceAnalyzer $analyzer, RelaxmedicImageProcessor $imageProcessor): JsonResponse
     {
         $this->authorizeCreateClinicalRecords($request);
+        $scaleModel = BioimpedanceClinicSetting::current()->scale_model;
+
+        if ($scaleModel === BioimpedanceClinicSetting::SCALE_MODEL_BODYSCAN_PRO) {
+            throw ValidationException::withMessages([
+                'scale_model' => 'O fluxo de avaliação da Bodyscan Pro ainda está em preparação. Selecione outro modelo para registrar uma avaliação.',
+            ]);
+        }
+
         $sourceMetadata = null;
 
-        if (BioimpedanceClinicSetting::current()->scale_model === BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDIC) {
+        if ($scaleModel === BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDIC) {
             $this->authorizeClinicalProfessional($request);
             $source = $request->validate([
                 'relaxmedic_review_confirmed' => ['accepted'],

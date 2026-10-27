@@ -135,6 +135,10 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 		return <BlockedState title="Selecione um cliente" description="Abra o cadastro de um cliente e toque em “Nova avaliação” para iniciar." onBack={onBackToClients} />;
 	}
 
+	if (scaleModel === 'relaxmedic_bodyscan_pro') {
+		return <BlockedState title="Bodyscan Pro em preparação" description="O modelo já está selecionado como padrão. O fluxo de avaliação será habilitado depois da adaptação das métricas." onBack={onBackToClients} />;
+	}
+
 	if (scaleModel !== 'relaxmedic') {
 		return <BlockedState title="Relaxmedic não está selecionada" description="A versão PWA desta etapa aceita apenas avaliações Relaxmedic. Altere o modelo nas configurações do painel para continuar." onBack={onBackToClients} />;
 	}

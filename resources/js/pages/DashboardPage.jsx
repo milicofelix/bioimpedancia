@@ -77,7 +77,7 @@ const defaultClinic = {
 	contact: 'Avaliação corporal e acompanhamento estético',
 	footer_text: 'Ricosty Emagrecimento e Estética - Avaliação corporal e acompanhamento estético',
 	technical_notice: 'Os resultados de bioimpedância são estimativas e podem variar conforme hidratação, alimentação, ciclo hormonal, medicamentos e condições de medição. Este documento não substitui avaliação médica ou nutricional.',
-	scale_model: 'omron_hbf_514c',
+	scale_model: 'relaxmedic_bodyscan_pro',
 };
 
 const emptyUserForm = {
@@ -646,6 +646,7 @@ export default function DashboardPage({ userName }) {
 	const selectedAssessment = selectedClient?.assessments?.find((assessment) => assessment.id === selectedAssessmentId)
 		?? selectedClient?.assessments?.[0]
 		?? null;
+	const isBodyscanProSelected = clinic.scale_model === 'relaxmedic_bodyscan_pro';
 	const isRelaxmedicAssessment = clinic.scale_model === 'relaxmedic' && assessmentMode === 'create';
 	const relaxmedicFlaggedFields = new Set([
 		...(relaxmedicExtraction?.missing_fields ?? []),
@@ -677,7 +678,8 @@ export default function DashboardPage({ userName }) {
 	const canAdmin = Boolean(currentUser?.is_admin);
 	const canCreateClinicalRecords = ['admin', 'professional', 'reception'].includes(currentUser?.role);
 	const canClinicalProfessional = ['admin', 'professional'].includes(currentUser?.role);
-	const canCreateCurrentAssessment = clinic.scale_model === 'relaxmedic' ? canClinicalProfessional : canCreateClinicalRecords;
+	const canCreateCurrentAssessment = !isBodyscanProSelected
+		&& (clinic.scale_model === 'relaxmedic' ? canClinicalProfessional : canCreateClinicalRecords);
 
 	async function handleLogout() {
 		await logout();
@@ -1345,7 +1347,8 @@ export default function DashboardPage({ userName }) {
 						<form onSubmit={(event) => runAction('save-clinic', () => submitClinic(event))} className="mt-4 space-y-3">
 							<Field label="Modelo da balança">
 								<select value={clinicForm.scale_model} onChange={(event) => updateClinic('scale_model', event.target.value)} className={inputClass()}>
-									<option value="omron_hbf_514c">Omron HBF-514C (atual)</option>
+									<option value="relaxmedic_bodyscan_pro">Bodyscan Pro (padrão)</option>
+									<option value="omron_hbf_514c">Omron HBF-514C</option>
 									<option value="relaxmedic">Relaxmedic</option>
 								</select>
 							</Field>
@@ -1508,7 +1511,7 @@ export default function DashboardPage({ userName }) {
 									<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Histórico de avaliações</p>
 									<h2 className="mt-1 text-lg font-semibold text-slate-950">{selectedClient.assessments?.length ?? 0} registro(s)</h2>
 								</div>
-								<button type="button" disabled={!canCreateCurrentAssessment} onClick={startNewAssessment} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
+								<button type="button" disabled={!canCreateCurrentAssessment} title={isBodyscanProSelected ? 'O fluxo da Bodyscan Pro será habilitado na próxima etapa.' : undefined} onClick={startNewAssessment} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
 									Nova avaliação
 								</button>
 							</div>
