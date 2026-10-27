@@ -1,0 +1,81 @@
+import React, { useMemo, useState } from 'react';
+import { relaxmedicMetricLabels } from '../../../domain/bioimpedance/relaxmedic';
+import { localDatetimeNow } from '../../../shared/formatters';
+import PwaButton from '../../components/ui/PwaButton';
+import PwaIcon from '../../components/ui/PwaIcon';
+import { relaxmedicIntegerFields, relaxmedicTextFields } from './relaxmedicAssessmentForm';
+import { segmentClassificationOptions, segmentLabels } from './bodyscanAssessmentForm';
+
+const valueFields = ['mass_kg', 'reference_percentage', 'classification', 'reference_min_percentage', 'reference_max_percentage'];
+
+function firstError(errors, key) {
+	const value = errors?.[key];
+	return Array.isArray(value) ? value[0] : value;
+}
+
+function SegmentSection({ title, type, segments, statuses, errors, onUpdate }) {
+	return (
+		<section className="rounded-2xl border border-slate-200 bg-white p-4">
+			<div className="flex items-center gap-2"><PwaIcon name="clipboard" size={18} /><h3 className="font-bold text-slate-950">{title}</h3></div>
+			<p className="mt-1 text-xs text-slate-600"><strong>L</strong> = lado esquerdo · <strong>R</strong> = lado direito</p>
+			<div className="mt-3 space-y-3">
+				{segments.map(({ segment, index }) => {
+					const prefix = `segmental.${type}.${segment.region}.${segment.side}`;
+					const incoherentRange = Number(String(segment.reference_min_percentage).replace(',', '.')) > Number(String(segment.reference_max_percentage).replace(',', '.'));
+					const flagged = incoherentRange || valueFields.some((field) => ['missing', 'unrecognized', 'suspicious'].includes(statuses?.[`${prefix}.${field}`]));
+					const rowError = valueFields.map((field) => firstError(errors, `segmental_measurements.${index}.${field}`)).find(Boolean);
+					return (
+						<fieldset key={`${segment.region}-${segment.side}`} className={`rounded-xl border border-l-4 p-3 ${rowError ? 'border-rose-300 bg-rose-50' : flagged ? 'border-amber-300 border-l-amber-500 bg-amber-50/40' : 'border-slate-200 border-l-emerald-400'}`}>
+							<legend className="px-1 text-sm font-bold text-slate-800">{segmentLabels[`${segment.region}|${segment.side}`]} {flagged ? <span className="ml-1 rounded-full bg-amber-200 px-2 py-0.5 text-[10px] text-amber-950">Conferir</span> : null}</legend>
+							<div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+								<SegmentInput label="Massa (kg)" value={segment.mass_kg} onChange={(value) => onUpdate(index, 'mass_kg', value)} />
+								<SegmentInput label="Referência (%)" value={segment.reference_percentage} onChange={(value) => onUpdate(index, 'reference_percentage', value)} />
+								<label className="col-span-2 text-xs font-semibold text-slate-700 sm:col-span-1">Classificação<select required value={segment.classification ?? ''} onChange={(event) => onUpdate(index, 'classification', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2"><option value="">Selecione</option>{segmentClassificationOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+								<SegmentInput label="Faixa mín. (%)" value={segment.reference_min_percentage} onChange={(value) => onUpdate(index, 'reference_min_percentage', value)} />
+								<SegmentInput label="Faixa máx. (%)" value={segment.reference_max_percentage} onChange={(value) => onUpdate(index, 'reference_max_percentage', value)} />
+							</div>
+							{incoherentRange ? <p role="alert" className="mt-2 text-xs font-semibold text-amber-800">Percentual incoerente: a faixa mínima está acima da máxima.</p> : null}
+							{rowError ? <p role="alert" className="mt-2 text-xs font-semibold text-rose-700">{rowError}</p> : null}
+						</fieldset>
+					);
+				})}
+			</div>
+		</section>
+	);
+}
+
+function SegmentInput({ label, value, onChange }) {
+	return <label className="text-xs font-semibold text-slate-700">{label}<input required inputMode="decimal" value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-2 font-normal outline-none focus:ring-2 focus:ring-emerald-400" /></label>;
+}
+
+export default function BodyscanReview({ previewUrl, form, extraction, confirmed, errors, saving, online, onGeneralUpdate, onSegmentUpdate, onConfirm, onSubmit, onRestart }) {
+	const [panel, setPanel] = useState('values');
+	const statuses = extraction?.field_statuses ?? {};
+	const grouped = useMemo(() => ({
+		fat: form.segments.map((segment, index) => ({ segment, index })).filter(({ segment }) => segment.type === 'fat'),
+		muscle: form.segments.map((segment, index) => ({ segment, index })).filter(({ segment }) => segment.type === 'muscle'),
+	}), [form.segments]);
+	const incomplete = form.segments.length !== 10 || form.segments.some((segment) => valueFields.some((field) => String(segment[field] ?? '').trim() === ''));
+	const warnings = [...new Set([...(extraction?.quality_issues ?? []), ...(extraction?.suspicious_values ?? []).map((item) => item.reason).filter(Boolean)])];
+
+	return (
+		<form onSubmit={onSubmit} aria-busy={saving} className="pwa-card p-4 sm:p-5">
+			<div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Conferência humana</p><h2 className="mt-1 text-lg font-bold text-slate-950">Compare todos os dados Bodyscan</h2></div><PwaButton type="button" variant="ghost" icon="refresh" onClick={() => { if (window.confirm('Descartar a leitura e todas as correções para trocar a imagem?')) onRestart(); }}>Trocar imagem</PwaButton></div>
+			{extraction?.side_consistency?.possible_swap ? <p role="alert" className="mt-3 rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm font-bold text-rose-800">Possível troca entre os lados L (esquerdo) e R (direito). Confira os marcadores diretamente na imagem.</p> : null}
+			{warnings.length ? <details className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm"><summary className="min-h-11 cursor-pointer font-bold">{warnings.length} {warnings.length === 1 ? 'alerta da leitura' : 'alertas da leitura'}</summary><ul className="list-disc space-y-1 pl-5">{warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></details> : null}
+			<div className="mt-4 grid grid-cols-2 gap-2 lg:hidden"><button type="button" onClick={() => setPanel('image')} className={`min-h-11 rounded-xl font-bold ${panel === 'image' ? 'bg-ricosty-700 text-white' : 'bg-slate-100'}`}>Imagem</button><button type="button" onClick={() => setPanel('values')} className={`min-h-11 rounded-xl font-bold ${panel === 'values' ? 'bg-ricosty-700 text-white' : 'bg-slate-100'}`}>Valores</button></div>
+			<div className="mt-4 lg:grid lg:grid-cols-[minmax(0,.7fr)_minmax(0,1.3fr)] lg:gap-5">
+				<div className={`${panel === 'image' ? 'block' : 'hidden'} lg:block`}><div className="sticky top-20 rounded-xl border bg-slate-100 p-2"><img src={previewUrl} alt="Relatório Bodyscan Pro original para conferência" className="mx-auto max-h-[75vh] rounded-lg object-contain" /></div></div>
+				<div className={`${panel === 'values' ? 'block' : 'hidden'} space-y-4 lg:block`}>
+					<section className="rounded-2xl border border-slate-200 bg-white p-4"><h3 className="font-bold text-slate-950">Métricas gerais</h3><label className="mt-3 block text-sm font-semibold">Data e hora<input type="datetime-local" required max={localDatetimeNow()} value={form.general.evaluated_at} onChange={(event) => onGeneralUpdate('evaluated_at', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label><div className="mt-3 grid gap-2 sm:grid-cols-2">{Object.entries(relaxmedicMetricLabels).map(([field, label]) => { const flagged = ['missing', 'unrecognized', 'suspicious'].includes(statuses[`metrics.${field}`]); return <label key={field} className={`rounded-xl border p-3 text-xs font-semibold ${flagged ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}`}>{label}{flagged ? <span className="ml-2 text-[10px] font-bold text-amber-800">CONFERIR</span> : null}{field === 'obesity_level' ? <select required value={form.general[field]} onChange={(event) => onGeneralUpdate(field, event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 font-normal"><option value="">Selecione após conferir</option>{(extraction?.allowed_values?.obesity_level ?? []).map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input required type="text" inputMode={relaxmedicTextFields.includes(field) ? 'text' : relaxmedicIntegerFields.includes(field) ? 'numeric' : 'decimal'} value={form.general[field]} onChange={(event) => onGeneralUpdate(field, event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 font-normal" />}{firstError(errors, field) ? <span className="mt-1 block text-rose-700">{firstError(errors, field)}</span> : null}</label>; })}</div></section>
+					<SegmentSection title="Gordura segmentar" type="fat" segments={grouped.fat} statuses={statuses} errors={errors} onUpdate={onSegmentUpdate} />
+					<SegmentSection title="Equilíbrio muscular" type="muscle" segments={grouped.muscle} statuses={statuses} errors={errors} onUpdate={onSegmentUpdate} />
+					<label className="block text-sm font-semibold">Observações<input maxLength={2000} value={form.general.notes} onChange={(event) => onGeneralUpdate('notes', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label>
+				</div>
+			</div>
+			<label className="mt-5 flex items-start gap-3 rounded-2xl border border-ricosty-200 bg-ricosty-50 p-4 text-sm font-semibold"><input type="checkbox" checked={confirmed} disabled={incomplete} onChange={(event) => onConfirm(event.target.checked)} className="mt-0.5 h-5 w-5" /><span>Comparei a imagem original e confirmo as métricas gerais, os cinco segmentos de gordura e os cinco segmentos musculares.</span></label>
+			{firstError(errors, 'source_metadata') || firstError(errors, 'bodyscan_review_confirmed') || firstError(errors, 'segmental_measurements') ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-700">{firstError(errors, 'source_metadata') ?? firstError(errors, 'bodyscan_review_confirmed') ?? firstError(errors, 'segmental_measurements')}</p> : null}
+			<PwaButton type="submit" disabled={incomplete || !confirmed || saving || !online} loading={saving} icon="check" className="mt-4 w-full">{saving ? 'Criando avaliação...' : 'Confirmar e criar avaliação'}</PwaButton>
+		</form>
+	);
+}

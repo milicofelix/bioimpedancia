@@ -264,6 +264,10 @@ class BodyscanProImageProcessor
                 'segmental_measurements' => $payload['segmental_measurements'] ?? [],
             ],
             'detected_sections' => $detectedSections->all(),
+            'allowed_values' => [
+                'obesity_level' => $this->valueNormalizer->obesityLevelOptions(),
+                'segment_classification' => Segment::CLASSIFICATION_LABELS,
+            ],
             'image' => [
                 'name' => $image->getClientOriginalName(),
                 'size_bytes' => $image->getSize(),

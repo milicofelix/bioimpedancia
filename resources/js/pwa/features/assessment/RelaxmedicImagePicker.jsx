@@ -11,7 +11,7 @@ export function validateRelaxmedicImage(file) {
 	return '';
 }
 
-export default function RelaxmedicImagePicker({ previewUrl, fileName, disabled, error, onSelect }) {
+export default function RelaxmedicImagePicker({ previewUrl, fileName, reportName = 'Relaxmedic', disabled, error, onSelect }) {
 	const cameraInput = useRef(null);
 	const galleryInput = useRef(null);
 
@@ -24,7 +24,7 @@ export default function RelaxmedicImagePicker({ previewUrl, fileName, disabled, 
 
 	return (
 		<section className="pwa-card p-5">
-			<div className="flex items-start gap-3"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-ricosty-100 text-ricosty-700"><PwaIcon name="camera" size={24} /></div><div><p className="text-xs font-bold uppercase tracking-wide text-ricosty-600">Relatório Relaxmedic</p><h2 className="mt-1 text-lg font-bold text-slate-950">Como deseja adicionar?</h2></div></div>
+			<div className="flex items-start gap-3"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-ricosty-100 text-ricosty-700"><PwaIcon name="camera" size={24} /></div><div><p className="text-xs font-bold uppercase tracking-wide text-ricosty-600">Relatório {reportName}</p><h2 className="mt-1 text-lg font-bold text-slate-950">Como deseja adicionar?</h2></div></div>
 			<p className="mt-1 text-sm leading-6 text-slate-600">Use a foto completa, nítida e sem reflexos. Formato JPEG/JPG, até 10 MB.</p>
 
 			<input ref={cameraInput} type="file" accept="image/jpeg,.jpg,.jpeg" capture="environment" onChange={select} className="sr-only" tabIndex={-1} />
@@ -38,7 +38,7 @@ export default function RelaxmedicImagePicker({ previewUrl, fileName, disabled, 
 			{error ? <p role="alert" className="pwa-status-enter mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p> : null}
 			{previewUrl ? (
 				<div className="pwa-screen-enter mt-4 overflow-hidden rounded-2xl border border-ricosty-200 bg-ricosty-cream/50 p-3">
-					<img src={previewUrl} alt="Prévia do relatório Relaxmedic selecionado" className="mx-auto max-h-80 rounded-lg object-contain" />
+					<img src={previewUrl} alt={`Prévia do relatório ${reportName} selecionado`} className="mx-auto max-h-80 rounded-lg object-contain" />
 					<div className="mt-3 flex items-start justify-center gap-2 text-xs text-slate-700"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><PwaIcon name="check" size={12} /></span><span className="break-all text-center">{fileName}</span></div>
 				</div>
 			) : null}

@@ -31,6 +31,15 @@ export async function processRelaxmedicImage(image) {
 	return data.extraction;
 }
 
+export async function processBodyscanProImage(image) {
+	const payload = new FormData();
+	payload.append('image', image);
+
+	const { data } = await window.axios.post('/bioimpedance/bodyscan-pro/process-image', payload);
+
+	return data.extraction;
+}
+
 export async function createBioimpedanceAssessment(payload) {
 	const { data } = await window.axios.post('/bioimpedance/assessments', payload);
 

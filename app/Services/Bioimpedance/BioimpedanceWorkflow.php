@@ -6,6 +6,7 @@ use App\Models\AppAudit;
 use App\Models\Bioimpedance\BioimpedanceAiAnalysisOutput;
 use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceAssessmentAudit;
+use App\Models\Bioimpedance\BioimpedanceSegmentalMeasurement;
 use App\Models\Bioimpedance\BioimpedanceClient;
 use App\Models\Bioimpedance\BioimpedanceClinicSetting;
 use App\Models\Bioimpedance\BioimpedanceReportShare;
@@ -261,18 +262,35 @@ class BioimpedanceWorkflow
         ]);
     }
 
-    public function storeAssessment(Request $request, BioimpedanceAnalyzer $analyzer, RelaxmedicImageProcessor $imageProcessor): JsonResponse
+    public function storeAssessment(Request $request, BioimpedanceAnalyzer $analyzer, RelaxmedicImageProcessor $imageProcessor, BodyscanProImageProcessor $bodyscanProcessor): JsonResponse
     {
         $this->authorizeCreateClinicalRecords($request);
         $scaleModel = BioimpedanceClinicSetting::current()->scale_model;
 
-        if ($scaleModel === BioimpedanceClinicSetting::SCALE_MODEL_BODYSCAN_PRO) {
-            throw ValidationException::withMessages([
-                'scale_model' => 'O fluxo de avaliação da Bodyscan Pro ainda está em preparação. Selecione outro modelo para registrar uma avaliação.',
-            ]);
-        }
-
         $sourceMetadata = null;
+        $segmentalMeasurements = [];
+
+        if ($scaleModel === BioimpedanceClinicSetting::SCALE_MODEL_BODYSCAN_PRO) {
+            $this->authorizeClinicalProfessional($request);
+            [$sourceMetadata, $segmentalMeasurements] = $this->validateBodyscanReview($request, $bodyscanProcessor);
+            $request->validate(collect([
+                'weight_kg', 'scale_bmi', 'body_fat_percentage', 'muscle_rate_percentage',
+                'lean_body_mass_kg', 'subcutaneous_fat_percentage', 'visceral_fat_level',
+                'body_water_percentage', 'skeletal_muscle_percentage', 'muscle_mass_kg',
+                'bone_mass_kg', 'protein_percentage', 'resting_metabolism_kcal', 'body_age',
+                'fat_mass_kg', 'water_weight_kg', 'protein_mass_kg', 'ideal_body_weight_kg',
+                'obesity_level', 'body_type',
+            ])->mapWithKeys(fn (string $field) => [$field => ['required']])->all(), [], [
+                'weight_kg' => 'peso',
+                'scale_bmi' => 'IMC',
+            ]);
+
+            if (! $this->relaxmedicValueNormalizer->recognizesObesityLevel($request->input('obesity_level'))) {
+                throw ValidationException::withMessages([
+                    'obesity_level' => 'Selecione um nível de obesidade reconhecido depois de conferir a imagem.',
+                ]);
+            }
+        }
 
         if ($scaleModel === BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDIC) {
             $this->authorizeClinicalProfessional($request);
@@ -372,7 +390,7 @@ class BioimpedanceWorkflow
                 ]);
             }
 
-            $assessment = DB::transaction(function () use ($validated, $snapshot, $request, $analysis, $sourceMetadata): BioimpedanceAssessment {
+            $assessment = DB::transaction(function () use ($validated, $snapshot, $request, $analysis, $sourceMetadata, $segmentalMeasurements): BioimpedanceAssessment {
                 $assessment = BioimpedanceAssessment::query()->create([
                     ...$validated,
                     ...$snapshot,
@@ -382,6 +400,11 @@ class BioimpedanceWorkflow
                     'analysis' => $analysis,
                     'source_metadata' => $sourceMetadata,
                 ]);
+
+                if ($segmentalMeasurements !== []) {
+                    $assessment->segmentalMeasurements()->createMany($segmentalMeasurements);
+                    $assessment->load('segmentalMeasurements');
+                }
 
                 $this->auditAssessment(
                     $assessment,
@@ -795,11 +818,112 @@ class BioimpedanceWorkflow
         return $response;
     }
 
+    private function validateBodyscanReview(Request $request, BodyscanProImageProcessor $processor): array
+    {
+        $validated = $request->validate([
+            'bodyscan_review_confirmed' => ['accepted'],
+            'source_metadata' => ['required', 'array'],
+            'source_metadata.type' => ['required', Rule::in(['bodyscan_pro_image_extraction'])],
+            'source_metadata.name' => ['required', 'string', 'max:255'],
+            'source_metadata.size_bytes' => ['required', 'integer', 'between:1,10485760'],
+            'source_metadata.mime_type' => ['required', Rule::in(['image/jpeg'])],
+            'source_metadata.stored' => ['required', 'declined'],
+            'source_metadata.sha256' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/'],
+            'source_metadata.processed_at' => ['required', 'date'],
+            'source_metadata.processor_model' => ['required', 'string', 'max:100'],
+            'source_metadata.reference_version' => ['required', 'string', 'max:40'],
+            'source_metadata.measured_at' => ['nullable', 'date'],
+            'source_metadata.metrics' => ['required', 'array'],
+            'source_metadata.segmental_measurements' => ['required', 'array', 'size:10'],
+            'source_metadata.raw_values' => ['present', 'array'],
+            'source_metadata.detected_sections' => ['required', 'array', 'min:3'],
+            'source_metadata.field_statuses' => ['present', 'array'],
+            'source_metadata.missing_fields' => ['present', 'array'],
+            'source_metadata.suspicious_values' => ['present', 'array'],
+            'source_metadata.quality_issues' => ['present', 'array'],
+            'source_metadata.side_consistency' => ['required', 'array'],
+            'source_metadata.signature' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/'],
+            'segmental_measurements' => ['required', 'array', 'size:10'],
+            'segmental_measurements.*.type' => ['required', Rule::in(BioimpedanceSegmentalMeasurement::TYPES)],
+            'segmental_measurements.*.region' => ['required', Rule::in(BioimpedanceSegmentalMeasurement::REGIONS)],
+            'segmental_measurements.*.side' => ['required', Rule::in(BioimpedanceSegmentalMeasurement::SIDES)],
+            'segmental_measurements.*.mass_kg' => ['required', 'numeric', 'between:0,300'],
+            'segmental_measurements.*.reference_percentage' => ['required', 'numeric', 'between:0,1000'],
+            'segmental_measurements.*.classification' => ['required', Rule::in(BioimpedanceSegmentalMeasurement::CLASSIFICATIONS)],
+            'segmental_measurements.*.reference_min_percentage' => ['required', 'numeric', 'between:0,1000'],
+            'segmental_measurements.*.reference_max_percentage' => ['required', 'numeric', 'between:0,1000'],
+        ], [
+            'bodyscan_review_confirmed.accepted' => 'Confirme que todos os dados foram comparados com a imagem.',
+            'source_metadata.required' => 'Processe novamente a imagem Bodyscan Pro antes de salvar.',
+            'segmental_measurements.size' => 'Confira as cinco regiões de gordura e as cinco regiões musculares.',
+            'segmental_measurements.*.required' => 'Todos os valores segmentares precisam ser conferidos e preenchidos.',
+        ]);
+
+        if (! $processor->verifyMetadata($validated['source_metadata'])) {
+            throw ValidationException::withMessages(['source_metadata' => 'A extração Bodyscan foi alterada ou expirou. Processe novamente a imagem.']);
+        }
+
+        $expectedKeys = collect(BioimpedanceSegmentalMeasurement::TYPES)
+            ->flatMap(fn (string $type) => collect(BioimpedanceSegmentalMeasurement::EXPECTED_SEGMENTS)
+                ->map(fn (array $segment) => $type.'|'.$segment['region'].'|'.$segment['side']))
+            ->sort()->values();
+        $submittedKeys = collect($validated['segmental_measurements'])
+            ->map(fn (array $segment) => $segment['type'].'|'.$segment['region'].'|'.$segment['side'])
+            ->sort()->values();
+
+        if ($submittedKeys->duplicates()->isNotEmpty() || $submittedKeys->all() !== $expectedKeys->all()) {
+            throw ValidationException::withMessages(['segmental_measurements' => 'As regiões segmentares estão duplicadas, ausentes ou com lados incompatíveis.']);
+        }
+
+        foreach ($validated['segmental_measurements'] as $index => $segment) {
+            if ((float) $segment['reference_min_percentage'] > (float) $segment['reference_max_percentage']) {
+                throw ValidationException::withMessages(["segmental_measurements.{$index}.reference_min_percentage" => 'O limite mínimo não pode ser maior que o máximo.']);
+            }
+        }
+
+        $originals = collect($validated['source_metadata']['segmental_measurements'])->keyBy(
+            fn (array $segment) => $segment['type'].'|'.$segment['region'].'|'.$segment['side'],
+        );
+        $segments = collect($validated['segmental_measurements'])->map(function (array $segment) use ($originals) {
+            $key = $segment['type'].'|'.$segment['region'].'|'.$segment['side'];
+
+            return [
+                ...$segment,
+                'reference_version' => BioimpedanceSegmentalMeasurement::defaultReferenceVersion(),
+                'raw_value' => data_get($originals->get($key), 'raw_value'),
+            ];
+        })->all();
+
+        return [[
+            'type' => 'bodyscan_pro_image_extraction',
+            'image_name' => $validated['source_metadata']['name'],
+            'image_size_bytes' => $validated['source_metadata']['size_bytes'],
+            'image_mime_type' => 'image/jpeg',
+            'image_sha256' => $validated['source_metadata']['sha256'],
+            'image_stored' => false,
+            'processed_at' => $validated['source_metadata']['processed_at'],
+            'processor_model' => $validated['source_metadata']['processor_model'],
+            'reference_version' => $validated['source_metadata']['reference_version'],
+            'ocr_field_statuses' => $validated['source_metadata']['field_statuses'],
+            'ocr_missing_fields' => $validated['source_metadata']['missing_fields'],
+            'ocr_suspicious_values' => $validated['source_metadata']['suspicious_values'],
+            'side_consistency' => $validated['source_metadata']['side_consistency'],
+            'review_confirmed_at' => now()->toIso8601String(),
+            'reviewed_by_user_id' => $request->user()->id,
+        ], $segments];
+    }
+
     private function validateAssessment(Request $request, bool $requireClient = true, ?string $deviceModel = null): array
     {
         $isRelaxmedic = $deviceModel !== null
-            ? $deviceModel === BioimpedanceClinicSetting::SCALE_MODEL_NAMES[BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDIC]
-            : BioimpedanceClinicSetting::current()->scale_model === BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDIC;
+            ? in_array($deviceModel, [
+                BioimpedanceClinicSetting::SCALE_MODEL_NAMES[BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDIC],
+                BioimpedanceClinicSetting::SCALE_MODEL_NAMES[BioimpedanceClinicSetting::SCALE_MODEL_BODYSCAN_PRO],
+            ], true)
+            : in_array(BioimpedanceClinicSetting::current()->scale_model, [
+                BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDIC,
+                BioimpedanceClinicSetting::SCALE_MODEL_BODYSCAN_PRO,
+            ], true);
 
         $request->merge([
             'weight_kg' => $this->normalizeDecimal($request->input('weight_kg')),
@@ -959,7 +1083,7 @@ class BioimpedanceWorkflow
 
     private function assessmentAuditValues(BioimpedanceAssessment $assessment): array
     {
-        return collect($assessment->only([
+        $values = collect($assessment->only([
             'evaluated_at',
             'device_model',
             'weight_kg',
@@ -995,6 +1119,16 @@ class BioimpedanceWorkflow
             'canceled_at',
             'cancellation_reason',
         ]))->map(fn ($value) => $value instanceof Carbon ? $value->toIso8601String() : $value)->all();
+
+        if ($assessment->relationLoaded('segmentalMeasurements')) {
+            $values['segmental_measurements'] = $assessment->segmentalMeasurements
+                ->map(fn (BioimpedanceSegmentalMeasurement $measurement) => $measurement->only([
+                    'type', 'region', 'side', 'mass_kg', 'reference_percentage', 'classification',
+                    'reference_min_percentage', 'reference_max_percentage', 'reference_version',
+                ]))->values()->all();
+        }
+
+        return $values;
     }
 
     private function auditAssessment(BioimpedanceAssessment $assessment, Request $request, string $action, string $reason, array $oldValues, array $newValues): void
