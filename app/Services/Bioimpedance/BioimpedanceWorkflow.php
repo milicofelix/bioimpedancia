@@ -2,6 +2,7 @@
 
 namespace App\Services\Bioimpedance;
 
+use App\Domain\Bioimpedance\ScaleModel;
 use App\Models\AppAudit;
 use App\Models\Bioimpedance\BioimpedanceAiAnalysisOutput;
 use App\Models\Bioimpedance\BioimpedanceAssessment;
@@ -269,10 +270,11 @@ class BioimpedanceWorkflow
 
         $sourceMetadata = null;
         $segmentalMeasurements = [];
+        $measurementProfile = [];
 
         if ($scaleModel === BioimpedanceClinicSetting::SCALE_MODEL_BODYSCAN_PRO) {
             $this->authorizeClinicalProfessional($request);
-            [$sourceMetadata, $segmentalMeasurements] = $this->validateBodyscanReview($request, $bodyscanProcessor);
+            [$sourceMetadata, $segmentalMeasurements, $measurementProfile] = $this->validateBodyscanReview($request, $bodyscanProcessor);
             $request->validate(collect([
                 'weight_kg', 'scale_bmi', 'body_fat_percentage', 'muscle_rate_percentage',
                 'lean_body_mass_kg', 'subcutaneous_fat_percentage', 'visceral_fat_level',
@@ -367,7 +369,7 @@ class BioimpedanceWorkflow
 
         $this->validateEvaluationDateAgainstBirthDate($client, $validated['evaluated_at']);
 
-        $snapshot = $this->assessmentSnapshot($client, $validated['evaluated_at']);
+        $snapshot = $this->assessmentSnapshot($client, $validated['evaluated_at'], $measurementProfile);
         $analysis = $analyzer->analyze($client->toArray(), [...$validated, ...$snapshot]);
 
         $creationLock = null;
@@ -847,6 +849,8 @@ class BioimpedanceWorkflow
 
         $validated = $request->validate([
             'bodyscan_review_confirmed' => ['accepted'],
+            'athlete_mode_at_assessment' => ['required', 'boolean'],
+            'measurement_application' => ['required', Rule::in(ScaleModel::BODYSCAN_APPLICATIONS)],
             'source_metadata' => ['required', 'array'],
             'source_metadata.type' => ['required', Rule::in(['bodyscan_pro_image_extraction'])],
             'source_metadata.name' => ['required', 'string', 'max:255'],
@@ -857,6 +861,7 @@ class BioimpedanceWorkflow
             'source_metadata.processed_at' => ['required', 'date'],
             'source_metadata.processor_model' => ['required', 'string', 'max:100'],
             'source_metadata.reference_version' => ['required', 'string', 'max:40'],
+            'source_metadata.source_application' => ['nullable', Rule::in(ScaleModel::BODYSCAN_APPLICATIONS)],
             'source_metadata.measured_at' => ['nullable', 'date'],
             'source_metadata.metrics' => ['required', 'array'],
             'source_metadata.segmental_measurements' => ['required', 'array', 'size:10'],
@@ -958,6 +963,11 @@ class BioimpedanceWorkflow
             'processed_at' => $validated['source_metadata']['processed_at'],
             'processor_model' => $validated['source_metadata']['processor_model'],
             'reference_version' => $validated['source_metadata']['reference_version'],
+            'extracted_application' => $validated['source_metadata']['source_application'] ?? null,
+            'confirmed_application' => $validated['measurement_application'],
+            'athlete_mode_at_assessment' => (bool) $validated['athlete_mode_at_assessment'],
+            'device_model_code' => ScaleModel::BODYSCAN_PRO_MODEL_CODE,
+            'device_manual_version' => ScaleModel::BODYSCAN_PRO_MANUAL_VERSION,
             'ocr_field_statuses' => $validated['source_metadata']['field_statuses'],
             'ocr_missing_fields' => $validated['source_metadata']['missing_fields'],
             'ocr_suspicious_values' => $validated['source_metadata']['suspicious_values'],
@@ -967,7 +977,12 @@ class BioimpedanceWorkflow
             'segmental_review_corrections' => $segmentalReviewCorrections,
             'review_confirmed_at' => now()->toIso8601String(),
             'reviewed_by_user_id' => $request->user()->id,
-        ], $segments];
+        ], $segments, [
+            'athlete_mode_at_assessment' => (bool) $validated['athlete_mode_at_assessment'],
+            'measurement_application' => $validated['measurement_application'],
+            'device_model_code' => ScaleModel::BODYSCAN_PRO_MODEL_CODE,
+            'device_manual_version' => ScaleModel::BODYSCAN_PRO_MANUAL_VERSION,
+        ]];
     }
 
     private function validateAssessment(Request $request, bool $requireClient = true, ?string $deviceModel = null): array
@@ -1114,7 +1129,7 @@ class BioimpedanceWorkflow
         }
     }
 
-    private function assessmentSnapshot(BioimpedanceClient $client, string $evaluatedAt): array
+    private function assessmentSnapshot(BioimpedanceClient $client, string $evaluatedAt, array $measurementProfile = []): array
     {
         $settings = BioimpedanceClinicSetting::current();
 
@@ -1124,6 +1139,10 @@ class BioimpedanceWorkflow
             'biological_sex_at_assessment' => $client->biological_sex,
             'device_model' => $settings->scaleModelName(),
             'reference_version' => $settings->scaleReferenceVersion(),
+            'athlete_mode_at_assessment' => $measurementProfile['athlete_mode_at_assessment'] ?? null,
+            'measurement_application' => $measurementProfile['measurement_application'] ?? null,
+            'device_model_code' => $measurementProfile['device_model_code'] ?? null,
+            'device_manual_version' => $measurementProfile['device_manual_version'] ?? null,
         ];
     }
 
@@ -1135,6 +1154,10 @@ class BioimpedanceWorkflow
             'biological_sex_at_assessment' => $assessment->biological_sex_at_assessment ?? $client->biological_sex,
             'device_model' => $assessment->device_model ?? BioimpedanceAnalyzer::DEVICE_MODEL,
             'reference_version' => $assessment->reference_version ?? BioimpedanceAnalyzer::REFERENCE_VERSION,
+            'athlete_mode_at_assessment' => $assessment->athlete_mode_at_assessment,
+            'measurement_application' => $assessment->measurement_application,
+            'device_model_code' => $assessment->device_model_code,
+            'device_manual_version' => $assessment->device_manual_version,
         ];
     }
 
@@ -1143,6 +1166,10 @@ class BioimpedanceWorkflow
         $values = collect($assessment->only([
             'evaluated_at',
             'device_model',
+            'athlete_mode_at_assessment',
+            'measurement_application',
+            'device_model_code',
+            'device_manual_version',
             'weight_kg',
             'scale_bmi',
             'calculated_bmi',

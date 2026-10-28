@@ -81,7 +81,8 @@ class BodyscanProImageProcessor
         $response = Http::withToken($apiKey)
             ->acceptJson()
             ->asJson()
-            ->timeout((int) config('services.openai.timeout', 45))
+            ->connectTimeout(10)
+            ->timeout((int) config('services.openai.bodyscan_ocr_timeout', 90))
             ->post(rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/').'/responses', [
                 'model' => $processorModel,
                 'store' => false,
@@ -127,6 +128,7 @@ class BodyscanProImageProcessor
             'processed_at' => now()->toIso8601String(),
             'processor_model' => $processorModel,
             'reference_version' => ScaleModel::BODYSCAN_REFERENCE_VERSION,
+            'source_application' => $result['source_application'],
             'measured_at' => $result['measured_at'],
             'metrics' => $result['metrics'],
             'segmental_measurements' => $result['segmental_measurements'],
@@ -197,6 +199,11 @@ class BodyscanProImageProcessor
         $rawMetrics = is_array($payload['metrics'] ?? null) ? $payload['metrics'] : [];
         $metrics = [];
         $fieldStatuses = [];
+        $sourceApplication = $this->normalizeSourceApplication($payload['source_application'] ?? null);
+        $fieldStatuses['source_application'] = $sourceApplication === null ? 'missing' : 'recognized';
+        if ($sourceApplication === null) {
+            $missingFields->push('source_application');
+        }
         foreach (self::METRIC_FIELDS as $field) {
             $rawValue = $rawMetrics[$field] ?? null;
             $metrics[$field] = array_key_exists($field, self::NUMERIC_RANGES)
@@ -269,6 +276,7 @@ class BodyscanProImageProcessor
             'is_complete' => $isComplete,
             'report_type' => 'Bodyscan Pro',
             'reference_version' => ScaleModel::BODYSCAN_REFERENCE_VERSION,
+            'source_application' => $sourceApplication,
             'measured_at' => $measuredAt,
             'metrics' => $metrics,
             'segmental_measurements' => $segmentalMeasurements,
@@ -597,6 +605,17 @@ class BodyscanProImageProcessor
         return Str::lower(Str::ascii(trim($value)));
     }
 
+    private function normalizeSourceApplication(mixed $value): ?string
+    {
+        $normalized = $this->normalizedLabel((string) $value);
+
+        return match (true) {
+            str_contains($normalized, 'relaxfit') => ScaleModel::BODYSCAN_APPLICATION_RELAXFIT,
+            str_contains($normalized, 'fitdays') => ScaleModel::BODYSCAN_APPLICATION_FITDAYS,
+            default => null,
+        };
+    }
+
     private function isVisualQualityIssue(string $issue): bool
     {
         $normalized = $this->normalizedLabel($issue);
@@ -624,7 +643,7 @@ class BodyscanProImageProcessor
             'type', 'name', 'size_bytes', 'mime_type', 'stored', 'sha256', 'processed_at',
             'processor_model', 'reference_version', 'measured_at', 'metrics', 'segmental_measurements',
             'raw_values', 'detected_sections', 'field_statuses', 'missing_fields', 'suspicious_values',
-            'quality_issues', 'side_consistency',
+            'quality_issues', 'side_consistency', 'source_application',
         ])->mapWithKeys(fn (string $key) => [$key => $metadata[$key] ?? null])->all();
 
         return hash_hmac('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), (string) config('app.key'));
@@ -633,7 +652,8 @@ class BodyscanProImageProcessor
     private function prompt(): string
     {
         return <<<'PROMPT'
-Analise exclusivamente a imagem anexada. Ela deve ser um relatório da balança Bodyscan Pro exibido pelo aplicativo RelaxFit.
+Analise exclusivamente a imagem anexada. Ela deve ser um relatório da balança Bodyscan Pro exibido pelo aplicativo RelaxFit ou Fitdays.
+Identifique source_application pela marca visível no relatório: relaxfit ou fitdays. Use null quando a origem não estiver legível; não deduza pela aparência.
 Reconheça o modelo pelo conjunto de seções e não apenas pela aparência: "Dados de membro", "Análise de gordura segmentar", "Equilíbrio muscular" e "Índice corporal".
 Extraia cada valor pelo rótulo textual e pelo marcador L/R correspondente. Nunca determine o lado apenas pela posição na tela.
 Para os segmentos, use somente estes identificadores: type fat ou muscle; region arm, trunk ou leg; side left, center ou right. O tronco deve usar side center.
@@ -645,7 +665,7 @@ Extraia as métricas gerais do bloco "Índice corporal" pelos nomes dos rótulos
 Não calcule, estime, deduza ou complete valores ausentes. Use null quando algo não estiver legível.
 Converta a data e hora para YYYY-MM-DDTHH:MM:SS sem inventar fuso horário.
 Em detected_sections, copie os títulos realmente visíveis.
-Marque recognized=false para outro aplicativo, relatório sem análise segmentar ou imagem que não permita identificar o Bodyscan Pro.
+Marque recognized=false para aplicativo diferente de RelaxFit/Fitdays, relatório sem análise segmentar ou imagem que não permita identificar o Bodyscan Pro.
 Marque is_complete=false quando houver corte, desfoque, valor ilegível, seção ausente ou lado não confirmável.
 Em side_consistency, confirme a visibilidade dos marcadores L e R e marque possible_swap=true diante de qualquer dúvida sobre os lados.
 Em legibility use clear, uncertain ou unreadable.
@@ -670,11 +690,12 @@ PROMPT;
         return [
             'type' => 'object',
             'additionalProperties' => false,
-            'required' => ['recognized', 'is_complete', 'quality_issues', 'measured_at', 'detected_sections', 'metrics', 'segmental_measurements', 'side_consistency', 'suspicious_values'],
+            'required' => ['recognized', 'is_complete', 'quality_issues', 'source_application', 'measured_at', 'detected_sections', 'metrics', 'segmental_measurements', 'side_consistency', 'suspicious_values'],
             'properties' => [
                 'recognized' => ['type' => 'boolean'],
                 'is_complete' => ['type' => 'boolean'],
                 'quality_issues' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'source_application' => ['type' => ['string', 'null'], 'enum' => ['relaxfit', 'fitdays', null]],
                 'measured_at' => $nullableString,
                 'detected_sections' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'metrics' => [

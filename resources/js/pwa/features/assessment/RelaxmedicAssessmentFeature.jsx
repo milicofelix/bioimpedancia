@@ -23,7 +23,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 	const [previewUrl, setPreviewUrl] = useState('');
 	const [extraction, setExtraction] = useState(null);
 	const [form, setForm] = useState(emptyRelaxmedicAssessment);
-	const [bodyscanForm, setBodyscanForm] = useState({ general: emptyRelaxmedicAssessment(), segments: [] });
+	const [bodyscanForm, setBodyscanForm] = useState({ general: emptyRelaxmedicAssessment(), profile: { athlete_mode_at_assessment: '', measurement_application: '' }, segments: [] });
 	const [confirmed, setConfirmed] = useState(false);
 	const [processing, setProcessing] = useState(false);
 	const [saving, setSaving] = useState(false);
@@ -53,7 +53,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 		setImageName('');
 		setExtraction(null);
 		setForm(emptyRelaxmedicAssessment());
-		setBodyscanForm({ general: emptyRelaxmedicAssessment(), segments: [] });
+		setBodyscanForm({ general: emptyRelaxmedicAssessment(), profile: { athlete_mode_at_assessment: '', measurement_application: '' }, segments: [] });
 		setConfirmed(false);
 		setImageError('');
 		setGeneralError('');
@@ -122,6 +122,12 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 		setBodyscanForm((current) => ({ ...current, segments: updateBodyscanSegment(current.segments, index, field, value) }));
 		setConfirmed(false);
 		setErrors({});
+	}
+
+	function updateBodyscanProfile(field, value) {
+		setBodyscanForm((current) => ({ ...current, profile: { ...current.profile, [field]: value } }));
+		setConfirmed(false);
+		setErrors((current) => ({ ...current, [field]: undefined, bodyscan_review_confirmed: undefined }));
 	}
 
 	function update(field, value) {
@@ -197,7 +203,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 				</>
 			) : (
 				scaleModel === 'relaxmedic_bodyscan_pro'
-					? <BodyscanReview previewUrl={previewUrl} form={bodyscanForm} extraction={extraction} confirmed={confirmed} errors={errors} saving={saving} online={isOnline} onGeneralUpdate={updateBodyscanGeneral} onSegmentUpdate={updateSegment} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />
+					? <BodyscanReview previewUrl={previewUrl} form={bodyscanForm} extraction={extraction} client={client} confirmed={confirmed} errors={errors} saving={saving} online={isOnline} onGeneralUpdate={updateBodyscanGeneral} onProfileUpdate={updateBodyscanProfile} onSegmentUpdate={updateSegment} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />
 					: <RelaxmedicReview previewUrl={previewUrl} form={form} extraction={extraction} confirmed={confirmed} errors={errors} saving={saving} online={isOnline} onUpdate={update} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />
 			)}
 			{generalError ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{generalError}</p> : null}

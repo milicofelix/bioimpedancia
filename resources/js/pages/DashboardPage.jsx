@@ -530,7 +530,7 @@ export default function DashboardPage({ userName }) {
 	const [processingRelaxmedicImage, setProcessingRelaxmedicImage] = useState(false);
 	const [relaxmedicExtraction, setRelaxmedicExtraction] = useState(null);
 	const [relaxmedicReviewConfirmed, setRelaxmedicReviewConfirmed] = useState(false);
-	const [bodyscanForm, setBodyscanForm] = useState({ general: { ...emptyAssessment }, segments: [] });
+	const [bodyscanForm, setBodyscanForm] = useState({ general: { ...emptyAssessment }, profile: { athlete_mode_at_assessment: '', measurement_application: '' }, segments: [] });
 	const [bodyscanProgressStep, setBodyscanProgressStep] = useState(1);
 
 	useEffect(() => {
@@ -782,7 +782,7 @@ export default function DashboardPage({ userName }) {
 		setRelaxmedicImageError('');
 		setRelaxmedicExtraction(null);
 		setRelaxmedicReviewConfirmed(false);
-		setBodyscanForm({ general: { ...emptyAssessment, evaluated_at: localDatetimeNow() }, segments: [] });
+		setBodyscanForm({ general: { ...emptyAssessment, evaluated_at: localDatetimeNow() }, profile: { athlete_mode_at_assessment: '', measurement_application: '' }, segments: [] });
 		setBodyscanProgressStep(1);
 		if (relaxmedicImageInputRef.current) {
 			relaxmedicImageInputRef.current.value = '';
@@ -865,6 +865,12 @@ export default function DashboardPage({ userName }) {
 		setBodyscanForm((current) => ({ ...current, segments: updateBodyscanSegment(current.segments, index, field, value) }));
 		setRelaxmedicReviewConfirmed(false);
 		setErrors({});
+	}
+
+	function updateBodyscanProfile(field, value) {
+		setBodyscanForm((current) => ({ ...current, profile: { ...current.profile, [field]: value } }));
+		setRelaxmedicReviewConfirmed(false);
+		setErrors((current) => ({ ...current, [field]: undefined, bodyscan_review_confirmed: undefined }));
 	}
 
 	function clearAssessmentDraft() {
@@ -954,14 +960,10 @@ export default function DashboardPage({ userName }) {
 		setSavingClient(true);
 		setErrors({});
 
-		let payload = {
+		const payload = {
 			...clientForm,
 			height_cm: normalizeHeightToCentimeters(clientForm.height_cm),
 		};
-
-		if (isBodyscanAssessment) {
-			payload = bodyscanAssessmentPayload({ ...bodyscanForm, general: assessmentForm }, selectedClient.id, relaxmedicExtraction?.image, relaxmedicReviewConfirmed);
-		}
 
 		try {
 			const { data } = clientMode === 'edit' && editingClientId
@@ -1080,7 +1082,7 @@ export default function DashboardPage({ userName }) {
 		setSavingAssessment(true);
 		setErrors({});
 
-		const payload = {
+		let payload = {
 			...assessmentForm,
 			bioimpedance_client_id: selectedClient.id,
 			weight_kg: normalizeDecimal(assessmentForm.weight_kg),
@@ -1091,6 +1093,15 @@ export default function DashboardPage({ userName }) {
 			relaxmedic_review_confirmed: isRelaxmedicAssessment && relaxmedicReviewConfirmed,
 			source_metadata: isRelaxmedicAssessment ? relaxmedicExtraction?.image : undefined,
 		};
+
+		if (isBodyscanAssessment && assessmentMode !== 'edit') {
+			payload = bodyscanAssessmentPayload(
+				{ ...bodyscanForm, general: assessmentForm },
+				selectedClient.id,
+				relaxmedicExtraction?.image,
+				relaxmedicReviewConfirmed,
+			);
+		}
 
 		if (assessmentMode === 'edit') {
 			payload.change_reason = assessmentChangeReason;
@@ -1786,11 +1797,13 @@ export default function DashboardPage({ userName }) {
 										previewUrl={relaxmedicImagePreview}
 										form={bodyscanForm}
 										extraction={relaxmedicExtraction}
+										client={selectedClient}
 										confirmed={relaxmedicReviewConfirmed}
 										errors={errors}
 										saving={savingAssessment}
 										online={isOnline}
 										onGeneralUpdate={updateBodyscanGeneral}
+										onProfileUpdate={updateBodyscanProfile}
 										onSegmentUpdate={updateBodyscanSegmentField}
 										onConfirm={setRelaxmedicReviewConfirmed}
 										onSubmit={(event) => runAction('save-assessment', () => submitAssessment(event))}

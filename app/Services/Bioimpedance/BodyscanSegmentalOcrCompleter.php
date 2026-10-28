@@ -15,7 +15,8 @@ class BodyscanSegmentalOcrCompleter
             $response = Http::withToken((string) config('services.openai.api_key'))
                 ->acceptJson()
                 ->asJson()
-                ->timeout((int) config('services.openai.timeout', 45))
+                ->connectTimeout(10)
+                ->timeout((int) config('services.openai.bodyscan_ocr_timeout', 90))
                 ->post(rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/').'/responses', [
                     'model' => $model,
                     'store' => false,

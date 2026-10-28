@@ -154,6 +154,10 @@ class BioimpedanceWorkspacePresenter
             'biological_sex_at_assessment' => $assessment->biological_sex_at_assessment,
             'device_model' => $assessment->device_model,
             'reference_version' => $assessment->reference_version,
+            'athlete_mode_at_assessment' => $assessment->athlete_mode_at_assessment,
+            'measurement_application' => $assessment->measurement_application,
+            'device_model_code' => $assessment->device_model_code,
+            'device_manual_version' => $assessment->device_manual_version,
             'segmental_measurements' => $assessment->segmentalMeasurements
                 ->sortBy(fn ($measurement) => $measurement->type.'|'.$measurement->region.'|'.$measurement->side)
                 ->values()

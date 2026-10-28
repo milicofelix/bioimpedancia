@@ -14,6 +14,16 @@ function firstError(errors, key) {
 	return Array.isArray(value) ? value[0] : value;
 }
 
+function ageAtMeasurement(birthDate, measuredAt) {
+	if (!birthDate || !measuredAt) return null;
+	const birth = new Date(`${birthDate}T12:00:00`);
+	const measured = new Date(measuredAt);
+	if (Number.isNaN(birth.getTime()) || Number.isNaN(measured.getTime())) return null;
+	let age = measured.getFullYear() - birth.getFullYear();
+	if (measured.getMonth() < birth.getMonth() || (measured.getMonth() === birth.getMonth() && measured.getDate() < birth.getDate())) age -= 1;
+	return age >= 0 ? age : null;
+}
+
 function SegmentSection({ title, type, segments, statuses, errors, onUpdate }) {
 	return (
 		<section className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -49,16 +59,20 @@ function SegmentInput({ label, value, onChange }) {
 	return <label className="text-xs font-semibold text-slate-700">{label}<input required inputMode="decimal" value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-2 font-normal outline-none focus:ring-2 focus:ring-emerald-400" /></label>;
 }
 
-export default function BodyscanReview({ previewUrl, form, extraction, confirmed, errors, saving, online, onGeneralUpdate, onSegmentUpdate, onConfirm, onSubmit, onRestart }) {
+export default function BodyscanReview({ previewUrl, form, extraction, client, confirmed, errors, saving, online, onGeneralUpdate, onProfileUpdate, onSegmentUpdate, onConfirm, onSubmit, onRestart }) {
 	const [panel, setPanel] = useState('values');
 	const statuses = extraction?.field_statuses ?? {};
 	const grouped = useMemo(() => ({
 		fat: form.segments.map((segment, index) => ({ segment, index })).filter(({ segment }) => segment.type === 'fat'),
 		muscle: form.segments.map((segment, index) => ({ segment, index })).filter(({ segment }) => segment.type === 'muscle'),
 	}), [form.segments]);
-	const incomplete = form.segments.length !== 10 || form.segments.some((segment) => valueFields.some((field) => String(segment[field] ?? '').trim() === ''));
+	const incomplete = !form.profile?.measurement_application
+		|| String(form.profile?.athlete_mode_at_assessment ?? '') === ''
+		|| form.segments.length !== 10
+		|| form.segments.some((segment) => valueFields.some((field) => String(segment[field] ?? '').trim() === ''));
 	const qualityWarnings = [...new Set(extraction?.quality_issues ?? [])];
 	const readingWarnings = [...new Set((extraction?.suspicious_values ?? []).map((item) => item.reason).filter(Boolean))];
+	const measurementAge = ageAtMeasurement(client?.birth_date, form.general.evaluated_at);
 
 	return (
 		<form onSubmit={onSubmit} aria-busy={saving} className="pwa-card p-4 sm:p-5">
@@ -70,6 +84,20 @@ export default function BodyscanReview({ previewUrl, form, extraction, confirmed
 			<div className="mt-4 lg:grid lg:grid-cols-[minmax(0,.7fr)_minmax(0,1.3fr)] lg:gap-5">
 				<div className={`${panel === 'image' ? 'block' : 'hidden'} lg:block`}><div className="sticky top-20 max-h-[75vh] overflow-y-auto rounded-xl border bg-slate-100 p-2"><img src={previewUrl} alt="Relatório Bodyscan Pro original para conferência" className="mx-auto h-auto w-full rounded-lg object-contain" /></div></div>
 				<div className={`${panel === 'values' ? 'block' : 'hidden'} space-y-4 lg:block`}>
+					<section className="rounded-2xl border border-ricosty-200 bg-ricosty-50/40 p-4">
+						<h3 className="font-bold text-slate-950">Perfil usado na medição</h3>
+						<p className="mt-1 text-xs leading-5 text-slate-600">Confirme os mesmos dados configurados no aplicativo da balança. Sexo, idade e altura vêm do cadastro do cliente e serão preservados na avaliação.</p>
+						<div className="mt-3 grid gap-2 sm:grid-cols-3">
+							<ProfileValue label="Sexo" value={client?.biological_sex === 'female' ? 'Feminino' : client?.biological_sex === 'male' ? 'Masculino' : 'Não informado'} />
+							<ProfileValue label="Idade na medição" value={measurementAge !== null ? `${measurementAge} anos` : 'Calculada ao salvar'} />
+							<ProfileValue label="Altura" value={client?.height_cm ? `${String(client.height_cm).replace('.', ',')} cm` : 'Não informada'} />
+						</div>
+						<div className="mt-3 grid gap-3 sm:grid-cols-2">
+							<label className="text-sm font-semibold text-slate-800">Aplicativo de origem<select required value={form.profile?.measurement_application ?? ''} onChange={(event) => onProfileUpdate('measurement_application', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3"><option value="">Selecione após conferir</option><option value="relaxfit">RelaxFit</option><option value="fitdays">Fitdays</option></select>{firstError(errors, 'measurement_application') ? <span className="mt-1 block text-xs text-rose-700">{firstError(errors, 'measurement_application')}</span> : null}</label>
+							<label className="text-sm font-semibold text-slate-800">Modo atleta<select required value={form.profile?.athlete_mode_at_assessment ?? ''} onChange={(event) => onProfileUpdate('athlete_mode_at_assessment', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3"><option value="">Selecione após conferir</option><option value="0">Desativado</option><option value="1">Ativado</option></select>{firstError(errors, 'athlete_mode_at_assessment') ? <span className="mt-1 block text-xs text-rose-700">{firstError(errors, 'athlete_mode_at_assessment')}</span> : null}</label>
+						</div>
+						<p className="mt-3 text-xs font-semibold text-slate-600">Equipamento RM-BD0015A · Manual de referência V1.1222</p>
+					</section>
 					<section className="rounded-2xl border border-slate-200 bg-white p-4"><h3 className="font-bold text-slate-950">Métricas gerais</h3><label className="mt-3 block text-sm font-semibold">Data e hora<input type="datetime-local" required max={localDatetimeNow()} value={form.general.evaluated_at} onChange={(event) => onGeneralUpdate('evaluated_at', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label><div className="mt-3 grid gap-2 sm:grid-cols-2">{Object.entries(relaxmedicMetricLabels).map(([field, label]) => { const flagged = ['missing', 'unrecognized', 'suspicious'].includes(statuses[`metrics.${field}`]); return <label key={field} className={`rounded-xl border p-3 text-xs font-semibold ${flagged ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}`}>{label}{flagged ? <span className="ml-2 text-[10px] font-bold text-amber-800">CONFERIR</span> : null}{field === 'obesity_level' ? <select required value={form.general[field]} onChange={(event) => onGeneralUpdate(field, event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 font-normal"><option value="">Selecione após conferir</option>{(extraction?.allowed_values?.obesity_level ?? []).map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input required type="text" inputMode={relaxmedicTextFields.includes(field) ? 'text' : relaxmedicIntegerFields.includes(field) ? 'numeric' : 'decimal'} value={form.general[field]} onChange={(event) => onGeneralUpdate(field, event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 font-normal" />}{firstError(errors, field) ? <span className="mt-1 block text-rose-700">{firstError(errors, field)}</span> : null}</label>; })}</div></section>
 					<div className="grid gap-4 xl:grid-cols-2"><SegmentalBodyMap measurements={form.segments} type="fat" /><SegmentalBodyMap measurements={form.segments} type="muscle" /></div>
 					<SegmentSection title="Gordura segmentar" type="fat" segments={grouped.fat} statuses={statuses} errors={errors} onUpdate={onSegmentUpdate} />
@@ -77,9 +105,13 @@ export default function BodyscanReview({ previewUrl, form, extraction, confirmed
 					<label className="block text-sm font-semibold">Observações<input maxLength={2000} value={form.general.notes} onChange={(event) => onGeneralUpdate('notes', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label>
 				</div>
 			</div>
-			<label className="mt-5 flex items-start gap-3 rounded-2xl border border-ricosty-200 bg-ricosty-50 p-4 text-sm font-semibold"><input type="checkbox" checked={confirmed} disabled={incomplete} onChange={(event) => onConfirm(event.target.checked)} className="mt-0.5 h-5 w-5" /><span>Comparei a imagem original e confirmo as métricas gerais, os cinco segmentos de gordura e os cinco segmentos musculares.</span></label>
+			<label className="mt-5 flex items-start gap-3 rounded-2xl border border-ricosty-200 bg-ricosty-50 p-4 text-sm font-semibold"><input type="checkbox" checked={confirmed} disabled={incomplete} onChange={(event) => onConfirm(event.target.checked)} className="mt-0.5 h-5 w-5" /><span>Comparei a imagem original e confirmo o perfil usado na medição, as métricas gerais, os cinco segmentos de gordura e os cinco segmentos musculares.</span></label>
 			{firstError(errors, 'source_metadata') || firstError(errors, 'bodyscan_review_confirmed') || firstError(errors, 'segmental_measurements') ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-700">{firstError(errors, 'source_metadata') ?? firstError(errors, 'bodyscan_review_confirmed') ?? firstError(errors, 'segmental_measurements')}</p> : null}
 			<PwaButton type="submit" disabled={incomplete || !confirmed || saving || !online} loading={saving} icon="check" className="mt-4 w-full">{saving ? 'Criando avaliação...' : 'Confirmar e criar avaliação'}</PwaButton>
 		</form>
 	);
+}
+
+function ProfileValue({ label, value }) {
+	return <div className="rounded-xl border border-white bg-white px-3 py-2"><span className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</span><strong className="text-sm text-slate-900">{value}</strong></div>;
 }

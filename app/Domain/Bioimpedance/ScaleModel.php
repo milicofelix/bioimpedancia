@@ -16,6 +16,19 @@ final class ScaleModel
 
     public const BODYSCAN_PRO_NAME = 'Bodyscan Pro';
 
+    public const BODYSCAN_PRO_MODEL_CODE = 'RM-BD0015A';
+
+    public const BODYSCAN_PRO_MANUAL_VERSION = 'V1.1222';
+
+    public const BODYSCAN_APPLICATION_RELAXFIT = 'relaxfit';
+
+    public const BODYSCAN_APPLICATION_FITDAYS = 'fitdays';
+
+    public const BODYSCAN_APPLICATIONS = [
+        self::BODYSCAN_APPLICATION_RELAXFIT,
+        self::BODYSCAN_APPLICATION_FITDAYS,
+    ];
+
     public const CAPABILITY_MANUAL_ENTRY = 'manual_entry';
 
     public const CAPABILITY_IMAGE_IMPORT = 'image_import';

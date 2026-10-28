@@ -17,6 +17,10 @@ export const segmentClassificationOptions = [
 export function bodyscanFormFromExtraction(extraction) {
 	return {
 		general: assessmentFromExtraction(extraction),
+		profile: {
+			athlete_mode_at_assessment: '',
+			measurement_application: extraction?.source_application ?? extraction?.image?.source_application ?? '',
+		},
 		segments: (extraction?.segmental_measurements ?? []).map((segment) => ({
 			...segment,
 			mass_kg: displayNumber(segment.mass_kg),
@@ -34,10 +38,14 @@ export function updateBodyscanSegment(segments, index, field, value) {
 }
 
 export function bodyscanAssessmentPayload(form, clientId, sourceMetadata, confirmed) {
+	const athleteMode = form.profile?.athlete_mode_at_assessment ?? '';
+
 	return {
 		...relaxmedicAssessmentPayload(form.general, clientId, sourceMetadata, false),
 		relaxmedic_review_confirmed: undefined,
 		bodyscan_review_confirmed: confirmed,
+		athlete_mode_at_assessment: athleteMode === '' ? '' : athleteMode === '1',
+		measurement_application: form.profile?.measurement_application ?? '',
 		segmental_measurements: form.segments.map(({ type, region, side, mass_kg, reference_percentage, classification, reference_min_percentage, reference_max_percentage }) => ({
 			type, region, side, classification,
 			mass_kg: normalizeDecimal(mass_kg),
