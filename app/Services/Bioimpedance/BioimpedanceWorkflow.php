@@ -838,6 +838,13 @@ class BioimpedanceWorkflow
 
     private function validateBodyscanReview(Request $request, BodyscanProImageProcessor $processor): array
     {
+        $submittedMetadata = $request->input('source_metadata');
+        if (is_array($submittedMetadata) && ! $processor->verifyMetadata($submittedMetadata)) {
+            throw ValidationException::withMessages([
+                'source_metadata' => 'A extração Bodyscan foi alterada. Processe novamente a imagem.',
+            ]);
+        }
+
         $validated = $request->validate([
             'bodyscan_review_confirmed' => ['accepted'],
             'source_metadata' => ['required', 'array'],
@@ -863,6 +870,7 @@ class BioimpedanceWorkflow
             'source_metadata.side_consistency.left_marker_visible' => ['required', 'boolean'],
             'source_metadata.side_consistency.right_marker_visible' => ['required', 'boolean'],
             'source_metadata.side_consistency.possible_swap' => ['required', 'boolean'],
+            'source_metadata.side_consistency.reason' => ['nullable', 'string', 'max:500'],
             'source_metadata.signature' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/'],
             'segmental_measurements' => ['required', 'array', 'size:10'],
             'segmental_measurements.*.type' => ['required', Rule::in(BioimpedanceSegmentalMeasurement::TYPES)],
@@ -879,10 +887,6 @@ class BioimpedanceWorkflow
             'segmental_measurements.size' => 'Confira as cinco regiões de gordura e as cinco regiões musculares.',
             'segmental_measurements.*.required' => 'Todos os valores segmentares precisam ser conferidos e preenchidos.',
         ]);
-
-        if (! $processor->verifyMetadata($validated['source_metadata'])) {
-            throw ValidationException::withMessages(['source_metadata' => 'A extração Bodyscan foi alterada ou expirou. Processe novamente a imagem.']);
-        }
 
         if (! $validated['source_metadata']['side_consistency']['left_marker_visible']
             || ! $validated['source_metadata']['side_consistency']['right_marker_visible']) {

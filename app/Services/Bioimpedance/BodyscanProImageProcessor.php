@@ -66,6 +66,7 @@ class BodyscanProImageProcessor
     public function __construct(
         private readonly BioimpedanceJpegInspector $jpegInspector,
         private readonly RelaxmedicValueNormalizer $valueNormalizer,
+        private readonly BodyscanSegmentalOcrCompleter $segmentalCompleter,
     ) {}
 
     public function process(UploadedFile $image): array
@@ -108,6 +109,12 @@ class BodyscanProImageProcessor
         if (! is_array($payload)) {
             throw new RuntimeException('O serviço de leitura retornou uma resposta inválida.');
         }
+
+        $payload['segmental_measurements'] = $this->segmentalCompleter->complete(
+            $contents,
+            $processorModel,
+            is_array($payload['segmental_measurements'] ?? null) ? $payload['segmental_measurements'] : [],
+        );
 
         $result = $this->normalize($payload, $image);
         $imageMetadata = [
@@ -447,9 +454,9 @@ class BodyscanProImageProcessor
     private function normalizeClassification(?string $classification): ?string
     {
         return match ($this->normalizedLabel($classification ?? '')) {
-            'baixo', 'baixa' => Segment::CLASSIFICATION_LOW,
-            'padrao', 'normal' => Segment::CLASSIFICATION_STANDARD,
-            'alto', 'alta' => Segment::CLASSIFICATION_HIGH,
+            'baixo', 'baixa', 'low' => Segment::CLASSIFICATION_LOW,
+            'padrao', 'normal', 'standard' => Segment::CLASSIFICATION_STANDARD,
+            'alto', 'alta', 'high' => Segment::CLASSIFICATION_HIGH,
             default => null,
         };
     }

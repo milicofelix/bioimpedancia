@@ -17,7 +17,9 @@ const states = {
 
 function number(value, suffix) {
 	if (value === null || value === undefined || value === '') return '—';
-	return `${Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}${suffix}`;
+	const numericValue = Number(value);
+	if (!Number.isFinite(numericValue)) return '—';
+	return `${numericValue.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}${suffix}`;
 }
 
 export default function SegmentalBodyMap({ measurements = [], type = 'fat', title }) {
