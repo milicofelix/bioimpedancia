@@ -18,8 +18,8 @@ class BioimpedanceClinicSetting extends Model
     public const SCALE_MODEL_NAMES = ScaleModel::NAMES;
 
     public const DEFAULTS = [
-        'display_name' => 'BioFlow Análise Corporal',
-        'legal_name' => 'BioFlow Análise Corporal',
+        'display_name' => 'Vita Scan Análise clínica Biológica',
+        'legal_name' => 'Vita Scan Análise clínica Biológica',
         'document' => null,
         'phone' => null,
         'whatsapp' => null,
@@ -31,7 +31,7 @@ class BioimpedanceClinicSetting extends Model
         'secondary_color' => '#4a4a4a',
         'logo_url' => '/images/brand/ricosty-logo.png',
         'contact' => 'Avaliação corporal e acompanhamento estético',
-        'footer_text' => 'BioFlow Análise Corporal - Avaliação corporal e acompanhamento estético',
+        'footer_text' => 'Vita Scan Análise clínica Biológica - Avaliação corporal e acompanhamento estético',
         'technical_notice' => 'Os resultados de bioimpedância são estimativas e podem variar conforme hidratação, alimentação, ciclo hormonal, medicamentos e condições de medição. Este documento não substitui avaliação médica ou nutricional.',
         'scale_model' => self::SCALE_MODEL_BODYSCAN_PRO,
     ];

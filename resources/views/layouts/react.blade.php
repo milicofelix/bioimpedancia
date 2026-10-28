@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>BioFlow Análise Corporal</title>
+        <title>Vita Scan — Análise clínica Biológica</title>
         <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png">
 
         @stack('head')

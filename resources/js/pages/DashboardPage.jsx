@@ -22,7 +22,7 @@ import KnowledgeDocumentsPanel from '../components/bioimpedance/KnowledgeDocumen
 import BodyscanReview from '../pwa/features/assessment/BodyscanReview';
 import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocolComplete, emptyBodyscanProtocol, updateBodyscanSegment } from '../pwa/features/assessment/bodyscanAssessmentForm';
 import BodyscanProtocolChecklist from '../pwa/features/assessment/BodyscanProtocolChecklist';
-import BioFlowBrand from '../components/brand/BioFlowBrand';
+import VitaScanBrand from '../components/brand/VitaScanBrand';
 
 const emptyClient = {
 	full_name: '',
@@ -66,8 +66,8 @@ const emptyAssessment = {
 };
 
 const defaultClinic = {
-	display_name: 'BioFlow Análise Corporal',
-	legal_name: 'BioFlow Análise Corporal',
+	display_name: 'Vita Scan Análise clínica Biológica',
+	legal_name: 'Vita Scan Análise clínica Biológica',
 	document: '',
 	phone: '',
 	whatsapp: '',
@@ -79,7 +79,7 @@ const defaultClinic = {
 	secondary_color: '#4a4a4a',
 	logo_url: '/images/brand/ricosty-logo.png',
 	contact: 'Avaliação corporal e acompanhamento estético',
-	footer_text: 'BioFlow Análise Corporal - Avaliação corporal e acompanhamento estético',
+	footer_text: 'Vita Scan Análise clínica Biológica - Avaliação corporal e acompanhamento estético',
 	technical_notice: 'Os resultados de bioimpedância são estimativas e podem variar conforme hidratação, alimentação, ciclo hormonal, medicamentos e condições de medição. Este documento não substitui avaliação médica ou nutricional.',
 	scale_model: 'relaxmedic_bodyscan_pro',
 };
@@ -1249,7 +1249,7 @@ export default function DashboardPage({ userName }) {
 			<header className="no-print border-b border-slate-200 bg-white">
 				<div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
 					<div className="flex items-center gap-4">
-						<BioFlowBrand headingLevel="h1" showTagline={false} />
+						<VitaScanBrand headingLevel="h1" showTagline={false} />
 						<div>
 							<p className="text-sm font-semibold text-slate-950">{clinic.display_name}</p>
 							<p className="text-xs text-slate-500">{clinic.contact}</p>
@@ -2133,7 +2133,7 @@ function Report({ clinic, client, assessment, professional }) {
 			<header className="report-header relative flex flex-col gap-5 overflow-hidden border-b border-rose-200 bg-gradient-to-br from-rose-50 via-white to-stone-100 px-8 py-8 text-slate-900 sm:flex-row sm:items-center sm:justify-between">
 				<div className="pointer-events-none absolute inset-x-0 top-0 h-2" style={{ background: `linear-gradient(90deg, ${clinic.primary_color}, #f2c7cf, ${clinic.secondary_color})` }}></div>
 				<div className="flex items-center gap-5">
-					<BioFlowBrand headingLevel="h1" size="large" />
+					<VitaScanBrand headingLevel="h1" size="large" />
 				</div>
 				<div className="text-left sm:text-right">
 					<p className="text-xl font-bold uppercase tracking-wide" style={{ color: clinic.secondary_color }}>Relatório de bioimpedância</p>

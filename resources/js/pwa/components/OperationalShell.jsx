@@ -6,7 +6,7 @@ import useServiceWorkerUpdate from '../hooks/useServiceWorkerUpdate';
 import OfflineNotice from './OfflineNotice';
 import PwaUpdateNotice from './PwaUpdateNotice';
 import PwaButton from './ui/PwaButton';
-import BioFlowBrand from '../../components/brand/BioFlowBrand';
+import VitaScanBrand from '../../components/brand/VitaScanBrand';
 
 const navigation = [
 	{ section: 'clientes', label: 'Clientes', icon: 'users' },
@@ -34,7 +34,7 @@ export default function OperationalShell({ activeSection, clinic, currentUser, o
 			<header className="pwa-safe-top pwa-safe-inline sticky top-0 z-20 border-b border-ricosty-200/70 bg-white/90 pb-3 backdrop-blur-xl">
 				<div className="mx-auto flex max-w-xl items-center justify-between gap-3">
 					<div className="flex min-w-0 items-center gap-2.5">
-						<BioFlowBrand headingLevel="h1" size="compact" showTagline={false} className="shrink-0" />
+						<VitaScanBrand headingLevel="h1" size="compact" showTagline={false} className="shrink-0" />
 						<div className="hidden min-w-0 border-l border-slate-200 pl-2.5 sm:block">
 							<p className="break-words text-xs font-bold leading-tight text-ricosty-950">{clinic?.display_name ?? 'Ricosty'}</p>
 							<p className="break-words text-[10px] font-medium leading-tight text-slate-600">Atendimento operacional</p>

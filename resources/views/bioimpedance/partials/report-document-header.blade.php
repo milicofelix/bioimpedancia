@@ -4,8 +4,8 @@
             <img class="document-logo" src="{{ $clinic['logo_data_uri'] }}" alt="" aria-hidden="true">
         @endif
         <div class="document-brand-copy">
-            <h1 class="document-brand-name"><span>Bio</span><em>Flow</em></h1>
-            <p class="document-brand-subtitle">Análise corporal</p>
+            <h1 class="document-brand-name"><span>Vita </span><em>Scan</em></h1>
+            <p class="document-brand-subtitle">Análise clínica Biológica</p>
         </div>
     </div>
     <div class="document-identification">
