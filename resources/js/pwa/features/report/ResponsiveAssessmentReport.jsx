@@ -4,6 +4,7 @@ import { formatMetric, metricDelta, metricsForAssessment } from './reportMetrics
 import PwaIcon from '../../components/ui/PwaIcon';
 import SegmentalBodyMap from '../../../components/bioimpedance/SegmentalBodyMap';
 import SegmentalComparison from '../../../components/bioimpedance/SegmentalComparison';
+import BioFlowBrand from '../../../components/brand/BioFlowBrand';
 
 export default function ResponsiveAssessmentReport({ client, assessment, previous }) {
 	const metrics = metricsForAssessment(assessment);
@@ -17,7 +18,7 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 		<article className="pwa-card overflow-hidden">
 			<header className="bg-white">
 				<div className="flex flex-wrap items-center justify-between gap-4 border-b border-ricosty-100 px-5 py-4 sm:px-6">
-					<img src="/images/brand/ricosty-logo.png" alt="Ricosty Emagrecimento e Estética" className="h-11 w-32 object-contain object-left" />
+					<BioFlowBrand headingLevel="h2" size="compact" showTagline={false} />
 					<div className="text-right"><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ricosty-700">Documento clínico</p><p className="mt-1 text-xs font-semibold text-slate-600">Avaliação #{assessment.id}</p></div>
 				</div>
 				<div className="relative overflow-hidden bg-gradient-to-br from-ricosty-950 via-ricosty-900 to-amber-800 p-5 text-white sm:p-6">

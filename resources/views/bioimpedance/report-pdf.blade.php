@@ -9,8 +9,12 @@
         body { margin: 0; color: #172033; font-family: DejaVu Sans, Arial, sans-serif; font-size: 9px; line-height: 1.4; }
         .document-header { position: fixed; top: -63px; left: 0; right: 0; height: 52px; padding: 6px 12px; border-bottom: 1px solid #ead5da; background: #fff; }
         .document-brand, .document-identification { display: inline-block; width: 49%; vertical-align: middle; }
-        .document-logo { width: 150px; max-height: 40px; object-fit: contain; }
-        .document-brand-name { font-size: 16px; }
+        .document-logo { display: inline-block; width: 28px; height: 40px; object-fit: contain; vertical-align: middle; }
+        .document-brand-copy { display: inline-block; margin-left: 6px; vertical-align: middle; }
+        .document-brand-name { margin: 0; color: #052f59; font-size: 16px; font-weight: 700; line-height: 1; letter-spacing: -1px; }
+        .document-brand-name span { color: #052f59; }
+        .document-brand-name em { color: #159fbd; font-style: normal; }
+        .document-brand-subtitle { margin: 3px 0 0; color: #526172; font-size: 5px; font-weight: 700; letter-spacing: 1.2px; line-height: 1; text-transform: uppercase; }
         .document-identification { color: #667085; font-size: 7px; text-align: right; }
         .document-identification strong { color: #172033; font-size: 9px; }
         .document-footer { position: fixed; bottom: -31px; left: 0; right: 0; height: 24px; padding: 6px 12px; border-top: 1px solid #ead5da; color: #667085; font-size: 7px; background: #fff; }

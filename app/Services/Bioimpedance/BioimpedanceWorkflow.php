@@ -1467,8 +1467,7 @@ class BioimpedanceWorkflow
 
     private function logoDataUri(): ?string
     {
-        $logoUrl = BioimpedanceClinicSetting::current()->logo_url ?? BioimpedanceClinicSetting::DEFAULTS['logo_url'];
-        $path = public_path(ltrim((string) parse_url($logoUrl, PHP_URL_PATH), '/'));
+        $path = public_path('images/brand/bioflow-mark.png');
 
         if (! is_file($path)) {
             return null;

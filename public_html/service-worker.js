@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'ricosty-pwa-v3';
+const CACHE_VERSION = 'ricosty-pwa-v5';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const OFFLINE_URL = '/offline.html';
 const PRECACHE_URLS = [
@@ -7,8 +7,9 @@ const PRECACHE_URLS = [
     '/pwa/icons/icon-192.png',
     '/pwa/icons/icon-512.png',
     '/pwa/icons/icon-maskable-512.png',
-    '/pwa/icons/icon-monochrome.svg',
     '/pwa/icons/apple-touch-icon.png',
+    '/images/brand/ricosty-logo.png',
+    '/images/brand/bioflow-mark.png',
 ];
 
 const NEVER_CACHE_PREFIXES = [

@@ -1,4 +1,4 @@
-# Ricosty Emagrecimento e Estética
+# BioFlow Análise Corporal
 
 Sistema Laravel + React para cadastro de clientes, avaliações de bioimpedância Omron HBF-514C, relatório PDF profissional, histórico corporal, compartilhamento seguro e assistente de observações fundamentado em referências parametrizadas.
 
