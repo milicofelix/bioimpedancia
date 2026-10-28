@@ -5,7 +5,6 @@ import PwaIcon from '../../components/ui/PwaIcon';
 
 export default function ResponsiveAssessmentReport({ client, assessment, previous }) {
 	const metrics = metricsForAssessment(assessment);
-	const indicatorReferences = Object.values(assessment.analysis?.indicators ?? {}).map((indicator) => indicator?.reference_range).filter(Boolean);
 	const primaryFields = new Set(['weight_kg', 'calculated_bmi', 'scale_bmi', 'body_fat_percentage']);
 	const primaryMetrics = metrics.filter((metric) => primaryFields.has(metric.field)).slice(0, 3);
 	const secondaryMetrics = metrics.filter((metric) => !primaryMetrics.includes(metric));
@@ -45,7 +44,6 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 				<div className="mt-3 grid gap-3 sm:grid-cols-2">{secondaryMetrics.map((metric) => <div key={metric.field} className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{metric.label}</p><p className="mt-1 break-words text-base font-bold text-slate-950">{formatMetric(assessment[metric.field], metric)}</p>{metric.type ? <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-sky-700">{metric.type}</p> : null}{metric.note ? <p className="mt-1 text-xs leading-5 text-slate-600">{metric.note}</p> : null}</div>)}</div>
 
 				{assessment.device_model === 'Relaxmedic' ? <section className="mt-5 rounded-xl border border-sky-200 bg-sky-50 p-4 text-xs leading-5 text-sky-950"><strong>Como interpretar:</strong> os dados de composição corporal são estimativas produzidas por algoritmos do equipamento. Coerência matemática entre massa gorda, massa magra e peso não comprova precisão fisiológica. Compare tendências em condições semelhantes e não use IMC ou “peso ideal” isoladamente para definir objetivos.</section> : null}
-				{indicatorReferences.length ? <section className="mt-3 rounded-xl border border-slate-200 bg-white p-4 text-xs leading-5 text-slate-700"><strong>Referências do equipamento:</strong><ul className="mt-1 list-disc pl-5">{indicatorReferences.map((reference) => <li key={reference}>{reference}</li>)}</ul></section> : null}
 				{assessment.age_at_assessment >= 60 ? <section className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-950"><strong>Atenção à funcionalidade:</strong> em pessoas com 60 anos ou mais, o planejamento deve considerar preservação de massa, força, equilíbrio, mobilidade e autonomia. O percentual muscular estimado não comprova, isoladamente, força ou função preservada.</section> : null}
 
 				<section className="mt-5 rounded-2xl border border-ricosty-100 bg-ricosty-50/60 p-4">
@@ -55,8 +53,15 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 							<p className="mt-1 text-xs text-slate-500">Anterior: {formatDate(previous.evaluated_at)} · {previous.device_model}</p>
 							<div className="mt-3 space-y-2">
 								{metrics.filter((metric) => !metric.text && previous[metric.field] !== null && previous[metric.field] !== undefined).map((metric) => (
-									<div key={metric.field} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg bg-white px-3 py-2 text-xs">
-										<span className="font-semibold text-slate-800">{metric.label}<span className="block font-normal text-slate-600">Anterior: {formatMetric(previous[metric.field], metric)}</span></span>
+									<div key={metric.field} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg bg-white px-3 py-3 text-xs">
+										<div>
+											<p className="font-semibold text-slate-800">{metric.label}</p>
+											<p className="mt-1 flex flex-wrap items-center gap-2 text-slate-600">
+												<span><span className="mr-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">Anterior</span>{formatMetric(previous[metric.field], metric)}</span>
+												<span aria-hidden="true" className="text-ricosty-500">→</span>
+												<strong className="text-slate-950"><span className="mr-1 text-[10px] uppercase tracking-wide text-slate-500">Atual</span>{formatMetric(assessment[metric.field], metric)}</strong>
+											</p>
+										</div>
 										<DeltaBadge current={assessment[metric.field]} previous={previous[metric.field]} value={metricDelta(assessment[metric.field], previous[metric.field], metric)} />
 									</div>
 								))}
