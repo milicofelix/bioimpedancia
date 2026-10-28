@@ -2,6 +2,7 @@
 
 namespace App\Services\Bioimpedance;
 
+use App\Domain\Bioimpedance\ScaleModel;
 use App\Models\Bioimpedance\BioimpedanceAiAnalysisOutput;
 use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceClient;
@@ -159,6 +160,9 @@ class BioimpedanceWorkspacePresenter
             'device_model_code' => $assessment->device_model_code,
             'device_manual_version' => $assessment->device_manual_version,
             'measurement_protocol' => $assessment->measurement_protocol,
+            'device_technical_specifications' => $assessment->device_model === ScaleModel::BODYSCAN_PRO_NAME
+                ? ScaleModel::bodyscanTechnicalSpecifications()
+                : null,
             'segmental_measurements' => $assessment->segmentalMeasurements
                 ->sortBy(fn ($measurement) => $measurement->type.'|'.$measurement->region.'|'.$measurement->side)
                 ->values()

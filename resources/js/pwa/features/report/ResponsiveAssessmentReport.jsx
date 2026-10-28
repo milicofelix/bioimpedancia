@@ -10,6 +10,7 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 	const primaryFields = new Set(['weight_kg', 'calculated_bmi', 'scale_bmi', 'body_fat_percentage']);
 	const primaryMetrics = metrics.filter((metric) => primaryFields.has(metric.field)).slice(0, 3);
 	const secondaryMetrics = metrics.filter((metric) => !primaryMetrics.includes(metric));
+	const specifications = assessment.device_technical_specifications;
 
 	return (
 		<article className="pwa-card overflow-hidden">
@@ -31,6 +32,7 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 			</header>
 
 			<div className="p-4 sm:p-5">
+				{specifications ? <p className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-700"><strong>Especificações do equipamento:</strong> {specifications.electrodes} eletrodos · dupla frequência de {specifications.frequencies_khz.join(' kHz + ')} kHz · temperatura operacional de {specifications.minimum_temperature_c} °C a {specifications.maximum_temperature_c} °C. O manual não informa margem de erro; os valores são apresentados conforme o relatório importado.</p> : null}
 				<p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-ricosty-600">Principais resultados</p>
 				<div className="grid gap-3 sm:grid-cols-3">
 					{primaryMetrics.map((metric) => (

@@ -867,6 +867,7 @@ class BioimpedanceWorkflow
             'source_metadata.processor_model' => ['required', 'string', 'max:100'],
             'source_metadata.reference_version' => ['required', 'string', 'max:40'],
             'source_metadata.source_application' => ['nullable', Rule::in(ScaleModel::BODYSCAN_APPLICATIONS)],
+            'source_metadata.weight_unit' => ['required', Rule::in(['kg'])],
             'source_metadata.measured_at' => ['nullable', 'date'],
             'source_metadata.metrics' => ['required', 'array'],
             'source_metadata.segmental_measurements' => ['required', 'array', 'size:10'],
@@ -894,6 +895,8 @@ class BioimpedanceWorkflow
         ], [
             'bodyscan_review_confirmed.accepted' => 'Confirme que todos os dados foram comparados com a imagem.',
             'source_metadata.required' => 'Processe novamente a imagem Bodyscan Pro antes de salvar.',
+            'source_metadata.weight_unit.required' => 'A unidade do peso precisa estar identificada como kg.',
+            'source_metadata.weight_unit.in' => 'O sistema aceita relatórios Bodyscan somente em kg. Gere novamente o relatório nessa unidade.',
             'segmental_measurements.size' => 'Confira as cinco regiões de gordura e as cinco regiões musculares.',
             'segmental_measurements.*.required' => 'Todos os valores segmentares precisam ser conferidos e preenchidos.',
             'measurement_protocol.required' => 'Confirme o protocolo da medição antes de importar o relatório.',
@@ -971,6 +974,7 @@ class BioimpedanceWorkflow
             'processor_model' => $validated['source_metadata']['processor_model'],
             'reference_version' => $validated['source_metadata']['reference_version'],
             'extracted_application' => $validated['source_metadata']['source_application'] ?? null,
+            'weight_unit' => $validated['source_metadata']['weight_unit'],
             'confirmed_application' => $validated['measurement_application'],
             'athlete_mode_at_assessment' => (bool) $validated['athlete_mode_at_assessment'],
             'device_model_code' => ScaleModel::BODYSCAN_PRO_MODEL_CODE,
@@ -1005,6 +1009,12 @@ class BioimpedanceWorkflow
                 BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDIC,
                 BioimpedanceClinicSetting::SCALE_MODEL_BODYSCAN_PRO,
             ], true);
+        $isBodyscan = $deviceModel !== null
+            ? $deviceModel === BioimpedanceClinicSetting::SCALE_MODEL_NAMES[BioimpedanceClinicSetting::SCALE_MODEL_BODYSCAN_PRO]
+            : BioimpedanceClinicSetting::current()->scale_model === BioimpedanceClinicSetting::SCALE_MODEL_BODYSCAN_PRO;
+        $weightRange = $isBodyscan
+            ? 'between:'.ScaleModel::BODYSCAN_MIN_WEIGHT_KG.','.ScaleModel::BODYSCAN_MAX_WEIGHT_KG
+            : ($isRelaxmedic ? 'between:2,300' : 'between:2,150');
 
         $request->merge([
             'weight_kg' => $this->normalizeDecimal($request->input('weight_kg')),
@@ -1031,7 +1041,7 @@ class BioimpedanceWorkflow
         return $request->validate([
             'bioimpedance_client_id' => [$requireClient ? 'required' : 'sometimes', 'exists:bioimpedance_clients,id'],
             'evaluated_at' => ['required', 'date', 'before_or_equal:now'],
-            'weight_kg' => ['required', 'numeric', $isRelaxmedic ? 'between:2,300' : 'between:2,150'],
+            'weight_kg' => ['required', 'numeric', $weightRange],
             'scale_bmi' => ['nullable', 'numeric', 'between:7,90'],
             'body_fat_percentage' => ['nullable', 'numeric', $isRelaxmedic ? 'between:0,100' : 'between:5,60'],
             'skeletal_muscle_percentage' => ['nullable', 'numeric', $isRelaxmedic ? 'between:0,100' : 'between:5,50'],
@@ -1060,7 +1070,9 @@ class BioimpedanceWorkflow
             'evaluated_at.before_or_equal' => 'A avaliação não pode ser registrada no futuro. Confira a data e o horário informados.',
             'weight_kg.required' => 'Informe o peso exibido pela balança.',
             'weight_kg.numeric' => 'Informe o peso em kg. Exemplo: 95,2.',
-            'weight_kg.between' => $isRelaxmedic ? 'O peso deve estar entre 2 kg e 300 kg.' : 'O peso deve estar entre 2 kg e 150 kg para a Omron HBF-514C.',
+            'weight_kg.between' => $isBodyscan
+                ? 'O peso deve estar entre 5 kg e 180 kg para a Bodyscan Pro.'
+                : ($isRelaxmedic ? 'O peso deve estar entre 2 kg e 300 kg.' : 'O peso deve estar entre 2 kg e 150 kg para a Omron HBF-514C.'),
             'scale_bmi.numeric' => 'Informe o IMC da balança com número válido. Exemplo: 31,4.',
             'scale_bmi.between' => 'O IMC da balança deve estar entre 7 e 90.',
             'body_fat_percentage.numeric' => 'Informe a gordura corporal em percentual. Exemplo: 20,5.',

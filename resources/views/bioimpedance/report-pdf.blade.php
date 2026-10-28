@@ -127,6 +127,7 @@
         && ! in_array(mb_strtolower($deviceModel), $genericDeviceModels, true);
     $measurementApplicationLabels = ['relaxfit' => 'RelaxFit', 'fitdays' => 'Fitdays'];
     $measurementApplication = $measurementApplicationLabels[$assessment['measurement_application'] ?? ''] ?? null;
+    $deviceSpecifications = $assessment['device_technical_specifications'] ?? [];
     $displayClassification = fn ($indicator, $fallback = '-') => $indicator['classification'] ?? $fallback;
     $executiveSummary = str_replace(
         'a referência de classificação Relaxmedic não está cadastrada',
@@ -213,7 +214,7 @@
         <table class="grid"><tr>
             <td class="box"><div class="label">Índice de idade corporal do aparelho</div><div class="metric-small">{{ $assessment['body_age'] ?? '-' }} anos</div><div class="muted">Valor importado do equipamento; não é idade cronológica, biológica ou diagnóstico.</div></td>
             <td class="box"><div class="label">Metabolismo basal</div><div class="metric-small">{{ $assessment['resting_metabolism_kcal'] ? number_format($assessment['resting_metabolism_kcal'], 0, ',', '.') : '-' }} kcal/dia</div><div class="muted">Não corresponde ao gasto energético total nem à recomendação de consumo.</div></td>
-            <td class="box"><div class="label">Equipamento</div><div class="metric-small">{{ $manufacturer }}</div><div class="muted">@if($assessment['device_model_code'] ?? null)Modelo {{ $assessment['device_model_code'] }} · @elseif($hasSpecificDeviceModel)Modelo {{ $deviceModel }} · @endif Referência {{ $assessment['reference_version'] ?? ($reference['classification_version'] ?? '1.0.0') }}@if($assessment['device_manual_version'] ?? null) · Manual {{ $assessment['device_manual_version'] }}@endif @if($measurementApplication)<br>Origem {{ $measurementApplication }} · Modo atleta {{ ($assessment['athlete_mode_at_assessment'] ?? false) ? 'ativado' : 'desativado' }}@endif</div></td>
+            <td class="box"><div class="label">Equipamento</div><div class="metric-small">{{ $manufacturer }}</div><div class="muted">@if($assessment['device_model_code'] ?? null)Modelo {{ $assessment['device_model_code'] }} · @elseif($hasSpecificDeviceModel)Modelo {{ $deviceModel }} · @endif Referência {{ $assessment['reference_version'] ?? ($reference['classification_version'] ?? '1.0.0') }}@if($assessment['device_manual_version'] ?? null) · Manual {{ $assessment['device_manual_version'] }}@endif @if($measurementApplication)<br>Origem {{ $measurementApplication }} · Modo atleta {{ ($assessment['athlete_mode_at_assessment'] ?? false) ? 'ativado' : 'desativado' }}@endif @if($isBodyscan && $deviceSpecifications)<br>{{ $deviceSpecifications['electrodes'] }} eletrodos · Dupla frequência: {{ implode(' kHz + ', $deviceSpecifications['frequencies_khz']) }} kHz · Operação: {{ $deviceSpecifications['minimum_temperature_c'] }} °C a {{ $deviceSpecifications['maximum_temperature_c'] }} °C@endif</div></td>
         </tr></table>
     </div>
 </section>

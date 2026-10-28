@@ -20,6 +20,18 @@ final class ScaleModel
 
     public const BODYSCAN_PRO_MANUAL_VERSION = 'V1.1222';
 
+    public const BODYSCAN_MIN_WEIGHT_KG = 5;
+
+    public const BODYSCAN_MAX_WEIGHT_KG = 180;
+
+    public const BODYSCAN_ELECTRODES = 8;
+
+    public const BODYSCAN_FREQUENCIES_KHZ = [20, 100];
+
+    public const BODYSCAN_MIN_TEMPERATURE_C = 5;
+
+    public const BODYSCAN_MAX_TEMPERATURE_C = 35;
+
     public const BODYSCAN_APPLICATION_RELAXFIT = 'relaxfit';
 
     public const BODYSCAN_APPLICATION_FITDAYS = 'fitdays';
@@ -102,5 +114,20 @@ final class ScaleModel
     public static function supports(string $model, string $capability): bool
     {
         return in_array($capability, self::capabilities($model), true);
+    }
+
+    public static function bodyscanTechnicalSpecifications(): array
+    {
+        return [
+            'minimum_weight_kg' => self::BODYSCAN_MIN_WEIGHT_KG,
+            'maximum_weight_kg' => self::BODYSCAN_MAX_WEIGHT_KG,
+            'electrodes' => self::BODYSCAN_ELECTRODES,
+            'frequencies_khz' => self::BODYSCAN_FREQUENCIES_KHZ,
+            'minimum_temperature_c' => self::BODYSCAN_MIN_TEMPERATURE_C,
+            'maximum_temperature_c' => self::BODYSCAN_MAX_TEMPERATURE_C,
+            'supported_weight_units' => ['kg', 'lb', 'stone'],
+            'imported_weight_unit' => 'kg',
+            'accuracy_margin_documented' => false,
+        ];
     }
 }

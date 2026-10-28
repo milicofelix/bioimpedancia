@@ -36,7 +36,7 @@ class BodyscanProImageProcessor
     ];
 
     private const NUMERIC_RANGES = [
-        'weight_kg' => [2, 300],
+        'weight_kg' => [ScaleModel::BODYSCAN_MIN_WEIGHT_KG, ScaleModel::BODYSCAN_MAX_WEIGHT_KG],
         'scale_bmi' => [7, 90],
         'body_fat_percentage' => [0, 100],
         'muscle_rate_percentage' => [0, 100],
@@ -129,6 +129,7 @@ class BodyscanProImageProcessor
             'processor_model' => $processorModel,
             'reference_version' => ScaleModel::BODYSCAN_REFERENCE_VERSION,
             'source_application' => $result['source_application'],
+            'weight_unit' => $result['weight_unit'],
             'measured_at' => $result['measured_at'],
             'metrics' => $result['metrics'],
             'segmental_measurements' => $result['segmental_measurements'],
@@ -176,6 +177,14 @@ class BodyscanProImageProcessor
             || $matchedSections->count() < 3
             || $requiredSegmentalSections->diff($matchedSections)->isNotEmpty()) {
             throw new RuntimeException('A imagem não possui as seções segmentares necessárias para um relatório Bodyscan Pro compatível.');
+        }
+
+        $weightUnit = $this->normalizeWeightUnit($payload['weight_unit'] ?? null);
+        if ($weightUnit === null) {
+            throw new RuntimeException('Não foi possível identificar a unidade do peso. Confira se o relatório exibe kg, lb ou stone e envie uma imagem mais nítida.');
+        }
+        if ($weightUnit !== 'kg') {
+            throw new RuntimeException("O relatório está configurado em {$weightUnit}. Altere a unidade para kg no aplicativo e gere novamente o relatório; o sistema não converte valores automaticamente.");
         }
 
         $qualityIssues = collect($payload['quality_issues'] ?? [])
@@ -277,6 +286,7 @@ class BodyscanProImageProcessor
             'report_type' => 'Bodyscan Pro',
             'reference_version' => ScaleModel::BODYSCAN_REFERENCE_VERSION,
             'source_application' => $sourceApplication,
+            'weight_unit' => $weightUnit,
             'measured_at' => $measuredAt,
             'metrics' => $metrics,
             'segmental_measurements' => $segmentalMeasurements,
@@ -616,6 +626,18 @@ class BodyscanProImageProcessor
         };
     }
 
+    private function normalizeWeightUnit(mixed $value): ?string
+    {
+        $normalized = $this->normalizedLabel((string) $value);
+
+        return match (true) {
+            $normalized === 'kg', str_contains($normalized, 'quilograma'), str_contains($normalized, 'kilogram') => 'kg',
+            in_array($normalized, ['lb', 'lbs'], true), str_contains($normalized, 'libra'), str_contains($normalized, 'pound') => 'lb',
+            in_array($normalized, ['st', 'stone', 'stones'], true) => 'stone',
+            default => null,
+        };
+    }
+
     private function isVisualQualityIssue(string $issue): bool
     {
         $normalized = $this->normalizedLabel($issue);
@@ -643,7 +665,7 @@ class BodyscanProImageProcessor
             'type', 'name', 'size_bytes', 'mime_type', 'stored', 'sha256', 'processed_at',
             'processor_model', 'reference_version', 'measured_at', 'metrics', 'segmental_measurements',
             'raw_values', 'detected_sections', 'field_statuses', 'missing_fields', 'suspicious_values',
-            'quality_issues', 'side_consistency', 'source_application',
+            'quality_issues', 'side_consistency', 'source_application', 'weight_unit',
         ])->mapWithKeys(fn (string $key) => [$key => $metadata[$key] ?? null])->all();
 
         return hash_hmac('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), (string) config('app.key'));
@@ -654,6 +676,7 @@ class BodyscanProImageProcessor
         return <<<'PROMPT'
 Analise exclusivamente a imagem anexada. Ela deve ser um relatório da balança Bodyscan Pro exibido pelo aplicativo RelaxFit ou Fitdays.
 Identifique source_application pela marca visível no relatório: relaxfit ou fitdays. Use null quando a origem não estiver legível; não deduza pela aparência.
+Identifique weight_unit pela unidade impressa ao lado do peso: kg, lb ou stone. Use null se a unidade não estiver legível. Não converta valores entre unidades.
 Reconheça o modelo pelo conjunto de seções e não apenas pela aparência: "Dados de membro", "Análise de gordura segmentar", "Equilíbrio muscular" e "Índice corporal".
 Extraia cada valor pelo rótulo textual e pelo marcador L/R correspondente. Nunca determine o lado apenas pela posição na tela.
 Para os segmentos, use somente estes identificadores: type fat ou muscle; region arm, trunk ou leg; side left, center ou right. O tronco deve usar side center.
@@ -662,6 +685,7 @@ Em cada segmento extraia massa em kg, percentual relativo à referência, classi
 Classificação deve preservar o texto impresso, como Baixo, Padrão ou Alto. Não invente classificação ausente.
 Os percentuais segmentares são índices relativos à referência, não percentuais de gordura corporal.
 Extraia as métricas gerais do bloco "Índice corporal" pelos nomes dos rótulos.
+Preserve exatamente o valor decimal impresso. Não acrescente casas decimais nem alegue margem de erro ou precisão que não esteja escrita no relatório.
 Não calcule, estime, deduza ou complete valores ausentes. Use null quando algo não estiver legível.
 Converta a data e hora para YYYY-MM-DDTHH:MM:SS sem inventar fuso horário.
 Em detected_sections, copie os títulos realmente visíveis.
@@ -690,12 +714,13 @@ PROMPT;
         return [
             'type' => 'object',
             'additionalProperties' => false,
-            'required' => ['recognized', 'is_complete', 'quality_issues', 'source_application', 'measured_at', 'detected_sections', 'metrics', 'segmental_measurements', 'side_consistency', 'suspicious_values'],
+            'required' => ['recognized', 'is_complete', 'quality_issues', 'source_application', 'weight_unit', 'measured_at', 'detected_sections', 'metrics', 'segmental_measurements', 'side_consistency', 'suspicious_values'],
             'properties' => [
                 'recognized' => ['type' => 'boolean'],
                 'is_complete' => ['type' => 'boolean'],
                 'quality_issues' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'source_application' => ['type' => ['string', 'null'], 'enum' => ['relaxfit', 'fitdays', null]],
+                'weight_unit' => ['type' => ['string', 'null'], 'enum' => ['kg', 'lb', 'stone', null]],
                 'measured_at' => $nullableString,
                 'detected_sections' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'metrics' => [
