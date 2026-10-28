@@ -128,6 +128,7 @@
     $measurementApplicationLabels = ['relaxfit' => 'RelaxFit', 'fitdays' => 'Fitdays'];
     $measurementApplication = $measurementApplicationLabels[$assessment['measurement_application'] ?? ''] ?? null;
     $deviceSpecifications = $assessment['device_technical_specifications'] ?? [];
+    $informationalReferences = $reference['informational_references'] ?? [];
     $displayClassification = fn ($indicator, $fallback = '-') => $indicator['classification'] ?? $fallback;
     $executiveSummary = str_replace(
         'a referência de classificação Relaxmedic não está cadastrada',
@@ -235,6 +236,15 @@
                 @endforeach
             </table>
             <div class="notice"><strong>Por que as classificações podem ser diferentes?</strong> O IMC é calculado pelo sistema usando peso e altura. “Nível de obesidade” e “Tipo de corpo” são classificações distintas importadas do RelaxFit; o tipo corporal é proprietário do aplicativo e não equivale à classificação do IMC.</div>
+        @endif
+        @if($isBodyscan && count($informationalReferences))
+            <div class="section-title" style="color: {{ $secondaryColor }};">Referências informativas do manual</div>
+            <div class="notice"><strong>Uso documental.</strong> Estas faixas são genéricas, não são separadas por sexo ou idade e não geram classificação clínica. O manual descreve uso doméstico e não apresenta validação clínica; o IMC é o único item desta seção classificado automaticamente pelo sistema.</div>
+            <table class="grid">
+                @foreach(array_chunk($informationalReferences, 2) as $referenceRow)
+                    <tr>@foreach($referenceRow as $manualReference)<td class="box" style="width: 50%;"><div class="label">{{ $manualReference['label'] }}</div><div class="metric-small">{{ $manualReference['manual_range'] }}</div><div class="muted" style="margin-top: 3px; font-size: 7px;">{{ $manualReference['note'] }}</div></td>@endforeach @if(count($referenceRow) === 1)<td></td>@endif</tr>
+                @endforeach
+            </table>
         @endif
         <div class="section-title" style="color: {{ $secondaryColor }};">Evolução</div>
         @if(($comparison['history_count'] ?? 0) >= 2 && count($comparison['trends'] ?? []))

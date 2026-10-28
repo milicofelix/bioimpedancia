@@ -52,7 +52,21 @@ class BioimpedanceAnalyzer
         $reference = $isRelaxmedic ? $this->relaxmedicReference() : $this->reference();
         if ($deviceModel === ScaleModel::BODYSCAN_PRO_NAME) {
             $reference['model'] = ScaleModel::BODYSCAN_PRO_NAME;
+            $reference['model_code'] = ScaleModel::BODYSCAN_PRO_MODEL_CODE;
+            $reference['manual_code'] = ScaleModel::BODYSCAN_PRO_MANUAL_VERSION;
+            $reference['version'] = 'Manual do equipamento';
             $reference['classification_version'] = ScaleModel::BODYSCAN_REFERENCE_VERSION;
+            $reference['bmi_classification'] = [
+                'applied' => true,
+                'source' => 'Tabela convencional de IMC',
+                'note' => 'Única referência desta seção aplicada automaticamente pelo sistema.',
+            ];
+            $reference['manual_scope'] = [
+                'intended_use' => 'doméstico',
+                'medical_purpose' => false,
+                'clinical_validation_presented' => false,
+            ];
+            $reference['informational_references'] = ScaleModel::bodyscanInformationalReferences();
         }
 
         return [

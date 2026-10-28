@@ -35,7 +35,7 @@ const textFields = ['obesity_level', 'body_type'];
 const integerFields = ['resting_metabolism_kcal', 'body_age'];
 
 export function metricsForAssessment(assessment) {
-	const definitions = assessment?.device_model === 'Relaxmedic'
+	const definitions = ['Relaxmedic', 'Bodyscan Pro'].includes(assessment?.device_model)
 		? Object.entries(relaxmedicMetricLabels).map(([field, label]) => ({
 			field,
 			label: label.replace(/ \([^)]*\)$/, ''),

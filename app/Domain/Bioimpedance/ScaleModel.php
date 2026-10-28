@@ -130,4 +130,42 @@ final class ScaleModel
             'accuracy_margin_documented' => false,
         ];
     }
+
+    public static function bodyscanInformationalReferences(): array
+    {
+        return [
+            [
+                'key' => 'body_water',
+                'label' => 'Água corporal',
+                'manual_range' => '50–65%',
+                'related_field' => 'body_water_percentage',
+                'mapping_status' => 'informational_only',
+                'note' => 'Faixa genérica do manual, sem separação por sexo ou idade e sem uso para classificação clínica.',
+            ],
+            [
+                'key' => 'protein_rate',
+                'label' => 'Taxa de proteína',
+                'manual_range' => '14–18%',
+                'related_field' => 'protein_percentage',
+                'mapping_status' => 'informational_only',
+                'note' => 'Faixa genérica do manual, apresentada apenas para consulta documental.',
+            ],
+            [
+                'key' => 'bone_mass',
+                'label' => 'Massa óssea',
+                'manual_range' => '3–5% do peso',
+                'related_field' => null,
+                'mapping_status' => 'unconfirmed_mapping',
+                'note' => 'O aplicativo informa massa óssea em kg; a correspondência com o percentual descrito no manual não está confirmada.',
+            ],
+            [
+                'key' => 'muscular_system',
+                'label' => 'Sistema muscular',
+                'manual_range' => '40–50% do peso',
+                'related_field' => null,
+                'mapping_status' => 'unconfirmed_mapping',
+                'note' => 'Não foi confirmado se esta definição corresponde à taxa muscular, massa muscular ou músculo esquelético do aplicativo.',
+            ],
+        ];
+    }
 }

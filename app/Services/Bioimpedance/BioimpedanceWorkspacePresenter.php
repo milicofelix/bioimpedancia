@@ -110,8 +110,11 @@ class BioimpedanceWorkspacePresenter
     public function assessment(BioimpedanceAssessment $assessment): array
     {
         $analysis = $assessment->analysis;
-        if ($assessment->device_model === 'Relaxmedic'
-            && ($analysis['reference']['classification_version'] ?? null) !== BioimpedanceAnalyzer::REFERENCE_VERSION) {
+        $requiresCurrentAnalysis = $assessment->device_model === ScaleModel::RELAXMEDIC_NAME
+            && ($analysis['reference']['classification_version'] ?? null) !== BioimpedanceAnalyzer::REFERENCE_VERSION;
+        $requiresBodyscanReferences = $assessment->device_model === ScaleModel::BODYSCAN_PRO_NAME
+            && empty($analysis['reference']['informational_references']);
+        if ($requiresCurrentAnalysis || $requiresBodyscanReferences) {
             $analysis = $this->bioimpedanceAnalyzer->analyze(
                 $assessment->client->toArray(),
                 $assessment->toArray(),
