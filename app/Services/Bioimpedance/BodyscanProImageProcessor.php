@@ -172,6 +172,7 @@ class BodyscanProImageProcessor
         $qualityIssues = collect($payload['quality_issues'] ?? [])
             ->filter(fn ($issue) => is_string($issue) && trim($issue) !== '')
             ->map(fn (string $issue) => trim($issue))
+            ->filter(fn (string $issue) => $this->isVisualQualityIssue($issue))
             ->values();
         $missingFields = collect(self::REQUIRED_SECTIONS)
             ->reject(fn (string $required) => $matchedSections->contains($required))
@@ -179,6 +180,7 @@ class BodyscanProImageProcessor
             ->values();
         $suspiciousValues = collect($payload['suspicious_values'] ?? [])
             ->filter(fn ($item) => is_array($item) && filled($item['field'] ?? null) && filled($item['reason'] ?? null))
+            ->filter(fn (array $item) => $this->isReadingUncertainty((string) $item['reason']))
             ->map(fn (array $item) => [
                 'field' => mb_substr((string) $item['field'], 0, 120),
                 'value' => $item['value'] ?? null,
@@ -240,12 +242,16 @@ class BodyscanProImageProcessor
             $missingFields->push('measured_at');
         }
 
-        if (! ($payload['is_complete'] ?? false)) {
+        $hasConcreteReadingProblem = $qualityIssues->isNotEmpty()
+            || $missingFields->isNotEmpty()
+            || $suspiciousValues->isNotEmpty()
+            || $sideConsistency['possible_swap'];
+
+        if (! ($payload['is_complete'] ?? false) && $hasConcreteReadingProblem && $qualityIssues->isEmpty()) {
             $qualityIssues->push('O serviço identificou que alguma parte do relatório está cortada, borrada ou ilegível.');
         }
 
-        $isComplete = (bool) ($payload['is_complete'] ?? false)
-            && $missingFields->isEmpty()
+        $isComplete = $missingFields->isEmpty()
             && $suspiciousValues->isEmpty()
             && $qualityIssues->isEmpty()
             && ! $sideConsistency['possible_swap'];
@@ -506,6 +512,27 @@ class BodyscanProImageProcessor
         return Str::lower(Str::ascii(trim($value)));
     }
 
+    private function isVisualQualityIssue(string $issue): bool
+    {
+        $normalized = $this->normalizedLabel($issue);
+
+        return collect([
+            'resolucao', 'borrad', 'desfoc', 'ilegivel', 'cortad', 'recort', 'ocult',
+            'baixa qualidade', 'contraste', 'reflexo', 'luminos', 'imagem parcial', 'texto pequeno',
+        ])->contains(fn (string $term) => str_contains($normalized, $term));
+    }
+
+    private function isReadingUncertainty(string $reason): bool
+    {
+        $normalized = $this->normalizedLabel($reason);
+
+        return collect([
+            'ilegivel', 'incert', 'ambigu', 'baixa confianca', 'cortad', 'borrad', 'desfoc',
+            'unidade inesperada', 'unidade ausente', 'texto ocult', 'marcador', 'possivel troca',
+            'nao reconhecid', 'nao foi possivel',
+        ])->contains(fn (string $term) => str_contains($normalized, $term));
+    }
+
     private function signMetadata(array $metadata): string
     {
         $payload = collect([
@@ -537,7 +564,12 @@ Marque recognized=false para outro aplicativo, relatório sem análise segmentar
 Marque is_complete=false quando houver corte, desfoque, valor ilegível, seção ausente ou lado não confirmável.
 Em side_consistency, confirme a visibilidade dos marcadores L e R e marque possible_swap=true diante de qualquer dúvida sobre os lados.
 Em legibility use clear, uncertain ou unreadable.
-Liste em português todos os problemas visuais e valores suspeitos, sem realizar interpretação clínica.
+Use quality_issues exclusivamente para problemas da imagem: corte, desfoque, baixa resolução, reflexo, contraste ou texto ilegível.
+Use suspicious_values exclusivamente quando o texto, número, unidade ou lado não puder ser lido com confiança.
+Pontos, cores e classificações exibidos pelo aplicativo pertencem ao resultado do equipamento. Não os trate como problema de qualidade, valor suspeito, risco clínico, atenção ou saída de faixa.
+Não interprete vermelho, amarelo, verde ou azul. Não conclua risco, normalidade ou gravidade a partir de cores.
+Não inclua em quality_issues ou suspicious_values valores legíveis apenas por estarem coloridos ou classificados pelo dispositivo.
+Liste em português somente problemas de leitura, sem realizar interpretação clínica.
 PROMPT;
     }
 
