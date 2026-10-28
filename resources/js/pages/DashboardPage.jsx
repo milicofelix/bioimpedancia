@@ -485,7 +485,6 @@ export default function DashboardPage({ userName }) {
 	const runAction = useActionLock();
 	const assessmentSectionRef = useRef(null);
 	const relaxmedicImageInputRef = useRef(null);
-	const bodyscanCameraInputRef = useRef(null);
 	const imagePreviewUrlRef = useRef('');
 	const [clients, setClients] = useState([]);
 	const [clinic, setClinic] = useState(defaultClinic);
@@ -783,7 +782,6 @@ export default function DashboardPage({ userName }) {
 		if (relaxmedicImageInputRef.current) {
 			relaxmedicImageInputRef.current.value = '';
 		}
-		if (bodyscanCameraInputRef.current) bodyscanCameraInputRef.current.value = '';
 	}
 
 	function selectRelaxmedicImage(event) {
@@ -844,7 +842,6 @@ export default function DashboardPage({ userName }) {
 			setErrors({});
 			setRelaxmedicImage(null);
 			if (relaxmedicImageInputRef.current) relaxmedicImageInputRef.current.value = '';
-			if (bodyscanCameraInputRef.current) bodyscanCameraInputRef.current.value = '';
 		} catch (error) {
 			const imageError = error.response?.data?.errors?.image?.[0];
 			setRelaxmedicImageError(imageError ?? error.response?.data?.message ?? (navigator.onLine ? 'A conexão foi interrompida durante o envio. Nenhuma avaliação foi criada.' : 'A conexão caiu durante o envio. Tente novamente quando estiver online.'));
@@ -1739,14 +1736,13 @@ export default function DashboardPage({ userName }) {
 				<div className={`block rounded-2xl border-2 border-dashed p-5 transition ${relaxmedicImageError ? 'border-rose-300 bg-rose-50' : 'border-sky-200 bg-sky-50/60 hover:border-sky-300'}`}>
 									<span className="block text-sm font-bold text-slate-900">Imagem da avaliação {isBodyscanAssessment ? 'Bodyscan Pro' : 'Relaxmedic'}</span>
 									<span className="mt-1 block text-xs text-slate-500">Formatos aceitos: JPEG ou JPG, com no máximo 10 MB.</span>
-					{isBodyscanAssessment ? <><input ref={bodyscanCameraInputRef} type="file" accept="image/jpeg,.jpg,.jpeg" capture="environment" onChange={selectRelaxmedicImage} className="sr-only" /><button type="button" onClick={() => bodyscanCameraInputRef.current?.click()} disabled={!canClinicalProfessional || !selectedClient?.is_active} className="mt-4 min-h-11 rounded-xl bg-sky-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Fotografar relatório</button><span className="mx-3 text-xs text-slate-500">ou escolha da galeria:</span></> : null}
 									<input
 										ref={relaxmedicImageInputRef}
 										type="file"
 										accept="image/jpeg,.jpg,.jpeg"
 										onChange={selectRelaxmedicImage}
 										disabled={!canClinicalProfessional || !selectedClient || !selectedClient.is_active}
-										className="mt-4 block w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-sky-700 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white disabled:cursor-not-allowed disabled:opacity-50"
+						className="mt-4 block w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-sky-700 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white disabled:cursor-not-allowed disabled:opacity-50"
 									/>
 				</div>
 
