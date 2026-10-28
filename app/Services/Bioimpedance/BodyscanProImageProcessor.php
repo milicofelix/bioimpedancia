@@ -242,6 +242,7 @@ class BodyscanProImageProcessor
             $suspiciousValues,
             $fieldStatuses,
         );
+        $this->appendConsistencyWarnings($metrics, $segmentalMeasurements, $suspiciousValues, $fieldStatuses);
         $sideConsistency = $this->sideConsistency($payload['side_consistency'] ?? [], $suspiciousValues);
         $measuredAt = $this->normalizeMeasuredAt($payload['measured_at'] ?? null, $suspiciousValues, $fieldStatuses);
 
@@ -442,6 +443,83 @@ class BodyscanProImageProcessor
             'possible_swap' => $possibleSwap,
             'reason' => $reason,
         ];
+    }
+
+    private function appendConsistencyWarnings(array $metrics, array $segments, $suspiciousValues, array &$fieldStatuses): void
+    {
+        $weight = $metrics['weight_kg'] ?? null;
+        $ratioChecks = [
+            'body_fat_percentage' => ['mass' => 'fat_mass_kg', 'label' => 'massa gorda'],
+            'muscle_rate_percentage' => ['mass' => 'muscle_mass_kg', 'label' => 'massa muscular'],
+            'body_water_percentage' => ['mass' => 'water_weight_kg', 'label' => 'peso da água'],
+            'protein_percentage' => ['mass' => 'protein_mass_kg', 'label' => 'massa de proteína'],
+        ];
+        if (is_numeric($weight) && (float) $weight > 0) {
+            foreach ($ratioChecks as $percentageField => $check) {
+                $percentage = $metrics[$percentageField] ?? null;
+                $mass = $metrics[$check['mass']] ?? null;
+                if (! is_numeric($percentage) || ! is_numeric($mass)) {
+                    continue;
+                }
+
+                $calculated = ((float) $mass / (float) $weight) * 100;
+                if (abs($calculated - (float) $percentage) > 1.0) {
+                    $fieldStatuses['metrics.'.$percentageField] = 'suspicious';
+                    $suspiciousValues->push([
+                        'field' => 'metrics.'.$percentageField,
+                        'value' => $percentage,
+                        'reason' => 'O percentual não é coerente com peso e '.$check['label'].'. Confira os valores na imagem.',
+                    ]);
+                }
+            }
+        }
+
+        $leanMass = $metrics['lean_body_mass_kg'] ?? null;
+        $fatMass = $metrics['fat_mass_kg'] ?? null;
+        if (is_numeric($weight) && is_numeric($leanMass) && is_numeric($fatMass)
+            && abs(((float) $leanMass + (float) $fatMass) - (float) $weight) > 1.0) {
+            $suspiciousValues->push([
+                'field' => 'metrics.body_composition_total',
+                'value' => (float) $leanMass + (float) $fatMass,
+                'reason' => 'A soma de massa magra e massa gorda difere do peso total. Confira os três valores.',
+            ]);
+        }
+
+        $segmentalFatMass = collect($segments)
+            ->where('type', Segment::TYPE_FAT)
+            ->sum(fn (array $segment) => is_numeric($segment['mass_kg'] ?? null) ? (float) $segment['mass_kg'] : 0.0);
+        if (is_numeric($fatMass) && $segmentalFatMass > 0) {
+            $tolerance = max(1.5, (float) $fatMass * 0.05);
+            if (abs($segmentalFatMass - (float) $fatMass) > $tolerance) {
+                $suspiciousValues->push([
+                    'field' => 'segmental.fat.total_mass',
+                    'value' => round($segmentalFatMass, 2),
+                    'reason' => 'A soma da gordura segmentar difere da massa gorda total além da tolerância de leitura. Confira especialmente o tronco e as pernas.',
+                ]);
+            }
+        }
+
+        foreach ($segments as $segment) {
+            $percentage = $segment['reference_percentage'] ?? null;
+            $minimum = $segment['reference_min_percentage'] ?? null;
+            $maximum = $segment['reference_max_percentage'] ?? null;
+            if (! is_numeric($percentage) || ! is_numeric($minimum) || ! is_numeric($maximum)) {
+                continue;
+            }
+
+            $expectedClassification = (float) $percentage < (float) $minimum
+                ? Segment::CLASSIFICATION_LOW
+                : ((float) $percentage > (float) $maximum ? Segment::CLASSIFICATION_HIGH : Segment::CLASSIFICATION_STANDARD);
+            if (($segment['classification'] ?? null) !== $expectedClassification) {
+                $key = 'segmental.'.$segment['type'].'.'.$segment['region'].'.'.$segment['side'].'.classification';
+                $fieldStatuses[$key] = 'suspicious';
+                $suspiciousValues->push([
+                    'field' => $key,
+                    'value' => $segment['classification'] ?? null,
+                    'reason' => 'A classificação não corresponde ao percentual e à faixa de referência informados.',
+                ]);
+            }
+        }
     }
 
     private function isExpectedSegment(?string $region, ?string $side): bool

@@ -14,7 +14,11 @@
 @endphp
 <div class="label">{{ $title }}</div>
 <div class="metric-value">{{ $value }}</div>
-<span class="badge {{ $indicator['tone'] ?? 'neutral' }}">{{ $pending ? 'Sem classificação disponível' : ($indicator['classification'] ?? '-') }}</span>
+@unless($pending)
+    <span class="badge {{ $indicator['tone'] ?? 'neutral' }}">{{ $indicator['classification'] ?? '-' }}</span>
+@else
+    <div class="muted" style="margin-top: 5px; font-size: 7px;">Estimativa do equipamento sem classificação textual</div>
+@endunless
 @if($scale)
     <div class="pointer-row">
         @unless($pending)
@@ -34,6 +38,6 @@
         </tr>
     </table>
 @endif
-@if($indicator['reference_range'] ?? null)
+@if(($indicator['reference_range'] ?? null) && ! $pending)
     <div class="muted" style="margin-top: 5px; font-size: 7px;">{{ $indicator['reference_range'] }}</div>
 @endif

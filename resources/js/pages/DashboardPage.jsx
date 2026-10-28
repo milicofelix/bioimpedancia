@@ -107,7 +107,7 @@ const evolutionMetrics = [
 	{ key: 'body_fat_percentage', label: 'Gordura', unit: 'p.p.', valueUnit: '%', decimals: 1, lowerIsBetter: true },
 	{ key: 'skeletal_muscle_percentage', label: 'Músculo', unit: 'p.p.', valueUnit: '%', decimals: 1, lowerIsBetter: false },
 	{ key: 'visceral_fat_level', label: 'Visceral', unit: 'níveis', valueUnit: 'nível', decimals: 0, lowerIsBetter: true },
-	{ key: 'body_age', label: 'Idade corporal', unit: 'anos', decimals: 0, lowerIsBetter: true },
+	{ key: 'body_age', label: 'Índice de idade corporal do aparelho', unit: 'anos', decimals: 0 },
 ];
 
 const evolutionPeriods = [
@@ -1839,7 +1839,7 @@ export default function DashboardPage({ userName }) {
 								<input inputMode="numeric" placeholder="1780" value={assessmentForm.resting_metabolism_kcal} onChange={(event) => updateAssessment('resting_metabolism_kcal', event.target.value)} className={inputClass()} />
 								<FieldError errors={errors} field="resting_metabolism_kcal" />
 							</Field>
-							<Field label="Idade corporal">
+							<Field label="Índice de idade corporal do aparelho">
 								<input inputMode="numeric" placeholder="47" value={assessmentForm.body_age} onChange={(event) => updateAssessment('body_age', event.target.value)} className={inputClass()} />
 								<FieldError errors={errors} field="body_age" />
 							</Field>
@@ -2148,7 +2148,7 @@ function Report({ clinic, client, assessment, professional }) {
 							</div>
 							<div className="report-body-age border-slate-300 md:border-l md:pl-8">
 								<div className="grid grid-cols-[1fr_auto] gap-4">
-									<HeroMetric eyebrow="Idade corporal" value={assessment.body_age ?? '-'} unit="anos" compactEyebrow />
+									<HeroMetric eyebrow="Índice de idade corporal do aparelho" value={assessment.body_age ?? '-'} unit="anos" compactEyebrow />
 									{bodyAgeDelta !== null ? (
 										<div className="pt-7 text-right">
 											<p className={`text-sm font-bold leading-5 ${bodyAgeDelta > 0 ? 'text-[#b96f7d]' : 'text-emerald-700'}`}>

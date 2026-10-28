@@ -7,7 +7,7 @@ const omronMetrics = [
 	{ field: 'skeletal_muscle_percentage', label: 'Músculo esquelético', unit: '%', decimals: 1 },
 	{ field: 'visceral_fat_level', label: 'Gordura visceral', unit: '', decimals: 1 },
 	{ field: 'resting_metabolism_kcal', label: 'Metabolismo basal', unit: 'kcal', decimals: 0 },
-	{ field: 'body_age', label: 'Idade corporal', unit: 'anos', decimals: 0 },
+	{ field: 'body_age', label: 'Índice de idade corporal do aparelho', unit: 'anos', decimals: 0 },
 ];
 
 const relaxmedicUnits = {

@@ -11,10 +11,6 @@ class BodyscanSegmentalOcrCompleter
 {
     public function complete(string $imageContents, string $model, array $segments): array
     {
-        if (! $this->needsCompletion($segments)) {
-            return $segments;
-        }
-
         try {
             $response = Http::withToken((string) config('services.openai.api_key'))
                 ->acceptJson()
@@ -43,7 +39,7 @@ class BodyscanSegmentalOcrCompleter
                 ->throw()
                 ->json();
         } catch (ConnectionException|RequestException) {
-            return $segments;
+            return $this->markSecondReadingUnavailable($segments);
         }
 
         $payload = json_decode($this->outputText($response), true);
@@ -51,20 +47,11 @@ class BodyscanSegmentalOcrCompleter
             ? $payload['segmental_measurements']
             : [];
 
-        return $this->merge($segments, $secondReading);
-    }
-
-    private function needsCompletion(array $segments): bool
-    {
-        if (count($segments) !== 10) {
-            return true;
+        if ($secondReading === []) {
+            return $this->markSecondReadingUnavailable($segments);
         }
 
-        return collect($segments)->contains(fn ($segment) => ! is_array($segment)
-            || collect(['mass_kg', 'reference_percentage', 'classification'])->contains(
-                fn (string $field) => ! isset($segment[$field]) || $segment[$field] === ''
-            )
-            || ($segment['legibility'] ?? null) !== 'clear');
+        return $this->merge($segments, $secondReading);
     }
 
     private function merge(array $firstReading, array $secondReading): array
@@ -81,7 +68,26 @@ class BodyscanSegmentalOcrCompleter
                     return $retry;
                 }
                 if (! is_array($retry)) {
-                    return $original;
+                    return [
+                        ...$original,
+                        'legibility' => 'uncertain',
+                        'raw_value' => ($original['raw_value'] ?? 'Leitura inicial disponível').' | Segunda leitura indisponível',
+                    ];
+                }
+
+                $conflictingFields = collect(['mass_kg', 'reference_percentage', 'classification'])
+                    ->filter(fn (string $field) => $this->valuesConflict($field, $original[$field] ?? null, $retry[$field] ?? null))
+                    ->values();
+                if ($conflictingFields->isNotEmpty()) {
+                    $merged = $original;
+                    foreach ($conflictingFields as $field) {
+                        $merged[$field] = null;
+                    }
+                    $merged['legibility'] = 'uncertain';
+                    $merged['raw_value'] = 'Leitura inicial: '.($original['raw_value'] ?? 'não informada')
+                        .' | Segunda leitura: '.($retry['raw_value'] ?? 'não informada');
+
+                    return $merged;
                 }
 
                 $merged = $original;
@@ -96,6 +102,47 @@ class BodyscanSegmentalOcrCompleter
 
                 return $merged;
             }))->filter()->values()->all();
+    }
+
+    private function markSecondReadingUnavailable(array $segments): array
+    {
+        return collect($segments)->map(function ($segment) {
+            if (! is_array($segment)) {
+                return $segment;
+            }
+
+            return [
+                ...$segment,
+                'legibility' => 'uncertain',
+                'raw_value' => ($segment['raw_value'] ?? 'Leitura inicial disponível').' | Segunda leitura indisponível',
+            ];
+        })->all();
+    }
+
+    private function valuesConflict(string $field, mixed $first, mixed $second): bool
+    {
+        if ($first === null || $first === '' || $second === null || $second === '') {
+            return false;
+        }
+
+        if (is_numeric($first) && is_numeric($second)) {
+            return abs((float) $first - (float) $second) > 0.01;
+        }
+
+        if ($field === 'classification') {
+            $labels = [
+                'baixo' => 'low', 'baixa' => 'low', 'low' => 'low',
+                'padrao' => 'standard', 'normal' => 'standard', 'standard' => 'standard',
+                'alto' => 'high', 'alta' => 'high', 'high' => 'high',
+            ];
+            $normalize = fn (mixed $value) => $labels[mb_strtolower(
+                preg_replace('/[^a-z0-9]+/', '', iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', (string) $value) ?: ''),
+            )] ?? null;
+
+            return $normalize($first) !== $normalize($second);
+        }
+
+        return mb_strtolower(trim((string) $first)) !== mb_strtolower(trim((string) $second));
     }
 
     private function key(array $segment): string

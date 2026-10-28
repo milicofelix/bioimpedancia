@@ -77,7 +77,13 @@
         .segmental-page .content, .segmental-grid, .segmental-map { page-break-inside: avoid; }
         .segmental-title { color: #7f1d3f; font-size: 11px; font-weight: 700; text-align: center; }
         .segmental-subtitle { margin-top: 2px; color: #667085; font-size: 6px; text-align: center; }
-        .segmental-svg { display: block; width: 100%; height: 285px; }
+        .segmental-visual { width: 100%; height: 270px; border-collapse: collapse; table-layout: fixed; }
+        .segmental-visual td { padding: 2px; border: 0; vertical-align: middle; }
+        .segmental-visual .body-column { width: 42%; text-align: center; }
+        .segmental-silhouette { display: block; width: 100%; height: 250px; }
+        .segmental-value { color: #334155; font-size: 6px; line-height: 1.35; }
+        .segmental-value strong { color: #172033; font-size: 7px; }
+        .segmental-value-right { text-align: right; }
         .segmental-table { width: 100%; border-collapse: collapse; font-size: 6px; }
         .segmental-table caption { padding: 4px 0 3px; color: #475467; font-size: 6px; font-weight: 700; text-align: left; text-transform: uppercase; }
         .segmental-table th, .segmental-table td { padding: 3px 4px; border: 1px solid #e5e7eb; text-align: left; }
@@ -119,12 +125,10 @@
     $hasSpecificDeviceModel = $deviceModel !== ''
         && mb_strtolower($deviceModel) !== mb_strtolower($manufacturer)
         && ! in_array(mb_strtolower($deviceModel), $genericDeviceModels, true);
-    $displayClassification = fn ($indicator, $fallback = '-') => ($indicator['pending'] ?? false)
-        ? 'Sem classificação disponível'
-        : ($indicator['classification'] ?? $fallback);
+    $displayClassification = fn ($indicator, $fallback = '-') => $indicator['classification'] ?? $fallback;
     $executiveSummary = str_replace(
         'a referência de classificação Relaxmedic não está cadastrada',
-        'sem classificação disponível para este indicador',
+        'o equipamento não forneceu uma classificação textual para este indicador',
         $assessment['analysis']['summary'] ?? 'Síntese indisponível.',
     );
     $observationOriginLabels = [
@@ -196,8 +200,8 @@
         <table class="grid"><tr>
             <td class="box hero" style="width: 25%;"><div class="label">Peso</div><div class="metric-value">{{ $br($assessment['weight_kg']) }} <span class="metric-unit">kg</span></div></td>
             <td class="box hero" style="width: 25%;"><div class="label">IMC calculado</div><div class="metric-value">{{ $br($assessment['calculated_bmi']) }}</div><span class="badge {{ $tone($bmi) }}">{{ $displayClassification($bmi) }}</span></td>
-            <td class="box hero" style="width: 25%;"><div class="label">Gordura corporal</div><div class="metric-value">{{ $br($assessment['body_fat_percentage']) }} <span class="metric-unit">%</span></div><span class="badge {{ $tone($bodyFat) }}">{{ $displayClassification($bodyFat, 'Estimativa') }}</span></td>
-            <td class="box hero" style="width: 25%;"><div class="label">Músculo esquelético</div><div class="metric-value">{{ $br($assessment['skeletal_muscle_percentage']) }} <span class="metric-unit">%</span></div><span class="badge {{ $tone($muscle) }}">{{ $displayClassification($muscle, 'Estimativa') }}</span></td>
+            <td class="box hero" style="width: 25%;"><div class="label">Gordura corporal</div><div class="metric-value">{{ $br($assessment['body_fat_percentage']) }} <span class="metric-unit">%</span></div>@if(!($bodyFat['pending'] ?? false))<span class="badge {{ $tone($bodyFat) }}">{{ $displayClassification($bodyFat, 'Estimativa') }}</span>@else<div class="muted" style="margin-top: 6px;">Estimativa do equipamento</div>@endif</td>
+            <td class="box hero" style="width: 25%;"><div class="label">Músculo esquelético</div><div class="metric-value">{{ $br($assessment['skeletal_muscle_percentage']) }} <span class="metric-unit">%</span></div>@if(!($muscle['pending'] ?? false))<span class="badge {{ $tone($muscle) }}">{{ $displayClassification($muscle, 'Estimativa') }}</span>@else<div class="muted" style="margin-top: 6px;">Estimativa do equipamento</div>@endif</td>
         </tr></table>
         <div class="summary"><div class="section-title" style="margin-top: 0; color: {{ $primaryColor }};">Síntese da avaliação</div><p>{{ $executiveSummary }}</p></div>
         @if($isRelaxmedic)
@@ -205,7 +209,7 @@
             @if($assessmentAge >= 60)<div class="notice"><strong>Atenção à pessoa idosa.</strong> Objetivos devem priorizar preservação de massa, força, equilíbrio, mobilidade e autonomia, sem usar isoladamente IMC ou peso de referência do fabricante.</div>@endif
         @endif
         <table class="grid"><tr>
-            <td class="box"><div class="label">Idade corporal</div><div class="metric-small">{{ $assessment['body_age'] ?? '-' }} anos</div><div class="muted">{{ $isRelaxmedic ? 'Estimativa proprietária; não representa idade biológica real.' : 'Indicador estimado pelo equipamento.' }}</div></td>
+            <td class="box"><div class="label">Índice de idade corporal do aparelho</div><div class="metric-small">{{ $assessment['body_age'] ?? '-' }} anos</div><div class="muted">Valor importado do equipamento; não é idade cronológica, biológica ou diagnóstico.</div></td>
             <td class="box"><div class="label">Metabolismo basal</div><div class="metric-small">{{ $assessment['resting_metabolism_kcal'] ? number_format($assessment['resting_metabolism_kcal'], 0, ',', '.') : '-' }} kcal/dia</div><div class="muted">Não corresponde ao gasto energético total nem à recomendação de consumo.</div></td>
             <td class="box"><div class="label">Equipamento</div><div class="metric-small">{{ $manufacturer }}</div><div class="muted">@if($hasSpecificDeviceModel)Modelo {{ $deviceModel }} · @endif Referência {{ $assessment['reference_version'] ?? ($reference['classification_version'] ?? '1.0.0') }}</div></td>
         </tr></table>

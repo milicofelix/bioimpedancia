@@ -121,7 +121,7 @@ class BioimpedanceAnalyzer
                 'tone' => 'neutral',
             ],
             'body_age' => [
-                'label' => 'Idade corporal',
+                'label' => 'Índice de idade corporal do aparelho',
                 'value' => isset($assessment['body_age']) ? ((int) $assessment['body_age']).' anos' : 'Nao informada',
                 'classification' => null,
                 'tone' => 'neutral',
