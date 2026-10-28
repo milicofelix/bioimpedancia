@@ -3,6 +3,7 @@ import { formatDate } from '../../../shared/formatters';
 import { formatMetric, metricDelta, metricsForAssessment } from './reportMetrics';
 import PwaIcon from '../../components/ui/PwaIcon';
 import SegmentalBodyMap from '../../../components/bioimpedance/SegmentalBodyMap';
+import SegmentalComparison from '../../../components/bioimpedance/SegmentalComparison';
 
 export default function ResponsiveAssessmentReport({ client, assessment, previous }) {
 	const metrics = metricsForAssessment(assessment);
@@ -46,6 +47,7 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 
 				{['Relaxmedic', 'Bodyscan Pro'].includes(assessment.device_model) ? <section className="mt-5 rounded-xl border border-sky-200 bg-sky-50 p-4 text-xs leading-5 text-sky-950"><strong>Como interpretar:</strong> os dados de composição corporal são estimativas produzidas por algoritmos do equipamento. Coerência matemática entre massa gorda, massa magra e peso não comprova precisão fisiológica. Compare tendências em condições semelhantes e não use IMC ou “peso ideal” isoladamente para definir objetivos.</section> : null}
 				{assessment.segmental_measurements?.length ? <section className="mt-5"><p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-ricosty-600">Análise segmentar Bodyscan</p><div className="grid gap-4 xl:grid-cols-2"><SegmentalBodyMap measurements={assessment.segmental_measurements} type="fat" /><SegmentalBodyMap measurements={assessment.segmental_measurements} type="muscle" /></div></section> : null}
+				{assessment.segmental_measurements?.length ? <SegmentalComparison current={assessment.segmental_measurements} previous={previous?.segmental_measurements ?? []} previousDate={previous ? formatDate(previous.evaluated_at) : null} /> : null}
 				{assessment.age_at_assessment >= 60 ? <section className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-950"><strong>Atenção à funcionalidade:</strong> em pessoas com 60 anos ou mais, o planejamento deve considerar preservação de massa, força, equilíbrio, mobilidade e autonomia. O percentual muscular estimado não comprova, isoladamente, força ou função preservada.</section> : null}
 
 				<section className="mt-5 rounded-2xl border border-ricosty-100 bg-ricosty-50/60 p-4">

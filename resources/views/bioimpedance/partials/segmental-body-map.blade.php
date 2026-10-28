@@ -39,10 +39,12 @@
             <circle cx="{{ $item['lineX'] }}" cy="{{ $item['lineY'] }}" r="3" fill="{{ $item['state'][2] }}"/>
             <text x="{{ $item['textX'] }}" y="{{ $item['textY'] - 12 }}" text-anchor="{{ $left ? 'start' : 'end' }}" fill="#334155" font-size="7" font-weight="700">{{ $item['label'] }}</text>
             <text x="{{ $item['textX'] }}" y="{{ $item['textY'] }}" text-anchor="{{ $left ? 'start' : 'end' }}" fill="#172033" font-size="8" font-weight="700">{{ $pdfNumber($item['measurement']['mass_kg'] ?? null, ' kg') }}</text>
-            <text x="{{ $item['textX'] }}" y="{{ $item['textY'] + 11 }}" text-anchor="{{ $left ? 'start' : 'end' }}" fill="{{ $item['state'][2] }}" font-size="7" font-weight="700">{{ $item['state'][1] }} {{ $item['state'][0] }}</text>
+            <text x="{{ $item['textX'] }}" y="{{ $item['textY'] + 10 }}" text-anchor="{{ $left ? 'start' : 'end' }}" fill="#475467" font-size="7">{{ $pdfNumber($item['measurement']['reference_percentage'] ?? null, '% ref.') }}</text>
+            <text x="{{ $item['textX'] }}" y="{{ $item['textY'] + 20 }}" text-anchor="{{ $left ? 'start' : 'end' }}" fill="{{ $item['state'][2] }}" font-size="7" font-weight="700">{{ $item['state'][1] }} {{ $item['state'][0] }}</text>
         @endforeach
     </svg>
     <table class="segmental-table">
+        <caption>Equivalente textual de {{ mb_strtolower($title) }}</caption>
         <thead><tr><th>Região/lado</th><th>kg</th><th>% ref.</th><th>Estado</th></tr></thead>
         <tbody>@foreach($items as $item)<tr><th>{{ $item['label'] }}</th><td>{{ $pdfNumber($item['measurement']['mass_kg'] ?? null) }}</td><td>{{ $pdfNumber($item['measurement']['reference_percentage'] ?? null) }}</td><td style="color: {{ $item['state'][2] }}; font-weight: 700;">{{ $item['state'][1] }} {{ $item['state'][0] }}</td></tr>@endforeach</tbody>
     </table>

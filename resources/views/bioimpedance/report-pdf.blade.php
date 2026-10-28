@@ -74,12 +74,20 @@
         .page-guidance .validation td { padding: 5px 7px; }
         .segmental-grid { width: 100%; border-collapse: separate; border-spacing: 8px; table-layout: fixed; }
         .segmental-grid > tbody > tr > td { width: 50%; padding: 8px; border: 1px solid #f2d6dc; border-radius: 8px; background: #fff; vertical-align: top; }
+        .segmental-page .content, .segmental-grid, .segmental-map { page-break-inside: avoid; }
         .segmental-title { color: #7f1d3f; font-size: 11px; font-weight: 700; text-align: center; }
         .segmental-subtitle { margin-top: 2px; color: #667085; font-size: 6px; text-align: center; }
         .segmental-svg { display: block; width: 100%; height: 285px; }
         .segmental-table { width: 100%; border-collapse: collapse; font-size: 6px; }
+        .segmental-table caption { padding: 4px 0 3px; color: #475467; font-size: 6px; font-weight: 700; text-align: left; text-transform: uppercase; }
         .segmental-table th, .segmental-table td { padding: 3px 4px; border: 1px solid #e5e7eb; text-align: left; }
         .segmental-table thead th { background: #fbf2f4; color: #475467; text-transform: uppercase; }
+        .segmental-comparison { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 7px; }
+        .segmental-comparison th, .segmental-comparison td { padding: 6px; border: 1px solid #e5e7eb; text-align: left; }
+        .segmental-comparison th { background: #fbf2f4; color: #475467; text-transform: uppercase; }
+        .segmental-comparison tr { page-break-inside: avoid; }
+        .segmental-legend { width: 100%; border-collapse: separate; border-spacing: 5px; margin-top: 6px; }
+        .segmental-legend td { padding: 5px 7px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; font-size: 7px; text-align: center; }
     </style>
 </head>
 <body>
@@ -101,6 +109,10 @@
     $isBodyscan = ($assessment['device_model'] ?? null) === 'Bodyscan Pro';
     $isRelaxmedic = in_array(($assessment['device_model'] ?? null), ['Relaxmedic', 'Bodyscan Pro'], true);
     $segmentalMeasurements = $assessment['segmental_measurements'] ?? [];
+    $segmentalComparison = $comparison['segmental'] ?? null;
+    $hasSegmentalComparison = (bool) ($segmentalComparison['has_previous'] ?? false);
+    $hasSegmentalPage = $isBodyscan && count($segmentalMeasurements) > 0;
+    $totalSections = 3 + ($hasSegmentalPage ? 1 : 0) + ($hasSegmentalComparison ? 1 : 0);
     $manufacturer = trim((string) ($reference['manufacturer'] ?? ($isRelaxmedic ? 'Relaxmedic' : 'Omron')));
     $deviceModel = trim((string) ($reference['model'] ?? $assessment['device_model'] ?? ''));
     $genericDeviceModels = ['relaxmedic', 'relaxmedic/relaxfit'];
@@ -171,7 +183,7 @@
 @include('bioimpedance.partials.report-footer')
 
 <section class="report-section report-section-first">
-    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Visão executiva', 'pageNumber' => 1])
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Visão executiva', 'pageNumber' => 1, 'totalSections' => $totalSections])
     <div class="content">
         @if($assessment['is_canceled'])<div class="canceled"><strong>Avaliação cancelada.</strong> {{ $assessment['cancellation_reason'] }}</div>@endif
         <table class="grid"><tr>
@@ -201,7 +213,7 @@
 </section>
 
 <section class="report-section">
-    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Análise e evolução', 'pageNumber' => 2])
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Análise e evolução', 'pageNumber' => 2, 'totalSections' => $totalSections])
     <div class="content">
         <div class="section-title" style="color: {{ $secondaryColor }};">Composição corporal detalhada</div>
         <table class="grid">
@@ -257,21 +269,70 @@
     </div>
 </section>
 
-@if($isBodyscan && count($segmentalMeasurements))
-<section class="report-section">
-    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Análise segmentar', 'pageNumber' => 3])
+@if($hasSegmentalPage)
+<section class="report-section segmental-page">
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Análise segmentar', 'pageNumber' => 3, 'totalSections' => $totalSections])
     <div class="content">
-        <div class="notice"><strong>Leitura por região.</strong> L representa o lado esquerdo e R o lado direito. Cor, símbolo e texto identificam conjuntamente cada classificação.</div>
+        <div class="notice"><strong>Bodyscan Pro · referência {{ $assessment['reference_version'] ?? ($reference['classification_version'] ?? 'não informada') }}.</strong> L representa o lado esquerdo e R o lado direito. Massa, percentual de referência e classificação são apresentados ao redor do corpo e repetidos nas tabelas textuais.</div>
         <table class="segmental-grid"><tr>
             <td>@include('bioimpedance.partials.segmental-body-map', ['measurements' => $segmentalMeasurements, 'type' => 'fat', 'title' => 'Gordura segmentar'])</td>
             <td>@include('bioimpedance.partials.segmental-body-map', ['measurements' => $segmentalMeasurements, 'type' => 'muscle', 'title' => 'Equilíbrio muscular'])</td>
         </tr></table>
+        <table class="segmental-legend"><tr>
+            <td><strong style="color:#2563eb;">↓ Abaixo</strong><br><span class="muted">Abaixo da faixa do equipamento</span></td>
+            <td><strong style="color:#047857;">● Padrão</strong><br><span class="muted">Dentro da faixa do equipamento</span></td>
+            <td><strong style="color:#be123c;">↑ Alto</strong><br><span class="muted">Acima da faixa do equipamento</span></td>
+            <td><strong style="color:#475569;">? Não identificado</strong><br><span class="muted">Sem classificação reconhecida</span></td>
+        </tr></table>
+        @if(! $hasSegmentalComparison)<div class="summary muted"><strong>Linha de base segmentar.</strong> Estes valores serão usados como referência quando houver outra avaliação Bodyscan Pro.</div>@endif
+    </div>
+</section>
+@endif
+
+@if($isBodyscan && $hasSegmentalComparison)
+<section class="report-section">
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Evolução segmentar', 'pageNumber' => 4, 'totalSections' => $totalSections])
+    <div class="content">
+        <div class="notice"><strong>Comparação do mesmo equipamento.</strong> Os valores mostram mudanças numéricas entre avaliações Bodyscan Pro e não classificam melhora, piora ou problema clínico.</div>
+        @foreach(['fat' => 'Gordura segmentar', 'muscle' => 'Equilíbrio muscular'] as $segmentType => $segmentTitle)
+            <div class="section-title" style="color: {{ $secondaryColor }};">{{ $segmentTitle }}</div>
+            <table class="segmental-comparison">
+                <thead><tr><th>Região</th><th>Massa anterior → atual</th><th>Variação</th><th>Referência anterior → atual</th><th>Variação</th></tr></thead>
+                <tbody>
+                @foreach(collect($segmentalComparison['regions'])->where('type', $segmentType) as $region)
+                    <tr>
+                        <td><strong>{{ $region['label'] }}</strong></td>
+                        <td>{{ $br($region['mass_kg']['previous'], 2) }} kg → <strong>{{ $br($region['mass_kg']['current'], 2) }} kg</strong></td>
+                        <td>{{ $region['mass_kg']['delta'] > 0 ? '+' : '' }}{{ $br($region['mass_kg']['delta'], 2) }} kg</td>
+                        <td>{{ $br($region['reference_percentage']['previous']) }}% → <strong>{{ $br($region['reference_percentage']['current']) }}%</strong></td>
+                        <td>{{ $region['reference_percentage']['delta'] > 0 ? '+' : '' }}{{ $br($region['reference_percentage']['delta']) }} p.p.</td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
+        @endforeach
+
+        <div class="section-title" style="color: {{ $secondaryColor }};">Comparação entre os lados</div>
+        <table class="segmental-comparison">
+            <thead><tr><th>Medição</th><th>Região</th><th>Diferença absoluta anterior</th><th>Diferença absoluta atual</th><th>Referência anterior → atual</th></tr></thead>
+            <tbody>
+            @foreach($segmentalComparison['laterality'] as $balance)
+                <tr>
+                    <td>{{ $balance['type'] === 'fat' ? 'Gordura' : 'Músculo' }}</td>
+                    <td><strong>{{ $balance['label'] }}</strong></td>
+                    <td>{{ $br($balance['previous_mass_difference_kg'], 2) }} kg</td>
+                    <td>{{ $br($balance['current_mass_difference_kg'], 2) }} kg</td>
+                    <td>{{ $br($balance['previous_reference_difference']) }} → {{ $br($balance['current_reference_difference']) }} p.p.</td>
+                </tr>
+            @endforeach
+            </tbody>
+        </table>
     </div>
 </section>
 @endif
 
 <section class="report-section page-guidance">
-    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Orientações e validação', 'pageNumber' => $isBodyscan && count($segmentalMeasurements) ? 4 : 3])
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Orientações e validação', 'pageNumber' => $hasSegmentalPage ? ($hasSegmentalComparison ? 5 : 4) : 3, 'totalSections' => $totalSections])
     <div class="content">
         <div class="section-title" style="color: {{ $secondaryColor }};">Interpretação profissional</div>
         <div class="summary">@if($assessment['notes'])<p style="white-space: pre-line;">{{ $assessment['notes'] }}</p>@else<p class="muted">Nenhuma observação profissional foi registrada.</p>@endif<div class="origin-note">{{ $observationOriginLabels[$assessment['observation_origin'] ?? 'professional'] }}</div></div>

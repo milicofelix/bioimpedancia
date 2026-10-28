@@ -523,14 +523,14 @@ class BioimpedanceWorkflow
 
     public function downloadAssessmentPdf(BioimpedanceAssessment $assessment, LegacyBioimpedanceAnalysisRefresher $legacyAnalysisRefresher): Response
     {
-        $assessment->load(['client', 'professional', 'correctedBy', 'canceledBy']);
+        $assessment->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements']);
         $legacyAnalysisRefresher->refreshIfLegacy($assessment);
-        $assessment->refresh()->load(['client', 'professional', 'correctedBy', 'canceledBy']);
+        $assessment->refresh()->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements']);
         $assessment->update([
             'report_issued_at' => now(),
             'report_issue_count' => $assessment->report_issue_count + 1,
         ]);
-        $assessment->refresh()->load(['client', 'professional', 'correctedBy', 'canceledBy']);
+        $assessment->refresh()->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements']);
         config(['dompdf.public_path' => public_path()]);
         $this->audit(request(), 'bioimpedance_assessment.report_downloaded', $assessment, 'Relatório PDF acessado', null, [
             'assessment_id' => $assessment->id,
@@ -763,7 +763,7 @@ class BioimpedanceWorkflow
     {
         $share = BioimpedanceReportShare::query()
             ->where('token_hash', hash('sha256', $token))
-            ->with(['assessment.client', 'assessment.professional', 'assessment.correctedBy', 'assessment.canceledBy'])
+            ->with(['assessment.client', 'assessment.professional', 'assessment.correctedBy', 'assessment.canceledBy', 'assessment.segmentalMeasurements'])
             ->firstOrFail();
 
         abort_if($share->revoked_at || $share->expires_at->isPast(), 410, 'Link expirado ou revogado.');

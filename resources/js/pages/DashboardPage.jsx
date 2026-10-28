@@ -647,6 +647,11 @@ export default function DashboardPage({ userName }) {
 	const selectedAssessment = selectedClient?.assessments?.find((assessment) => assessment.id === selectedAssessmentId)
 		?? selectedClient?.assessments?.[0]
 		?? null;
+	const previousSegmentalAssessment = selectedAssessment
+		? (selectedClient?.assessments ?? [])
+			.filter((assessment) => assessment.id !== selectedAssessment.id && !assessment.is_canceled && assessment.device_model === selectedAssessment.device_model && new Date(assessment.evaluated_at).getTime() < new Date(selectedAssessment.evaluated_at).getTime())
+			.sort((left, right) => new Date(right.evaluated_at) - new Date(left.evaluated_at))[0] ?? null
+		: null;
 	const isBodyscanProSelected = clinic.scale_model === 'relaxmedic_bodyscan_pro';
 	const isRelaxmedicAssessment = clinic.scale_model === 'relaxmedic' && assessmentMode === 'create';
 	const isBodyscanAssessment = isBodyscanProSelected && assessmentMode === 'create';
@@ -1592,7 +1597,7 @@ export default function DashboardPage({ userName }) {
 									) : null}
 								</div>
 							) : null}
-							<AssessmentDetails assessment={selectedAssessment} />
+							<AssessmentDetails assessment={selectedAssessment} previousAssessment={previousSegmentalAssessment} />
 							{(selectedAssessment?.has_approved_ai_observation || selectedAssessment?.care_guidance) && !selectedAssessment.is_canceled && canClinicalProfessional ? <div className="mt-4"><CareGuidanceAssistant key={selectedAssessment.id} assessment={selectedAssessment} online={isOnline} onApproved={(updatedClient, updatedAssessment) => { setClients((current) => current.map((client) => (client.id === updatedClient.id ? updatedClient : client))); setSelectedAssessmentId(updatedAssessment.id); }} /></div> : null}
 
 							{selectedAssessment && !selectedAssessment.is_canceled ? (
