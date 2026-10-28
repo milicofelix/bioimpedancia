@@ -356,14 +356,36 @@
     @include('bioimpedance.partials.report-header', ['pageTitle' => 'Orientações e validação', 'pageNumber' => $hasSegmentalPage ? ($hasSegmentalComparison ? 5 : 4) : 3, 'totalSections' => $totalSections])
     <div class="content">
         <div class="section-title" style="color: {{ $secondaryColor }};">Interpretação profissional</div>
-        <div class="summary">@if($assessment['notes'])<p style="white-space: pre-line;">{{ $assessment['notes'] }}</p>@else<p class="muted">Nenhuma observação profissional foi registrada.</p>@endif<div class="origin-note">{{ $observationOriginLabels[$assessment['observation_origin'] ?? 'professional'] }}</div></div>
+        <div class="summary">
+            @if($assessment['notes'])
+                <p style="white-space: pre-line;">{{ $assessment['notes'] }}</p>
+            @else
+                <p class="muted">Nenhuma observação profissional foi registrada.</p>
+            @endif
+            <div class="origin-note">{{ $observationOriginLabels[$assessment['observation_origin'] ?? 'professional'] }}</div>
+        </div>
         <div class="section-title" style="color: {{ $secondaryColor }};">Orientações aprovadas</div>
         @if($assessment['care_guidance'] ?? null)
             @foreach($guidanceSections as $section)
                 <div class="guidance-section"><div class="guidance-section-title">{{ $section['title'] }}</div><div>{{ $section['text'] }}</div></div>
             @endforeach
             <p class="muted" style="margin: 5px 2px 0;">Conteúdo educativo revisado pelo profissional; não substitui avaliação médica, nutricional ou de educação física.</p>
-            @if(count($assessment['care_guidance_sources'] ?? []))<div class="summary"><div class="label">Referências utilizadas</div><ul class="source-list">@foreach($assessment['care_guidance_sources'] as $source)<li>{{ $source['document'] ?? 'Documento de referência' }}@if($source['version'] ?? null) · versão {{ $source['version'] }}@endif · {{ $source['section'] ?? 'Seção não informada' }}</li>@endforeach</ul></div>@endif
+            @if(count($assessment['care_guidance_sources'] ?? []))
+                <div class="summary">
+                    <div class="label">Referências utilizadas</div>
+                    <ul class="source-list">
+                        @foreach($assessment['care_guidance_sources'] as $source)
+                            <li>
+                                {{ $source['document'] ?? 'Documento de referência' }}
+                                @if($source['version'] ?? null)
+                                    · versão {{ $source['version'] }}
+                                @endif
+                                · {{ $source['section'] ?? 'Seção não informada' }}
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
         @else
             <div class="summary muted">Nenhuma orientação educativa foi aprovada para esta avaliação.</div>
         @endif
@@ -373,7 +395,11 @@
             <tr><td><div class="label">Orientação aprovada por</div><strong>{{ $assessment['care_guidance_approved_by_name'] ?? 'Não aplicável' }}</strong></td><td><div class="label">Aprovação</div><strong>{{ ($assessment['care_guidance_approved_at'] ?? null) ? \Illuminate\Support\Carbon::parse($assessment['care_guidance_approved_at'])->format('d/m/Y H:i') : 'Não aplicável' }}</strong></td></tr>
             <tr><td><div class="label">Origem dos dados</div><strong>{{ $isRelaxmedic ? 'Imagem processada com conferência humana' : 'Entrada manual pelo profissional' }}</strong></td><td><div class="label">Correções registradas</div><strong>{{ $assessment['correction_count'] ?? 0 }}</strong></td></tr>
         </table>
-        @if($isRelaxmedic)<div class="notice"><strong>Origem auditável preservada.</strong> Os identificadores técnicos da imagem permanecem no registro interno de auditoria e não são exibidos no relatório entregue ao cliente. A imagem original não foi armazenada.</div>@endif
+        @if($isRelaxmedic)
+            <div class="notice">
+                <strong>Origem auditável preservada.</strong> Os identificadores técnicos da imagem permanecem no registro interno de auditoria e não são exibidos no relatório entregue ao cliente. A imagem original não foi armazenada.
+            </div>
+        @endif
         <div class="keep-together">
             <div class="section-title" style="color: {{ $secondaryColor }};">Limites do relatório</div>
             <div class="summary"><p>{{ $clinic['technical_notice'] }}</p></div>
