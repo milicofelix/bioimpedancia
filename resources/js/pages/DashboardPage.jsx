@@ -14,11 +14,13 @@ import {
 	numberBr,
 	toDatetimeLocal,
 } from '../shared/formatters';
-import { loadBioimpedanceWorkspace, logout } from '../services/bioimpedanceApi';
+import { loadBioimpedanceWorkspace, logout, processBodyscanProImage, processRelaxmedicImage as processRelaxmedicImageApi } from '../services/bioimpedanceApi';
 import { cpfMask, heightMask, normalizeInteger, phoneMask } from '../shared/inputMasks';
 import useActionLock from '../hooks/useActionLock';
 import CareGuidanceAssistant from '../pwa/features/assistant/CareGuidanceAssistant';
 import KnowledgeDocumentsPanel from '../components/bioimpedance/KnowledgeDocumentsPanel';
+import BodyscanReview from '../pwa/features/assessment/BodyscanReview';
+import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, updateBodyscanSegment } from '../pwa/features/assessment/bodyscanAssessmentForm';
 
 const emptyClient = {
 	full_name: '',
@@ -166,6 +168,11 @@ function FieldError({ errors, field }) {
 	if (!messages.length) return null;
 
 	return <p className="mt-1 text-xs font-semibold text-rose-700">{messages[0]}</p>;
+}
+
+function BodyscanDesktopProgress({ current }) {
+	const steps = ['Imagem', 'Leitura geral', 'Leitura segmentar', 'Conferência', 'Conclusão'];
+	return <ol className="grid grid-cols-5 gap-2" aria-label="Progresso da avaliação Bodyscan">{steps.map((step, index) => { const number = index + 1; const active = number === current; const done = number < current; return <li key={step} aria-current={active ? 'step' : undefined} className={`rounded-xl border px-2 py-3 text-center text-xs font-bold ${active ? 'border-sky-300 bg-sky-50 text-sky-800' : done ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-500'}`}><span className="block text-sm">{done ? '✓' : number}</span>{step}</li>; })}</ol>;
 }
 
 function RelaxmedicReview({ extraction, imagePreview, form, errors, flaggedFields, confirmed, onConfirmedChange, onUpdate, onSubmit, saving, canSave }) {
@@ -478,6 +485,8 @@ export default function DashboardPage({ userName }) {
 	const runAction = useActionLock();
 	const assessmentSectionRef = useRef(null);
 	const relaxmedicImageInputRef = useRef(null);
+	const bodyscanCameraInputRef = useRef(null);
+	const imagePreviewUrlRef = useRef('');
 	const [clients, setClients] = useState([]);
 	const [clinic, setClinic] = useState(defaultClinic);
 	const [clinicForm, setClinicForm] = useState(defaultClinic);
@@ -522,6 +531,8 @@ export default function DashboardPage({ userName }) {
 	const [processingRelaxmedicImage, setProcessingRelaxmedicImage] = useState(false);
 	const [relaxmedicExtraction, setRelaxmedicExtraction] = useState(null);
 	const [relaxmedicReviewConfirmed, setRelaxmedicReviewConfirmed] = useState(false);
+	const [bodyscanForm, setBodyscanForm] = useState({ general: { ...emptyAssessment }, segments: [] });
+	const [bodyscanProgressStep, setBodyscanProgressStep] = useState(1);
 
 	useEffect(() => {
 		loadBioimpedanceWorkspace().then((data) => {
@@ -563,31 +574,22 @@ export default function DashboardPage({ userName }) {
 	}, []);
 
 	useEffect(() => {
-		if (!relaxmedicImage) {
-			setRelaxmedicImagePreview(null);
-			return undefined;
-		}
+		if (!processingRelaxmedicImage || clinic.scale_model !== 'relaxmedic_bodyscan_pro') return undefined;
+		setBodyscanProgressStep(2);
+		const timeout = window.setTimeout(() => setBodyscanProgressStep(3), 1800);
+		return () => window.clearTimeout(timeout);
+	}, [processingRelaxmedicImage, clinic.scale_model]);
 
-		const previewUrl = window.URL.createObjectURL(relaxmedicImage);
-		setRelaxmedicImagePreview(previewUrl);
-
-		return () => window.URL.revokeObjectURL(previewUrl);
-	}, [relaxmedicImage]);
+	useEffect(() => () => {
+		if (imagePreviewUrlRef.current) window.URL.revokeObjectURL(imagePreviewUrlRef.current);
+	}, []);
 
 	useEffect(() => {
-		if (clinic.scale_model === 'relaxmedic') return;
-
-		setRelaxmedicImage(null);
-		setRelaxmedicImageError('');
-		setRelaxmedicExtraction(null);
-		setRelaxmedicReviewConfirmed(false);
-		if (relaxmedicImageInputRef.current) {
-			relaxmedicImageInputRef.current.value = '';
-		}
+		clearRelaxmedicImage();
 	}, [clinic.scale_model]);
 
 	useEffect(() => {
-		if (!selectedClientId || assessmentMode !== 'create' || clinic.scale_model === 'relaxmedic') return;
+		if (!selectedClientId || assessmentMode !== 'create' || ['relaxmedic', 'relaxmedic_bodyscan_pro'].includes(clinic.scale_model)) return;
 
 		const key = assessmentDraftKey(selectedClientId);
 		const storedDraft = key ? window.localStorage.getItem(key) : null;
@@ -609,7 +611,7 @@ export default function DashboardPage({ userName }) {
 	}, [assessmentMode, clinic.scale_model, selectedClientId]);
 
 	useEffect(() => {
-		if (!selectedClientId || assessmentMode !== 'create' || clinic.scale_model === 'relaxmedic') return;
+		if (!selectedClientId || assessmentMode !== 'create' || ['relaxmedic', 'relaxmedic_bodyscan_pro'].includes(clinic.scale_model)) return;
 
 		const key = assessmentDraftKey(selectedClientId);
 		if (!key) return;
@@ -631,7 +633,7 @@ export default function DashboardPage({ userName }) {
 
 	useEffect(() => {
 		const warnBeforeExit = (event) => {
-			if (assessmentMode !== 'create' || clinic.scale_model === 'relaxmedic' || !hasAssessmentDraftData(assessmentForm)) return;
+			if (assessmentMode !== 'create' || ['relaxmedic', 'relaxmedic_bodyscan_pro'].includes(clinic.scale_model) || !hasAssessmentDraftData(assessmentForm)) return;
 
 			event.preventDefault();
 			event.returnValue = '';
@@ -648,6 +650,8 @@ export default function DashboardPage({ userName }) {
 		?? null;
 	const isBodyscanProSelected = clinic.scale_model === 'relaxmedic_bodyscan_pro';
 	const isRelaxmedicAssessment = clinic.scale_model === 'relaxmedic' && assessmentMode === 'create';
+	const isBodyscanAssessment = isBodyscanProSelected && assessmentMode === 'create';
+	const isImageAssessment = isRelaxmedicAssessment || isBodyscanAssessment;
 	const relaxmedicFlaggedFields = new Set([
 		...(relaxmedicExtraction?.missing_fields ?? []),
 		...(relaxmedicExtraction?.suspicious_values ?? []).map((item) => item.field),
@@ -678,8 +682,7 @@ export default function DashboardPage({ userName }) {
 	const canAdmin = Boolean(currentUser?.is_admin);
 	const canCreateClinicalRecords = ['admin', 'professional', 'reception'].includes(currentUser?.role);
 	const canClinicalProfessional = ['admin', 'professional'].includes(currentUser?.role);
-	const canCreateCurrentAssessment = !isBodyscanProSelected
-		&& (clinic.scale_model === 'relaxmedic' ? canClinicalProfessional : canCreateClinicalRecords);
+	const canCreateCurrentAssessment = isImageAssessment ? canClinicalProfessional : canCreateClinicalRecords;
 
 	async function handleLogout() {
 		await logout();
@@ -768,13 +771,19 @@ export default function DashboardPage({ userName }) {
 	}
 
 	function clearRelaxmedicImage() {
+		if (imagePreviewUrlRef.current) window.URL.revokeObjectURL(imagePreviewUrlRef.current);
+		imagePreviewUrlRef.current = '';
 		setRelaxmedicImage(null);
+		setRelaxmedicImagePreview(null);
 		setRelaxmedicImageError('');
 		setRelaxmedicExtraction(null);
 		setRelaxmedicReviewConfirmed(false);
+		setBodyscanForm({ general: { ...emptyAssessment, evaluated_at: localDatetimeNow() }, segments: [] });
+		setBodyscanProgressStep(1);
 		if (relaxmedicImageInputRef.current) {
 			relaxmedicImageInputRef.current.value = '';
 		}
+		if (bodyscanCameraInputRef.current) bodyscanCameraInputRef.current.value = '';
 	}
 
 	function selectRelaxmedicImage(event) {
@@ -783,6 +792,9 @@ export default function DashboardPage({ userName }) {
 		setRelaxmedicImageError('');
 		setRelaxmedicExtraction(null);
 		setRelaxmedicReviewConfirmed(false);
+		if (imagePreviewUrlRef.current) window.URL.revokeObjectURL(imagePreviewUrlRef.current);
+		imagePreviewUrlRef.current = '';
+		setRelaxmedicImagePreview(null);
 
 		if (!file) return;
 
@@ -799,35 +811,58 @@ export default function DashboardPage({ userName }) {
 			return;
 		}
 
+		const previewUrl = window.URL.createObjectURL(file);
+		imagePreviewUrlRef.current = previewUrl;
+		setRelaxmedicImagePreview(previewUrl);
 		setRelaxmedicImage(file);
 	}
 
 	async function processRelaxmedicImage() {
 		if (!relaxmedicImage || processingRelaxmedicImage) return;
+		if (!navigator.onLine) {
+			setRelaxmedicImageError('Sem conexão. A imagem não foi enviada; tente novamente quando a internet voltar.');
+			return;
+		}
 
 		setProcessingRelaxmedicImage(true);
 		setRelaxmedicImageError('');
 		setRelaxmedicExtraction(null);
 
-		const payload = new FormData();
-		payload.append('image', relaxmedicImage);
-
 		try {
-			const { data } = await window.axios.post('/bioimpedance/relaxmedic/process-image', payload);
-			setRelaxmedicExtraction(data.extraction);
+			const extraction = isBodyscanAssessment
+				? await processBodyscanProImage(relaxmedicImage)
+				: await processRelaxmedicImageApi(relaxmedicImage);
+			setRelaxmedicExtraction(extraction);
+			if (isBodyscanAssessment) setBodyscanProgressStep(4);
 			setAssessmentForm({
 				...emptyAssessment,
-				evaluated_at: data.extraction.measured_at ?? localDatetimeNow(),
-				...Object.fromEntries(Object.entries(data.extraction.metrics ?? {}).map(([field, value]) => [field, value ?? ''])),
+				evaluated_at: extraction.measured_at ?? localDatetimeNow(),
+				...Object.fromEntries(Object.entries(extraction.metrics ?? {}).map(([field, value]) => [field, value ?? ''])),
 			});
+			if (isBodyscanAssessment) setBodyscanForm(bodyscanFormFromExtraction(extraction));
 			setRelaxmedicReviewConfirmed(false);
 			setErrors({});
+			setRelaxmedicImage(null);
+			if (relaxmedicImageInputRef.current) relaxmedicImageInputRef.current.value = '';
+			if (bodyscanCameraInputRef.current) bodyscanCameraInputRef.current.value = '';
 		} catch (error) {
 			const imageError = error.response?.data?.errors?.image?.[0];
-			setRelaxmedicImageError(imageError ?? error.response?.data?.message ?? 'Não foi possível processar a imagem. Tente novamente.');
+			setRelaxmedicImageError(imageError ?? error.response?.data?.message ?? (navigator.onLine ? 'A conexão foi interrompida durante o envio. Nenhuma avaliação foi criada.' : 'A conexão caiu durante o envio. Tente novamente quando estiver online.'));
 		} finally {
 			setProcessingRelaxmedicImage(false);
 		}
+	}
+
+	function updateBodyscanGeneral(field, value) {
+		updateAssessment(field, value);
+		setBodyscanForm((current) => ({ ...current, general: { ...current.general, [field]: value } }));
+		setRelaxmedicReviewConfirmed(false);
+	}
+
+	function updateBodyscanSegmentField(index, field, value) {
+		setBodyscanForm((current) => ({ ...current, segments: updateBodyscanSegment(current.segments, index, field, value) }));
+		setRelaxmedicReviewConfirmed(false);
+		setErrors({});
 	}
 
 	function clearAssessmentDraft() {
@@ -868,7 +903,7 @@ export default function DashboardPage({ userName }) {
 	}
 
 	function updateAssessment(field, value) {
-		const acceptsDecimalVisceralFat = isRelaxmedicAssessment
+		const acceptsDecimalVisceralFat = isImageAssessment
 			|| (assessmentMode === 'edit' && selectedAssessment?.device_model === 'Relaxmedic');
 		const integerFields = ['resting_metabolism_kcal', 'body_age', ...(!acceptsDecimalVisceralFat ? ['visceral_fat_level'] : [])];
 		const decimalFields = [
@@ -917,10 +952,14 @@ export default function DashboardPage({ userName }) {
 		setSavingClient(true);
 		setErrors({});
 
-		const payload = {
+		let payload = {
 			...clientForm,
 			height_cm: normalizeHeightToCentimeters(clientForm.height_cm),
 		};
+
+		if (isBodyscanAssessment) {
+			payload = bodyscanAssessmentPayload({ ...bodyscanForm, general: assessmentForm }, selectedClient.id, relaxmedicExtraction?.image, relaxmedicReviewConfirmed);
+		}
 
 		try {
 			const { data } = clientMode === 'edit' && editingClientId
@@ -1511,7 +1550,7 @@ export default function DashboardPage({ userName }) {
 									<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Histórico de avaliações</p>
 									<h2 className="mt-1 text-lg font-semibold text-slate-950">{selectedClient.assessments?.length ?? 0} registro(s)</h2>
 								</div>
-								<button type="button" disabled={!canCreateCurrentAssessment} title={isBodyscanProSelected ? 'O fluxo da Bodyscan Pro será habilitado na próxima etapa.' : undefined} onClick={startNewAssessment} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
+								<button type="button" disabled={!canCreateCurrentAssessment} onClick={startNewAssessment} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
 									Nova avaliação
 								</button>
 							</div>
@@ -1676,16 +1715,16 @@ export default function DashboardPage({ userName }) {
 									<p className="mt-1 text-sm text-slate-500">
 										{assessmentMode === 'edit'
 											? 'A correção exige justificativa e gera auditoria.'
-											: isRelaxmedicAssessment
-												? 'Envie a imagem de resultados gerada pelo aplicativo da balança Relaxmedic.'
+											: isImageAssessment
+												? `Envie o relatório completo gerado pelo aplicativo ${isBodyscanAssessment ? 'Bodyscan Pro/RelaxFit' : 'Relaxmedic'}.`
 												: 'Digite os valores exibidos na balança Omron antiga após a pesagem.'}
 									</p>
 								</div>
 								<div className="flex flex-col gap-2 sm:items-end">
-									{!isRelaxmedicAssessment ? <div className="rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-600">
+									{!isImageAssessment ? <div className="rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-600">
 										IMC calculado: <strong className="text-slate-950">{calculatedBmi ?? '-'}</strong>
 									</div> : null}
-									{!isRelaxmedicAssessment && assessmentDraftSavedAt ? (
+									{!isImageAssessment && assessmentDraftSavedAt ? (
 										<div className="flex items-center gap-2 text-xs text-slate-500">
 											<span>Rascunho salvo {formatDate(assessmentDraftSavedAt)}</span>
 											<button type="button" onClick={clearAssessmentDraft} className="font-bold text-rose-600">Descartar</button>
@@ -1694,11 +1733,13 @@ export default function DashboardPage({ userName }) {
 								</div>
 							</div>
 
-						{isRelaxmedicAssessment ? (
+						{isImageAssessment ? (
 							<div className="mt-5 space-y-4">
-								<label className={`block rounded-2xl border-2 border-dashed p-5 transition ${relaxmedicImageError ? 'border-rose-300 bg-rose-50' : 'border-sky-200 bg-sky-50/60 hover:border-sky-300'}`}>
-									<span className="block text-sm font-bold text-slate-900">Imagem da avaliação Relaxmedic</span>
+				{isBodyscanAssessment ? <BodyscanDesktopProgress current={relaxmedicExtraction ? 4 : bodyscanProgressStep} /> : null}
+				<div className={`block rounded-2xl border-2 border-dashed p-5 transition ${relaxmedicImageError ? 'border-rose-300 bg-rose-50' : 'border-sky-200 bg-sky-50/60 hover:border-sky-300'}`}>
+									<span className="block text-sm font-bold text-slate-900">Imagem da avaliação {isBodyscanAssessment ? 'Bodyscan Pro' : 'Relaxmedic'}</span>
 									<span className="mt-1 block text-xs text-slate-500">Formatos aceitos: JPEG ou JPG, com no máximo 10 MB.</span>
+					{isBodyscanAssessment ? <><input ref={bodyscanCameraInputRef} type="file" accept="image/jpeg,.jpg,.jpeg" capture="environment" onChange={selectRelaxmedicImage} className="sr-only" /><button type="button" onClick={() => bodyscanCameraInputRef.current?.click()} disabled={!canClinicalProfessional || !selectedClient?.is_active} className="mt-4 min-h-11 rounded-xl bg-sky-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Fotografar relatório</button><span className="mx-3 text-xs text-slate-500">ou escolha da galeria:</span></> : null}
 									<input
 										ref={relaxmedicImageInputRef}
 										type="file"
@@ -1707,7 +1748,7 @@ export default function DashboardPage({ userName }) {
 										disabled={!canClinicalProfessional || !selectedClient || !selectedClient.is_active}
 										className="mt-4 block w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-sky-700 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white disabled:cursor-not-allowed disabled:opacity-50"
 									/>
-								</label>
+				</div>
 
 								{relaxmedicImageError ? (
 									<div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
@@ -1715,19 +1756,19 @@ export default function DashboardPage({ userName }) {
 									</div>
 								) : null}
 
-								{relaxmedicImage && relaxmedicImagePreview ? (
+				{relaxmedicImagePreview && !relaxmedicExtraction ? (
 									<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
 										<div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-											<img src={relaxmedicImagePreview} alt="Prévia da avaliação Relaxmedic" className="max-h-[620px] w-full rounded-xl border border-slate-200 bg-white object-contain lg:w-80" />
+											<div className="max-h-[75vh] w-full overflow-auto rounded-xl border border-slate-200 bg-white lg:w-[360px]"><img src={relaxmedicImagePreview} alt={`Prévia vertical da avaliação ${isBodyscanAssessment ? 'Bodyscan Pro' : 'Relaxmedic'}`} className="h-auto w-full object-contain" /></div>
 											<div className="flex-1">
 												<p className="text-sm font-bold text-slate-900">Imagem pronta para a próxima etapa</p>
-												<p className="mt-2 break-all text-sm text-slate-600">{relaxmedicImage.name}</p>
-												<p className="mt-1 text-xs text-slate-500">{(relaxmedicImage.size / 1024 / 1024).toFixed(2)} MB</p>
+								<p className="mt-2 break-all text-sm text-slate-600">{relaxmedicImage?.name}</p>
+								<p className="mt-1 text-xs text-slate-500">{relaxmedicImage ? `${(relaxmedicImage.size / 1024 / 1024).toFixed(2)} MB` : null}</p>
 												<p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
 													A leitura não salva a avaliação nem mantém uma cópia da imagem no banco ou no armazenamento desta aplicação.
 												</p>
 												<div className="mt-4 flex flex-wrap gap-2">
-											<button type="button" onClick={() => runAction('process-relaxmedic-image', processRelaxmedicImage)} disabled={processingRelaxmedicImage} aria-busy={processingRelaxmedicImage} className="rounded-xl bg-sky-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-60">
+											<button type="button" onClick={() => runAction('process-bioimpedance-image', processRelaxmedicImage)} disabled={processingRelaxmedicImage || !isOnline} aria-busy={processingRelaxmedicImage} className="rounded-xl bg-sky-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-60">
 														{processingRelaxmedicImage ? 'Lendo imagem...' : relaxmedicExtraction ? 'Processar novamente' : 'Ler informações da imagem'}
 													</button>
 													<button type="button" onClick={clearRelaxmedicImage} disabled={processingRelaxmedicImage} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-bold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60">
@@ -1739,7 +1780,22 @@ export default function DashboardPage({ userName }) {
 									</div>
 								) : null}
 
-								{relaxmedicExtraction ? (
+								{relaxmedicExtraction ? (isBodyscanAssessment ? (
+									<BodyscanReview
+										previewUrl={relaxmedicImagePreview}
+										form={bodyscanForm}
+										extraction={relaxmedicExtraction}
+										confirmed={relaxmedicReviewConfirmed}
+										errors={errors}
+										saving={savingAssessment}
+										online={isOnline}
+										onGeneralUpdate={updateBodyscanGeneral}
+										onSegmentUpdate={updateBodyscanSegmentField}
+										onConfirm={setRelaxmedicReviewConfirmed}
+										onSubmit={(event) => runAction('save-assessment', () => submitAssessment(event))}
+										onRestart={clearRelaxmedicImage}
+									/>
+								) : (
 									<RelaxmedicReview
 										extraction={relaxmedicExtraction}
 										imagePreview={relaxmedicImagePreview}
@@ -1753,6 +1809,7 @@ export default function DashboardPage({ userName }) {
 										saving={savingAssessment}
 										canSave={canClinicalProfessional && Boolean(selectedClient?.is_active)}
 									/>
+				)
 								) : null}
 							</div>
 						) : (

@@ -49,10 +49,15 @@ class BioimpedanceAnalyzer
         $sex = $assessment['biological_sex_at_assessment'] ?? $client['biological_sex'];
         $deviceModel = $assessment['device_model'] ?? self::DEVICE_MODEL;
         $isRelaxmedic = in_array($deviceModel, [ScaleModel::RELAXMEDIC_NAME, ScaleModel::BODYSCAN_PRO_NAME], true);
+        $reference = $isRelaxmedic ? $this->relaxmedicReference() : $this->reference();
+        if ($deviceModel === ScaleModel::BODYSCAN_PRO_NAME) {
+            $reference['model'] = ScaleModel::BODYSCAN_PRO_NAME;
+            $reference['classification_version'] = ScaleModel::BODYSCAN_REFERENCE_VERSION;
+        }
 
         return [
             'source' => $isRelaxmedic ? ($deviceModel === ScaleModel::BODYSCAN_PRO_NAME ? 'Bodyscan Pro/RelaxFit' : 'Relaxmedic/RelaxFit') : 'Omron HBF-514C',
-            'reference' => $isRelaxmedic ? $this->relaxmedicReference() : $this->reference(),
+            'reference' => $reference,
             'age' => $age,
             'snapshot' => [
                 'age_at_assessment' => $age,

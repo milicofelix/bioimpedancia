@@ -72,6 +72,14 @@
         .page-guidance .summary p, .page-guidance .notice p, .page-guidance .guidance p { margin-top: 3px; margin-bottom: 3px; }
         .page-guidance .validation { margin-top: 5px; }
         .page-guidance .validation td { padding: 5px 7px; }
+        .segmental-grid { width: 100%; border-collapse: separate; border-spacing: 8px; table-layout: fixed; }
+        .segmental-grid > tbody > tr > td { width: 50%; padding: 8px; border: 1px solid #f2d6dc; border-radius: 8px; background: #fff; vertical-align: top; }
+        .segmental-title { color: #7f1d3f; font-size: 11px; font-weight: 700; text-align: center; }
+        .segmental-subtitle { margin-top: 2px; color: #667085; font-size: 6px; text-align: center; }
+        .segmental-svg { display: block; width: 100%; height: 285px; }
+        .segmental-table { width: 100%; border-collapse: collapse; font-size: 6px; }
+        .segmental-table th, .segmental-table td { padding: 3px 4px; border: 1px solid #e5e7eb; text-align: left; }
+        .segmental-table thead th { background: #fbf2f4; color: #475467; text-transform: uppercase; }
     </style>
 </head>
 <body>
@@ -90,7 +98,9 @@
     $br = fn ($value, $decimals = 1) => $value === null || $value === '' ? '-' : number_format((float) $value, $decimals, ',', '.');
     $primaryColor = $clinic['primary_color'] ?? '#d88b9a';
     $secondaryColor = $clinic['secondary_color'] ?? '#4a4a4a';
-    $isRelaxmedic = ($assessment['device_model'] ?? null) === 'Relaxmedic';
+    $isBodyscan = ($assessment['device_model'] ?? null) === 'Bodyscan Pro';
+    $isRelaxmedic = in_array(($assessment['device_model'] ?? null), ['Relaxmedic', 'Bodyscan Pro'], true);
+    $segmentalMeasurements = $assessment['segmental_measurements'] ?? [];
     $manufacturer = trim((string) ($reference['manufacturer'] ?? ($isRelaxmedic ? 'Relaxmedic' : 'Omron')));
     $deviceModel = trim((string) ($reference['model'] ?? $assessment['device_model'] ?? ''));
     $genericDeviceModels = ['relaxmedic', 'relaxmedic/relaxfit'];
@@ -247,8 +257,21 @@
     </div>
 </section>
 
+@if($isBodyscan && count($segmentalMeasurements))
+<section class="report-section">
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Análise segmentar', 'pageNumber' => 3])
+    <div class="content">
+        <div class="notice"><strong>Leitura por região.</strong> L representa o lado esquerdo e R o lado direito. Cor, símbolo e texto identificam conjuntamente cada classificação.</div>
+        <table class="segmental-grid"><tr>
+            <td>@include('bioimpedance.partials.segmental-body-map', ['measurements' => $segmentalMeasurements, 'type' => 'fat', 'title' => 'Gordura segmentar'])</td>
+            <td>@include('bioimpedance.partials.segmental-body-map', ['measurements' => $segmentalMeasurements, 'type' => 'muscle', 'title' => 'Equilíbrio muscular'])</td>
+        </tr></table>
+    </div>
+</section>
+@endif
+
 <section class="report-section page-guidance">
-    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Orientações e validação', 'pageNumber' => 3])
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Orientações e validação', 'pageNumber' => $isBodyscan && count($segmentalMeasurements) ? 4 : 3])
     <div class="content">
         <div class="section-title" style="color: {{ $secondaryColor }};">Interpretação profissional</div>
         <div class="summary">@if($assessment['notes'])<p style="white-space: pre-line;">{{ $assessment['notes'] }}</p>@else<p class="muted">Nenhuma observação profissional foi registrada.</p>@endif<div class="origin-note">{{ $observationOriginLabels[$assessment['observation_origin'] ?? 'professional'] }}</div></div>

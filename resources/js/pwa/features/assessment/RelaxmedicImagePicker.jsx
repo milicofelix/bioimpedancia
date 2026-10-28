@@ -38,7 +38,7 @@ export default function RelaxmedicImagePicker({ previewUrl, fileName, reportName
 			{error ? <p role="alert" className="pwa-status-enter mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p> : null}
 			{previewUrl ? (
 				<div className="pwa-screen-enter mt-4 overflow-hidden rounded-2xl border border-ricosty-200 bg-ricosty-cream/50 p-3">
-					<img src={previewUrl} alt={`Prévia do relatório ${reportName} selecionado`} className="mx-auto max-h-80 rounded-lg object-contain" />
+					<div className={`${reportName === 'Bodyscan Pro' ? 'max-h-[70vh] overflow-y-auto' : 'max-h-80'} rounded-lg bg-white`}><img src={previewUrl} alt={`Prévia do relatório ${reportName} selecionado`} className="mx-auto h-auto w-full rounded-lg object-contain" /></div>
 					<div className="mt-3 flex items-start justify-center gap-2 text-xs text-slate-700"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><PwaIcon name="check" size={12} /></span><span className="break-all text-center">{fileName}</span></div>
 				</div>
 			) : null}

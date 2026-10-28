@@ -13,6 +13,7 @@ import PwaStepIndicator from '../../components/ui/PwaStepIndicator';
 import useActionLock from '../../../hooks/useActionLock';
 import BodyscanReview from './BodyscanReview';
 import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, updateBodyscanSegment } from './bodyscanAssessmentForm';
+import BodyscanOcrProgress from './BodyscanOcrProgress';
 
 export default function RelaxmedicAssessmentFeature({ client, currentUser, scaleModel, onBackToClients, onCreated, onOpenAssistant }) {
 	const runAction = useActionLock();
@@ -31,7 +32,10 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 	const [errors, setErrors] = useState({});
 	const [createdAssessment, setCreatedAssessment] = useState(null);
 	const [pickerVersion, setPickerVersion] = useState(0);
+	const [bodyscanProcessingStage, setBodyscanProcessingStage] = useState(0);
 	const isOnline = useOnlineStatus();
+	const isBodyscan = scaleModel === 'relaxmedic_bodyscan_pro';
+	const journeySteps = isBodyscan ? ['Imagem', 'Leitura geral', 'Leitura segmentar', 'Conferência', 'Conclusão'] : ['Imagem', 'Processamento', 'Conferência', 'Conclusão'];
 
 	useEffect(() => () => {
 		if (previewReference.current) URL.revokeObjectURL(previewReference.current);
@@ -83,6 +87,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 		return runAction('process-bioimpedance-image', async () => {
 			if (!imageFile || processing || !isOnline) return;
 			setProcessing(true);
+		setBodyscanProcessingStage(0);
 			setImageError('');
 			setGeneralError('');
 			setErrors({});
@@ -95,12 +100,12 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 				if (scaleModel === 'relaxmedic_bodyscan_pro') setBodyscanForm(bodyscanFormFromExtraction(result));
 				else setForm(assessmentFromExtraction(result));
 				setConfirmed(false);
+				// A referência enviável é removida após o OCR; a URL temporária permanece apenas para conferência.
+				setImageFile(null);
+				setPickerVersion((current) => current + 1);
 			} catch (error) {
 				setImageError(apiValidationErrors(error).image?.[0] ?? apiErrorMessage(error, 'Não foi possível processar a imagem.'));
 			} finally {
-				// O arquivo deixa o estado após a tentativa. A URL temporária só permanece para a conferência visual.
-				setImageFile(null);
-				setPickerVersion((current) => current + 1);
 				setProcessing(false);
 			}
 		});
@@ -168,7 +173,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 	if (createdAssessment) {
 		return (
 			<PwaCard className="p-6 text-center">
-				<PwaStepIndicator steps={['Imagem', 'Processamento', 'Conferência', 'Conclusão']} current={4} />
+				<PwaStepIndicator steps={journeySteps} current={journeySteps.length} />
 				<div className="mx-auto mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-ricosty-100 text-2xl font-black text-ricosty-700">✓</div>
 				<h2 className="mt-3 text-xl font-bold text-slate-950">Avaliação criada com segurança</h2>
 				<p className="mt-2 text-sm leading-6 text-slate-600">Os dados de {client.full_name} foram salvos após a confirmação. A prévia temporária foi removida da PWA.</p>
@@ -183,9 +188,9 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 	return (
 		<div className="space-y-4">
 			<PwaJourneyHeader icon="camera" eyebrow={`Nova avaliação · ${scaleModel === 'relaxmedic_bodyscan_pro' ? 'Bodyscan Pro' : 'Relaxmedic'}`} title={client.full_name} description="A avaliação só será criada depois do processamento e da sua confirmação." />
-			<PwaStepIndicator steps={['Imagem', 'Processamento', 'Conferência', 'Conclusão']} current={extraction ? 3 : processing ? 2 : 1} />
+			<PwaStepIndicator steps={journeySteps} current={extraction ? journeySteps.length - 1 : processing ? 2 + (isBodyscan ? bodyscanProcessingStage : 0) : 1} />
 
-			{processing ? <RelaxmedicOcrProgress previewUrl={previewUrl} /> : !extraction ? (
+			{processing ? (isBodyscan ? <BodyscanOcrProgress previewUrl={previewUrl} onStageChange={setBodyscanProcessingStage} /> : <RelaxmedicOcrProgress previewUrl={previewUrl} />) : !extraction ? (
 				<>
 					<RelaxmedicImagePicker key={pickerVersion} reportName={scaleModel === 'relaxmedic_bodyscan_pro' ? 'Bodyscan Pro' : 'Relaxmedic'} previewUrl={previewUrl} fileName={imageName} disabled={!isOnline} error={imageError} onSelect={selectImage} />
 					{previewUrl ? <PwaButton type="button" disabled={!imageFile || !isOnline} onClick={processImage} icon="sparkles" className="w-full">{imageFile ? 'Enviar e processar imagem' : 'Selecione novamente para tentar'}</PwaButton> : null}
