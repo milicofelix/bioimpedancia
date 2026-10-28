@@ -14,6 +14,24 @@ export const segmentClassificationOptions = [
 	{ value: 'high', label: 'Alto' },
 ];
 
+export const bodyscanProtocolKeys = [
+	'profile_confirmed',
+	'athlete_mode_confirmed',
+	'electrodes_contact_confirmed',
+	'comparable_conditions_confirmed',
+];
+
+export const emptyBodyscanProtocol = () => ({
+	profile_confirmed: false,
+	athlete_mode_confirmed: false,
+	electrodes_contact_confirmed: false,
+	comparable_conditions_confirmed: false,
+});
+
+export function bodyscanProtocolComplete(protocol) {
+	return bodyscanProtocolKeys.every((key) => protocol?.[key] === true);
+}
+
 export function bodyscanFormFromExtraction(extraction) {
 	return {
 		general: assessmentFromExtraction(extraction),
@@ -21,6 +39,7 @@ export function bodyscanFormFromExtraction(extraction) {
 			athlete_mode_at_assessment: '',
 			measurement_application: extraction?.source_application ?? extraction?.image?.source_application ?? '',
 		},
+		protocol: extraction?.measurement_protocol ?? emptyBodyscanProtocol(),
 		segments: (extraction?.segmental_measurements ?? []).map((segment) => ({
 			...segment,
 			mass_kg: displayNumber(segment.mass_kg),
@@ -46,6 +65,7 @@ export function bodyscanAssessmentPayload(form, clientId, sourceMetadata, confir
 		bodyscan_review_confirmed: confirmed,
 		athlete_mode_at_assessment: athleteMode === '' ? '' : athleteMode === '1',
 		measurement_application: form.profile?.measurement_application ?? '',
+		measurement_protocol: form.protocol ?? emptyBodyscanProtocol(),
 		segmental_measurements: form.segments.map(({ type, region, side, mass_kg, reference_percentage, classification, reference_min_percentage, reference_max_percentage }) => ({
 			type, region, side, classification,
 			mass_kg: normalizeDecimal(mass_kg),

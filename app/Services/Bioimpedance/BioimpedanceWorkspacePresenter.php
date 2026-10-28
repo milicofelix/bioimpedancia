@@ -158,6 +158,7 @@ class BioimpedanceWorkspacePresenter
             'measurement_application' => $assessment->measurement_application,
             'device_model_code' => $assessment->device_model_code,
             'device_manual_version' => $assessment->device_manual_version,
+            'measurement_protocol' => $assessment->measurement_protocol,
             'segmental_measurements' => $assessment->segmentalMeasurements
                 ->sortBy(fn ($measurement) => $measurement->type.'|'.$measurement->region.'|'.$measurement->side)
                 ->values()

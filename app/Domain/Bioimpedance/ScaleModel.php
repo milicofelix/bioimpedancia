@@ -29,6 +29,13 @@ final class ScaleModel
         self::BODYSCAN_APPLICATION_FITDAYS,
     ];
 
+    public const BODYSCAN_PROTOCOL_KEYS = [
+        'profile_confirmed',
+        'athlete_mode_confirmed',
+        'electrodes_contact_confirmed',
+        'comparable_conditions_confirmed',
+    ];
+
     public const CAPABILITY_MANUAL_ENTRY = 'manual_entry';
 
     public const CAPABILITY_IMAGE_IMPORT = 'image_import';

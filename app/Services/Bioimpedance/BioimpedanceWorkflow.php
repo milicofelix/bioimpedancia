@@ -851,6 +851,11 @@ class BioimpedanceWorkflow
             'bodyscan_review_confirmed' => ['accepted'],
             'athlete_mode_at_assessment' => ['required', 'boolean'],
             'measurement_application' => ['required', Rule::in(ScaleModel::BODYSCAN_APPLICATIONS)],
+            'measurement_protocol' => ['required', 'array:'.implode(',', ScaleModel::BODYSCAN_PROTOCOL_KEYS)],
+            'measurement_protocol.profile_confirmed' => ['accepted'],
+            'measurement_protocol.athlete_mode_confirmed' => ['accepted'],
+            'measurement_protocol.electrodes_contact_confirmed' => ['accepted'],
+            'measurement_protocol.comparable_conditions_confirmed' => ['accepted'],
             'source_metadata' => ['required', 'array'],
             'source_metadata.type' => ['required', Rule::in(['bodyscan_pro_image_extraction'])],
             'source_metadata.name' => ['required', 'string', 'max:255'],
@@ -891,6 +896,8 @@ class BioimpedanceWorkflow
             'source_metadata.required' => 'Processe novamente a imagem Bodyscan Pro antes de salvar.',
             'segmental_measurements.size' => 'Confira as cinco regiões de gordura e as cinco regiões musculares.',
             'segmental_measurements.*.required' => 'Todos os valores segmentares precisam ser conferidos e preenchidos.',
+            'measurement_protocol.required' => 'Confirme o protocolo da medição antes de importar o relatório.',
+            'measurement_protocol.*.accepted' => 'Todas as confirmações do protocolo são obrigatórias para registrar a avaliação.',
         ]);
 
         if (! $validated['source_metadata']['side_consistency']['left_marker_visible']
@@ -968,6 +975,7 @@ class BioimpedanceWorkflow
             'athlete_mode_at_assessment' => (bool) $validated['athlete_mode_at_assessment'],
             'device_model_code' => ScaleModel::BODYSCAN_PRO_MODEL_CODE,
             'device_manual_version' => ScaleModel::BODYSCAN_PRO_MANUAL_VERSION,
+            'measurement_protocol' => $validated['measurement_protocol'],
             'ocr_field_statuses' => $validated['source_metadata']['field_statuses'],
             'ocr_missing_fields' => $validated['source_metadata']['missing_fields'],
             'ocr_suspicious_values' => $validated['source_metadata']['suspicious_values'],
@@ -982,6 +990,7 @@ class BioimpedanceWorkflow
             'measurement_application' => $validated['measurement_application'],
             'device_model_code' => ScaleModel::BODYSCAN_PRO_MODEL_CODE,
             'device_manual_version' => ScaleModel::BODYSCAN_PRO_MANUAL_VERSION,
+            'measurement_protocol' => $validated['measurement_protocol'],
         ]];
     }
 
@@ -1143,6 +1152,7 @@ class BioimpedanceWorkflow
             'measurement_application' => $measurementProfile['measurement_application'] ?? null,
             'device_model_code' => $measurementProfile['device_model_code'] ?? null,
             'device_manual_version' => $measurementProfile['device_manual_version'] ?? null,
+            'measurement_protocol' => $measurementProfile['measurement_protocol'] ?? null,
         ];
     }
 
@@ -1158,6 +1168,7 @@ class BioimpedanceWorkflow
             'measurement_application' => $assessment->measurement_application,
             'device_model_code' => $assessment->device_model_code,
             'device_manual_version' => $assessment->device_manual_version,
+            'measurement_protocol' => $assessment->measurement_protocol,
         ];
     }
 
@@ -1170,6 +1181,7 @@ class BioimpedanceWorkflow
             'measurement_application',
             'device_model_code',
             'device_manual_version',
+            'measurement_protocol',
             'weight_kg',
             'scale_bmi',
             'calculated_bmi',

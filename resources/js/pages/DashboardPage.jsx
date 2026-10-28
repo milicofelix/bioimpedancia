@@ -20,7 +20,8 @@ import useActionLock from '../hooks/useActionLock';
 import CareGuidanceAssistant from '../pwa/features/assistant/CareGuidanceAssistant';
 import KnowledgeDocumentsPanel from '../components/bioimpedance/KnowledgeDocumentsPanel';
 import BodyscanReview from '../pwa/features/assessment/BodyscanReview';
-import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, updateBodyscanSegment } from '../pwa/features/assessment/bodyscanAssessmentForm';
+import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocolComplete, emptyBodyscanProtocol, updateBodyscanSegment } from '../pwa/features/assessment/bodyscanAssessmentForm';
+import BodyscanProtocolChecklist from '../pwa/features/assessment/BodyscanProtocolChecklist';
 
 const emptyClient = {
 	full_name: '',
@@ -530,7 +531,7 @@ export default function DashboardPage({ userName }) {
 	const [processingRelaxmedicImage, setProcessingRelaxmedicImage] = useState(false);
 	const [relaxmedicExtraction, setRelaxmedicExtraction] = useState(null);
 	const [relaxmedicReviewConfirmed, setRelaxmedicReviewConfirmed] = useState(false);
-	const [bodyscanForm, setBodyscanForm] = useState({ general: { ...emptyAssessment }, profile: { athlete_mode_at_assessment: '', measurement_application: '' }, segments: [] });
+	const [bodyscanForm, setBodyscanForm] = useState({ general: { ...emptyAssessment }, profile: { athlete_mode_at_assessment: '', measurement_application: '' }, protocol: emptyBodyscanProtocol(), segments: [] });
 	const [bodyscanProgressStep, setBodyscanProgressStep] = useState(1);
 
 	useEffect(() => {
@@ -655,6 +656,7 @@ export default function DashboardPage({ userName }) {
 	const isBodyscanProSelected = clinic.scale_model === 'relaxmedic_bodyscan_pro';
 	const isRelaxmedicAssessment = clinic.scale_model === 'relaxmedic' && assessmentMode === 'create';
 	const isBodyscanAssessment = isBodyscanProSelected && assessmentMode === 'create';
+	const bodyscanProtocolIsComplete = bodyscanProtocolComplete(bodyscanForm.protocol);
 	const isImageAssessment = isRelaxmedicAssessment || isBodyscanAssessment;
 	const relaxmedicFlaggedFields = new Set([
 		...(relaxmedicExtraction?.missing_fields ?? []),
@@ -782,7 +784,7 @@ export default function DashboardPage({ userName }) {
 		setRelaxmedicImageError('');
 		setRelaxmedicExtraction(null);
 		setRelaxmedicReviewConfirmed(false);
-		setBodyscanForm({ general: { ...emptyAssessment, evaluated_at: localDatetimeNow() }, profile: { athlete_mode_at_assessment: '', measurement_application: '' }, segments: [] });
+		setBodyscanForm({ general: { ...emptyAssessment, evaluated_at: localDatetimeNow() }, profile: { athlete_mode_at_assessment: '', measurement_application: '' }, protocol: emptyBodyscanProtocol(), segments: [] });
 		setBodyscanProgressStep(1);
 		if (relaxmedicImageInputRef.current) {
 			relaxmedicImageInputRef.current.value = '';
@@ -842,7 +844,7 @@ export default function DashboardPage({ userName }) {
 				evaluated_at: extraction.measured_at ?? localDatetimeNow(),
 				...Object.fromEntries(Object.entries(extraction.metrics ?? {}).map(([field, value]) => [field, value ?? ''])),
 			});
-			if (isBodyscanAssessment) setBodyscanForm(bodyscanFormFromExtraction(extraction));
+			if (isBodyscanAssessment) setBodyscanForm((current) => ({ ...bodyscanFormFromExtraction(extraction), protocol: current.protocol }));
 			setRelaxmedicReviewConfirmed(false);
 			setErrors({});
 			setRelaxmedicImage(null);
@@ -871,6 +873,11 @@ export default function DashboardPage({ userName }) {
 		setBodyscanForm((current) => ({ ...current, profile: { ...current.profile, [field]: value } }));
 		setRelaxmedicReviewConfirmed(false);
 		setErrors((current) => ({ ...current, [field]: undefined, bodyscan_review_confirmed: undefined }));
+	}
+
+	function updateBodyscanProtocol(field, checked) {
+		setBodyscanForm((current) => ({ ...current, protocol: { ...current.protocol, [field]: checked } }));
+		setRelaxmedicReviewConfirmed(false);
 	}
 
 	function clearAssessmentDraft() {
@@ -1748,6 +1755,7 @@ export default function DashboardPage({ userName }) {
 
 						{isImageAssessment ? (
 							<div className="mt-5 space-y-4">
+				{isBodyscanAssessment && !relaxmedicExtraction ? <BodyscanProtocolChecklist value={bodyscanForm.protocol} onChange={updateBodyscanProtocol} disabled={processingRelaxmedicImage} /> : null}
 				{isBodyscanAssessment ? <BodyscanDesktopProgress current={relaxmedicExtraction ? 4 : bodyscanProgressStep} /> : null}
 				<div className={`block rounded-2xl border-2 border-dashed p-5 transition ${relaxmedicImageError ? 'border-rose-300 bg-rose-50' : 'border-sky-200 bg-sky-50/60 hover:border-sky-300'}`}>
 									<span className="block text-sm font-bold text-slate-900">Imagem da avaliação {isBodyscanAssessment ? 'Bodyscan Pro' : 'Relaxmedic'}</span>
@@ -1757,7 +1765,7 @@ export default function DashboardPage({ userName }) {
 										type="file"
 										accept="image/jpeg,.jpg,.jpeg"
 										onChange={selectRelaxmedicImage}
-										disabled={!canClinicalProfessional || !selectedClient || !selectedClient.is_active}
+						disabled={!canClinicalProfessional || !selectedClient || !selectedClient.is_active || (isBodyscanAssessment && !bodyscanProtocolIsComplete)}
 						className="mt-4 block w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-sky-700 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white disabled:cursor-not-allowed disabled:opacity-50"
 									/>
 				</div>
@@ -1780,7 +1788,7 @@ export default function DashboardPage({ userName }) {
 													A leitura não salva a avaliação nem mantém uma cópia da imagem no banco ou no armazenamento desta aplicação.
 												</p>
 												<div className="mt-4 flex flex-wrap gap-2">
-											<button type="button" onClick={() => runAction('process-bioimpedance-image', processRelaxmedicImage)} disabled={processingRelaxmedicImage || !isOnline} aria-busy={processingRelaxmedicImage} className="rounded-xl bg-sky-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-60">
+											<button type="button" onClick={() => runAction('process-bioimpedance-image', processRelaxmedicImage)} disabled={processingRelaxmedicImage || !isOnline || (isBodyscanAssessment && !bodyscanProtocolIsComplete)} aria-busy={processingRelaxmedicImage} className="rounded-xl bg-sky-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-60">
 														{processingRelaxmedicImage ? 'Lendo imagem...' : relaxmedicExtraction ? 'Processar novamente' : 'Ler informações da imagem'}
 													</button>
 													<button type="button" onClick={clearRelaxmedicImage} disabled={processingRelaxmedicImage} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-bold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60">
