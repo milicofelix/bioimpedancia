@@ -17,13 +17,14 @@ use Illuminate\Support\Str;
 
 class BioimpedanceObservationAssistant
 {
-    public const PROMPT_VERSION = 'rag-client-1.1.0';
+    public const PROMPT_VERSION = 'rag-client-1.2.0';
 
     public const MODEL_NAME = 'local-validated-rag-agent';
 
     public function __construct(
         private readonly KnowledgeSourceSnapshot $sourceSnapshot,
         private readonly PublishedKnowledgeSourceRepository $publishedSources,
+        private readonly BioimpedanceSegmentalClinicalContext $segmentalContext,
     ) {}
 
     private const DEFAULT_DOCUMENTS = [
@@ -300,6 +301,7 @@ Não altere, recalcule nem questione as classificações oficiais do backend.
 Não gere diagnóstico, prescrição, dieta, medicação, suplemento ou tratamento.
 Não afirme causalidade médica. Não substitua avaliação de profissional habilitado.
 Para dados Relaxmedic, trate composição corporal e idade corporal como estimativas proprietárias, gordura visceral como índice do dispositivo e TMB como estimativa que não equivale ao gasto energético total. Não aplique faixas Omron nem conclua que força ou função muscular estão preservadas.
+Para dados Bodyscan, não conclua perda muscular, assimetria clínica ou preservação funcional com base nos segmentos. Descreva somente valores e tendências, ressalvando condições de medição e necessidade de avaliação profissional.
 Evite linguagem interna, acadêmica ou excessivamente técnica.
 Não use expressões como "Sugestão ao profissional", "considerar a combinação", "pode indicar", "fatores clínicos associados" ou "acompanhamento longitudinal".
 Prefira frases curtas, humanas e compreensíveis para o cliente.
@@ -458,10 +460,19 @@ PROMPT;
     private function validateResponse(array $response, BioimpedanceAssessment $assessment, Collection $chunks): array
     {
         $errors = [];
-        $allowedChunkKeys = $chunks->pluck('chunk_key')->all();
+        $allowedChunkKeys = [
+            ...$chunks->pluck('chunk_key')->all(),
+            'assessment:current',
+            'assessment:history',
+            ...($this->segmentalContext->for($assessment)['evidence_ids'] ?? []),
+        ];
         $text = Str::lower(json_encode($response, JSON_UNESCAPED_UNICODE));
 
-        foreach (['diagnóstico', 'diagnostico', 'prescrevo', 'prescrição', 'medicamento', 'suplemento obrigatório', 'dieta de'] as $forbidden) {
+        foreach ([
+            'diagnóstico', 'diagnostico', 'prescrevo', 'prescrição', 'medicamento', 'suplemento obrigatório', 'dieta de',
+            'perda muscular confirmada', 'apresenta perda muscular', 'assimetria clínica identificada',
+            'apresenta assimetria clínica', 'comprova função muscular preservada', 'confirma musculatura preservada',
+        ] as $forbidden) {
             if (str_contains($text, $forbidden)) {
                 $errors[] = 'Conteúdo proibido detectado: '.$forbidden;
             }
@@ -548,7 +559,7 @@ PROMPT;
     private function structuredContext(BioimpedanceAssessment $assessment, Collection $history): array
     {
         $indicators = $assessment->analysis['indicators'] ?? [];
-        $usesManufacturerOnlyReferences = $assessment->device_model === 'Relaxmedic';
+        $usesManufacturerOnlyReferences = in_array($assessment->device_model, ['Relaxmedic', 'Bodyscan Pro'], true);
 
         return [
             'assessment_id' => $assessment->id,
@@ -573,6 +584,7 @@ PROMPT;
             ] : null,
             'warnings' => $assessment->analysis['warnings'] ?? [],
             'professional_notes' => $assessment->notes,
+            'segmental_analysis' => $this->segmentalContext->for($assessment),
         ];
     }
 
@@ -638,7 +650,7 @@ PROMPT;
             return null;
         }
 
-        if ($assessment->device_model === 'Relaxmedic') {
+        if (in_array($assessment->device_model, ['Relaxmedic', 'Bodyscan Pro'], true)) {
             return 'O aplicativo registrou idade corporal estimada de '.$assessment->body_age.' anos; esse índice proprietário não representa idade biológica real.';
         }
 
@@ -656,17 +668,18 @@ PROMPT;
             return 'Esta avaliação servirá como linha de base para comparação nas próximas medições.';
         }
 
+        $manufacturerEstimate = in_array($assessment->device_model, ['Relaxmedic', 'Bodyscan Pro'], true);
         $changes = collect([
             $this->changeText('peso', $previous['weight_kg'], $assessment->weight_kg, 'kg', true),
-            $this->changeText('gordura corporal', $previous['body_fat_percentage'], $assessment->body_fat_percentage, 'ponto percentual', true),
-            $this->changeText('músculo esquelético', $previous['skeletal_muscle_percentage'], $assessment->skeletal_muscle_percentage, 'ponto percentual', false),
-            $this->changeText('gordura visceral', $previous['visceral_fat_level'], $assessment->visceral_fat_level, 'nível', true, 0),
+            $this->changeText('gordura corporal', $previous['body_fat_percentage'], $assessment->body_fat_percentage, 'ponto percentual', $manufacturerEstimate ? null : true),
+            $this->changeText('músculo esquelético estimado', $previous['skeletal_muscle_percentage'], $assessment->skeletal_muscle_percentage, 'ponto percentual', $manufacturerEstimate ? null : false),
+            $this->changeText('gordura visceral', $previous['visceral_fat_level'], $assessment->visceral_fat_level, 'nível', $manufacturerEstimate ? null : true, 0),
         ])->filter();
 
         return $changes->isEmpty() ? null : 'Em relação à avaliação anterior, houve '.$changes->implode(', ').'.';
     }
 
-    private function changeText(string $label, mixed $previousValue, mixed $currentValue, string $unit, bool $lowerIsAttention, int $decimals = 1): ?string
+    private function changeText(string $label, mixed $previousValue, mixed $currentValue, string $unit, ?bool $lowerIsAttention, int $decimals = 1): ?string
     {
         if ($previousValue === null || $currentValue === null) {
             return null;
@@ -678,7 +691,8 @@ PROMPT;
         }
 
         $direction = $delta > 0 ? 'aumento' : 'redução';
-        $attention = ($lowerIsAttention && $delta > 0) || (! $lowerIsAttention && $delta < 0);
+        $attention = $lowerIsAttention !== null
+            && (($lowerIsAttention && $delta > 0) || (! $lowerIsAttention && $delta < 0));
 
         return $direction.' de '.$this->number(abs($delta), $decimals).' '.$unit.($unit === 'nível' && abs($delta) != 1.0 ? 's' : '').' em '.$label.($attention ? ', ponto de atenção no acompanhamento' : '');
     }
@@ -688,6 +702,7 @@ PROMPT;
         return BioimpedanceAssessment::query()
             ->where('bioimpedance_client_id', $assessment->bioimpedance_client_id)
             ->whereNull('canceled_at')
+            ->where('device_model', $assessment->device_model)
             ->where('evaluated_at', '<', $assessment->evaluated_at)
             ->orderBy('evaluated_at')
             ->get();

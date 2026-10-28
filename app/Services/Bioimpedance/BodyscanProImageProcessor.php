@@ -161,8 +161,12 @@ class BodyscanProImageProcessor
             ),
         );
 
-        if (! ($payload['recognized'] ?? false) || $matchedSections->count() < 3) {
-            throw new RuntimeException('A imagem não foi reconhecida como um relatório completo ou parcial da Bodyscan Pro.');
+        $requiredSegmentalSections = collect(['analise de gordura segmentar', 'equilibrio muscular']);
+
+        if (! ($payload['recognized'] ?? false)
+            || $matchedSections->count() < 3
+            || $requiredSegmentalSections->diff($matchedSections)->isNotEmpty()) {
+            throw new RuntimeException('A imagem não possui as seções segmentares necessárias para um relatório Bodyscan Pro compatível.');
         }
 
         $qualityIssues = collect($payload['quality_issues'] ?? [])

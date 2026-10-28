@@ -439,6 +439,7 @@ class BioimpedanceWorkflow
     public function updateAssessment(Request $request, BioimpedanceAssessment $assessment, BioimpedanceAnalyzer $analyzer): JsonResponse
     {
         $this->authorizeClinicalProfessional($request);
+        $assessment->loadMissing('segmentalMeasurements');
         if ($assessment->canceled_at) {
             throw ValidationException::withMessages([
                 'bioimpedance_assessment_id' => 'Avaliação cancelada não pode ser alterada.',
@@ -474,7 +475,8 @@ class BioimpedanceWorkflow
                 'care_guidance_approved_at' => null,
             ]);
 
-            $this->auditAssessment($assessment->refresh(), $request, 'corrected', $changeReason, $oldValues, $this->assessmentAuditValues($assessment));
+            $assessment->refresh()->load('segmentalMeasurements');
+            $this->auditAssessment($assessment, $request, 'corrected', $changeReason, $oldValues, $this->assessmentAuditValues($assessment));
             $this->audit(
                 $request,
                 'bioimpedance_assessment.corrected',
@@ -715,6 +717,22 @@ class BioimpedanceWorkflow
                     ->pluck('id')->values()->all(),
             ])->filter(fn ($source) => filled($source['id']))->values()->all();
 
+        $segmentalSources = collect(data_get($output->request->structured_context, 'segmental_analysis.current', []))
+            ->concat(data_get($output->request->structured_context, 'segmental_analysis.previous_same_model.measurements', []))
+            ->filter(fn (array $measurement) => $usedSourceIds->contains($measurement['evidence_id'] ?? null))
+            ->map(fn (array $measurement) => [
+                'id' => $measurement['evidence_id'],
+                'document' => 'Avaliação Bodyscan Pro',
+                'version' => $measurement['reference_version'] ?? $assessment->reference_version,
+                'section' => $this->segmentalAuditLabel($measurement),
+                'url' => null,
+                'checksum' => null,
+                'claim_ids' => collect($output->structured_claims ?? [])
+                    ->filter(fn (array $claim) => in_array($measurement['evidence_id'], $claim['source_ids'] ?? [], true))
+                    ->pluck('id')->values()->all(),
+            ])->values()->all();
+        $sources = [...$sources, ...$segmentalSources];
+
         DB::transaction(function () use ($assessment, $request, $validated, $output, $sources): void {
             $oldValues = $this->assessmentAuditValues($assessment);
             $assessment->update([
@@ -836,12 +854,15 @@ class BioimpedanceWorkflow
             'source_metadata.metrics' => ['required', 'array'],
             'source_metadata.segmental_measurements' => ['required', 'array', 'size:10'],
             'source_metadata.raw_values' => ['present', 'array'],
-            'source_metadata.detected_sections' => ['required', 'array', 'min:3'],
+            'source_metadata.detected_sections' => ['required', 'array', 'min:4'],
             'source_metadata.field_statuses' => ['present', 'array'],
             'source_metadata.missing_fields' => ['present', 'array'],
             'source_metadata.suspicious_values' => ['present', 'array'],
             'source_metadata.quality_issues' => ['present', 'array'],
             'source_metadata.side_consistency' => ['required', 'array'],
+            'source_metadata.side_consistency.left_marker_visible' => ['required', 'boolean'],
+            'source_metadata.side_consistency.right_marker_visible' => ['required', 'boolean'],
+            'source_metadata.side_consistency.possible_swap' => ['required', 'boolean'],
             'source_metadata.signature' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/'],
             'segmental_measurements' => ['required', 'array', 'size:10'],
             'segmental_measurements.*.type' => ['required', Rule::in(BioimpedanceSegmentalMeasurement::TYPES)],
@@ -861,6 +882,13 @@ class BioimpedanceWorkflow
 
         if (! $processor->verifyMetadata($validated['source_metadata'])) {
             throw ValidationException::withMessages(['source_metadata' => 'A extração Bodyscan foi alterada ou expirou. Processe novamente a imagem.']);
+        }
+
+        if (! $validated['source_metadata']['side_consistency']['left_marker_visible']
+            || ! $validated['source_metadata']['side_consistency']['right_marker_visible']) {
+            throw ValidationException::withMessages([
+                'source_metadata' => 'Os marcadores L e R precisam estar legíveis. Envie uma imagem completa e mais nítida antes de criar a avaliação.',
+            ]);
         }
 
         $expectedKeys = collect(BioimpedanceSegmentalMeasurement::TYPES)
@@ -893,6 +921,28 @@ class BioimpedanceWorkflow
                 'raw_value' => data_get($originals->get($key), 'raw_value'),
             ];
         })->all();
+        $segmentalReviewCorrections = collect($segments)->map(function (array $segment) use ($originals): ?array {
+            $key = $segment['type'].'|'.$segment['region'].'|'.$segment['side'];
+            $original = $originals->get($key, []);
+            $changes = collect(['mass_kg', 'reference_percentage', 'classification', 'reference_min_percentage', 'reference_max_percentage'])
+                ->mapWithKeys(function (string $field) use ($original, $segment): array {
+                    $before = $original[$field] ?? null;
+                    $after = $segment[$field] ?? null;
+                    $sameValue = $field === 'classification'
+                        ? (string) $before === (string) $after
+                        : (($before === null && $after === null)
+                            || (is_numeric($before) && is_numeric($after) && abs((float) $before - (float) $after) < 0.001));
+
+                    return $sameValue ? [] : [$field => ['extracted' => $before, 'confirmed' => $after]];
+                })->all();
+
+            return $changes === [] ? null : [
+                'type' => $segment['type'],
+                'region' => $segment['region'],
+                'side' => $segment['side'],
+                'changes' => $changes,
+            ];
+        })->filter()->values()->all();
 
         return [[
             'type' => 'bodyscan_pro_image_extraction',
@@ -907,7 +957,10 @@ class BioimpedanceWorkflow
             'ocr_field_statuses' => $validated['source_metadata']['field_statuses'],
             'ocr_missing_fields' => $validated['source_metadata']['missing_fields'],
             'ocr_suspicious_values' => $validated['source_metadata']['suspicious_values'],
+            'ocr_quality_issues' => $validated['source_metadata']['quality_issues'],
+            'ocr_detected_sections' => $validated['source_metadata']['detected_sections'],
             'side_consistency' => $validated['source_metadata']['side_consistency'],
+            'segmental_review_corrections' => $segmentalReviewCorrections,
             'review_confirmed_at' => now()->toIso8601String(),
             'reviewed_by_user_id' => $request->user()->id,
         ], $segments];
@@ -1129,6 +1182,21 @@ class BioimpedanceWorkflow
         }
 
         return $values;
+    }
+
+    private function segmentalAuditLabel(array $measurement): string
+    {
+        $type = ($measurement['type'] ?? null) === BioimpedanceSegmentalMeasurement::TYPE_FAT ? 'Gordura' : 'Músculo';
+        $region = match ([$measurement['region'] ?? null, $measurement['side'] ?? null]) {
+            ['arm', 'left'] => 'braço esquerdo',
+            ['arm', 'right'] => 'braço direito',
+            ['trunk', 'center'] => 'tronco',
+            ['leg', 'left'] => 'perna esquerda',
+            ['leg', 'right'] => 'perna direita',
+            default => 'região não identificada',
+        };
+
+        return $type.' segmentar - '.$region;
     }
 
     private function auditAssessment(BioimpedanceAssessment $assessment, Request $request, string $action, string $reason, array $oldValues, array $newValues): void

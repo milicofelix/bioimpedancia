@@ -26,6 +26,12 @@ class CareGuidanceSemanticValidator
         'colesterol alto',
         'diabetes',
         'hipertensão',
+        'perda muscular confirmada',
+        'apresenta perda muscular',
+        'assimetria clínica identificada',
+        'apresenta assimetria clínica',
+        'comprova função muscular preservada',
+        'confirma musculatura preservada',
     ];
 
     public function validate(array $response, Collection $chunks, array $context): array
@@ -167,6 +173,8 @@ class CareGuidanceSemanticValidator
         if (filled($context['professional_observation'] ?? null)) {
             $sources[] = 'observation:approved';
         }
+
+        $sources = [...$sources, ...($context['segmental_evidence_ids'] ?? [])];
 
         return $sources;
     }
