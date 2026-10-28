@@ -7,7 +7,7 @@ const omronMetrics = [
 	{ field: 'skeletal_muscle_percentage', label: 'Músculo esquelético', unit: '%', decimals: 1 },
 	{ field: 'visceral_fat_level', label: 'Gordura visceral', unit: '', decimals: 1 },
 	{ field: 'resting_metabolism_kcal', label: 'Metabolismo basal', unit: 'kcal', decimals: 0 },
-	{ field: 'body_age', label: 'Idade corporal', unit: 'anos', decimals: 0 },
+	{ field: 'body_age', label: 'Índice de idade corporal do aparelho', unit: 'anos', decimals: 0 },
 ];
 
 const relaxmedicUnits = {
@@ -35,7 +35,7 @@ const textFields = ['obesity_level', 'body_type'];
 const integerFields = ['resting_metabolism_kcal', 'body_age'];
 
 export function metricsForAssessment(assessment) {
-	const definitions = assessment?.device_model === 'Relaxmedic'
+	const definitions = ['Relaxmedic', 'Bodyscan Pro'].includes(assessment?.device_model)
 		? Object.entries(relaxmedicMetricLabels).map(([field, label]) => ({
 			field,
 			label: label.replace(/ \([^)]*\)$/, ''),

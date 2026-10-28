@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { apiErrorMessage, apiValidationErrors, createBioimpedanceAssessment, processRelaxmedicImage } from '../../../services/bioimpedanceApi';
+import { apiErrorMessage, apiValidationErrors, createBioimpedanceAssessment, processBodyscanProImage, processRelaxmedicImage } from '../../../services/bioimpedanceApi';
 import { assessmentAccess } from '../clients/clientAccess';
 import RelaxmedicImagePicker, { validateRelaxmedicImage } from './RelaxmedicImagePicker';
 import RelaxmedicReview from './RelaxmedicReview';
@@ -11,6 +11,10 @@ import PwaCard from '../../components/ui/PwaCard';
 import PwaJourneyHeader from '../../components/ui/PwaJourneyHeader';
 import PwaStepIndicator from '../../components/ui/PwaStepIndicator';
 import useActionLock from '../../../hooks/useActionLock';
+import BodyscanReview from './BodyscanReview';
+import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocolComplete, emptyBodyscanProtocol, updateBodyscanSegment } from './bodyscanAssessmentForm';
+import BodyscanOcrProgress from './BodyscanOcrProgress';
+import BodyscanProtocolChecklist from './BodyscanProtocolChecklist';
 
 export default function RelaxmedicAssessmentFeature({ client, currentUser, scaleModel, onBackToClients, onCreated, onOpenAssistant }) {
 	const runAction = useActionLock();
@@ -20,6 +24,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 	const [previewUrl, setPreviewUrl] = useState('');
 	const [extraction, setExtraction] = useState(null);
 	const [form, setForm] = useState(emptyRelaxmedicAssessment);
+	const [bodyscanForm, setBodyscanForm] = useState({ general: emptyRelaxmedicAssessment(), profile: { athlete_mode_at_assessment: '', measurement_application: '' }, protocol: emptyBodyscanProtocol(), segments: [] });
 	const [confirmed, setConfirmed] = useState(false);
 	const [processing, setProcessing] = useState(false);
 	const [saving, setSaving] = useState(false);
@@ -28,7 +33,11 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 	const [errors, setErrors] = useState({});
 	const [createdAssessment, setCreatedAssessment] = useState(null);
 	const [pickerVersion, setPickerVersion] = useState(0);
+	const [bodyscanProcessingStage, setBodyscanProcessingStage] = useState(0);
 	const isOnline = useOnlineStatus();
+	const isBodyscan = scaleModel === 'relaxmedic_bodyscan_pro';
+	const protocolComplete = bodyscanProtocolComplete(bodyscanForm.protocol);
+	const journeySteps = isBodyscan ? ['Imagem', 'Leitura geral', 'Leitura segmentar', 'Conferência', 'Conclusão'] : ['Imagem', 'Processamento', 'Conferência', 'Conclusão'];
 
 	useEffect(() => () => {
 		if (previewReference.current) URL.revokeObjectURL(previewReference.current);
@@ -46,6 +55,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 		setImageName('');
 		setExtraction(null);
 		setForm(emptyRelaxmedicAssessment());
+		setBodyscanForm({ general: emptyRelaxmedicAssessment(), profile: { athlete_mode_at_assessment: '', measurement_application: '' }, protocol: emptyBodyscanProtocol(), segments: [] });
 		setConfirmed(false);
 		setImageError('');
 		setGeneralError('');
@@ -76,27 +86,55 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 	}
 
 	async function processImage() {
-		return runAction('process-relaxmedic-image', async () => {
+		return runAction('process-bioimpedance-image', async () => {
 			if (!imageFile || processing || !isOnline) return;
 			setProcessing(true);
+		setBodyscanProcessingStage(0);
 			setImageError('');
 			setGeneralError('');
 			setErrors({});
 
 			try {
-				const result = await processRelaxmedicImage(imageFile);
+				const result = scaleModel === 'relaxmedic_bodyscan_pro'
+					? await processBodyscanProImage(imageFile)
+					: await processRelaxmedicImage(imageFile);
 				setExtraction(result);
-				setForm(assessmentFromExtraction(result));
+				if (scaleModel === 'relaxmedic_bodyscan_pro') setBodyscanForm((current) => ({ ...bodyscanFormFromExtraction(result), protocol: current.protocol }));
+				else setForm(assessmentFromExtraction(result));
 				setConfirmed(false);
+				// A referência enviável é removida após o OCR; a URL temporária permanece apenas para conferência.
+				setImageFile(null);
+				setPickerVersion((current) => current + 1);
 			} catch (error) {
 				setImageError(apiValidationErrors(error).image?.[0] ?? apiErrorMessage(error, 'Não foi possível processar a imagem.'));
 			} finally {
-				// O arquivo deixa o estado após a tentativa. A URL temporária só permanece para a conferência visual.
-				setImageFile(null);
-				setPickerVersion((current) => current + 1);
 				setProcessing(false);
 			}
 		});
+	}
+
+	function updateBodyscanGeneral(field, value) {
+		const maskedValue = field === 'evaluated_at' || field === 'notes' ? value : maskRelaxmedicValue(field, value);
+		setBodyscanForm((current) => ({ ...current, general: { ...current.general, [field]: maskedValue } }));
+		setConfirmed(false);
+		setErrors((current) => ({ ...current, [field]: undefined, bodyscan_review_confirmed: undefined }));
+	}
+
+	function updateSegment(index, field, value) {
+		setBodyscanForm((current) => ({ ...current, segments: updateBodyscanSegment(current.segments, index, field, value) }));
+		setConfirmed(false);
+		setErrors({});
+	}
+
+	function updateBodyscanProfile(field, value) {
+		setBodyscanForm((current) => ({ ...current, profile: { ...current.profile, [field]: value } }));
+		setConfirmed(false);
+		setErrors((current) => ({ ...current, [field]: undefined, bodyscan_review_confirmed: undefined }));
+	}
+
+	function updateBodyscanProtocol(field, checked) {
+		setBodyscanForm((current) => ({ ...current, protocol: { ...current.protocol, [field]: checked } }));
+		setConfirmed(false);
 	}
 
 	function update(field, value) {
@@ -115,7 +153,10 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 			setErrors({});
 
 			try {
-				const result = await createBioimpedanceAssessment(relaxmedicAssessmentPayload(form, client.id, extraction.image, confirmed));
+				const payload = scaleModel === 'relaxmedic_bodyscan_pro'
+					? bodyscanAssessmentPayload(bodyscanForm, client.id, extraction.image, confirmed)
+					: relaxmedicAssessmentPayload(form, client.id, extraction.image, confirmed);
+				const result = await createBioimpedanceAssessment(payload);
 				setCreatedAssessment(result.assessment);
 				onCreated(result.client, result.assessment);
 				clearPreview();
@@ -135,7 +176,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 		return <BlockedState title="Selecione um cliente" description="Abra o cadastro de um cliente e toque em “Nova avaliação” para iniciar." onBack={onBackToClients} />;
 	}
 
-	if (scaleModel !== 'relaxmedic') {
+	if (!['relaxmedic', 'relaxmedic_bodyscan_pro'].includes(scaleModel)) {
 		return <BlockedState title="Relaxmedic não está selecionada" description="A versão PWA desta etapa aceita apenas avaliações Relaxmedic. Altere o modelo nas configurações do painel para continuar." onBack={onBackToClients} />;
 	}
 
@@ -145,7 +186,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 	if (createdAssessment) {
 		return (
 			<PwaCard className="p-6 text-center">
-				<PwaStepIndicator steps={['Imagem', 'Processamento', 'Conferência', 'Conclusão']} current={4} />
+				<PwaStepIndicator steps={journeySteps} current={journeySteps.length} />
 				<div className="mx-auto mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-ricosty-100 text-2xl font-black text-ricosty-700">✓</div>
 				<h2 className="mt-3 text-xl font-bold text-slate-950">Avaliação criada com segurança</h2>
 				<p className="mt-2 text-sm leading-6 text-slate-600">Os dados de {client.full_name} foram salvos após a confirmação. A prévia temporária foi removida da PWA.</p>
@@ -159,16 +200,19 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 
 	return (
 		<div className="space-y-4">
-			<PwaJourneyHeader icon="camera" eyebrow="Nova avaliação · Relaxmedic" title={client.full_name} description="A avaliação só será criada depois do processamento e da sua confirmação." />
-			<PwaStepIndicator steps={['Imagem', 'Processamento', 'Conferência', 'Conclusão']} current={extraction ? 3 : processing ? 2 : 1} />
+			<PwaJourneyHeader icon="camera" eyebrow={`Nova avaliação · ${scaleModel === 'relaxmedic_bodyscan_pro' ? 'Bodyscan Pro' : 'Relaxmedic'}`} title={client.full_name} description="A avaliação só será criada depois do processamento e da sua confirmação." />
+			<PwaStepIndicator steps={journeySteps} current={extraction ? journeySteps.length - 1 : processing ? 2 + (isBodyscan ? bodyscanProcessingStage : 0) : 1} />
 
-			{processing ? <RelaxmedicOcrProgress previewUrl={previewUrl} /> : !extraction ? (
+			{processing ? (isBodyscan ? <BodyscanOcrProgress previewUrl={previewUrl} onStageChange={setBodyscanProcessingStage} /> : <RelaxmedicOcrProgress previewUrl={previewUrl} />) : !extraction ? (
 				<>
-					<RelaxmedicImagePicker key={pickerVersion} previewUrl={previewUrl} fileName={imageName} disabled={!isOnline} error={imageError} onSelect={selectImage} />
-					{previewUrl ? <PwaButton type="button" disabled={!imageFile || !isOnline} onClick={processImage} icon="sparkles" className="w-full">{imageFile ? 'Enviar e processar imagem' : 'Selecione novamente para tentar'}</PwaButton> : null}
+					{isBodyscan ? <BodyscanProtocolChecklist value={bodyscanForm.protocol} onChange={updateBodyscanProtocol} /> : null}
+					<RelaxmedicImagePicker key={pickerVersion} reportName={scaleModel === 'relaxmedic_bodyscan_pro' ? 'Bodyscan Pro' : 'Relaxmedic'} previewUrl={previewUrl} fileName={imageName} disabled={!isOnline || (isBodyscan && !protocolComplete)} error={imageError} onSelect={selectImage} />
+					{previewUrl ? <PwaButton type="button" disabled={!imageFile || !isOnline || (isBodyscan && !protocolComplete)} onClick={processImage} icon="sparkles" className="w-full">{imageFile ? 'Enviar e processar imagem' : 'Selecione novamente para tentar'}</PwaButton> : null}
 				</>
 			) : (
-				<RelaxmedicReview previewUrl={previewUrl} form={form} extraction={extraction} confirmed={confirmed} errors={errors} saving={saving} online={isOnline} onUpdate={update} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />
+				scaleModel === 'relaxmedic_bodyscan_pro'
+					? <BodyscanReview previewUrl={previewUrl} form={bodyscanForm} extraction={extraction} client={client} confirmed={confirmed} errors={errors} saving={saving} online={isOnline} onGeneralUpdate={updateBodyscanGeneral} onProfileUpdate={updateBodyscanProfile} onSegmentUpdate={updateSegment} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />
+					: <RelaxmedicReview previewUrl={previewUrl} form={form} extraction={extraction} confirmed={confirmed} errors={errors} saving={saving} online={isOnline} onUpdate={update} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />
 			)}
 			{generalError ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{generalError}</p> : null}
 		</div>

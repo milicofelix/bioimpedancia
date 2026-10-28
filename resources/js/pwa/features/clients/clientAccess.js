@@ -17,8 +17,8 @@ export function assessmentAccess(client, user, scaleModel) {
 	if (!client?.is_active) return { allowed: false, reason: 'Cliente inativo não pode receber novas avaliações.' };
 	if (client?.is_anonymized) return { allowed: false, reason: 'Cliente anonimizado não pode receber novas avaliações.' };
 	if (!WRITE_ROLES.includes(user?.role)) return { allowed: false, reason: 'Seu perfil possui permissão somente para consulta.' };
-	if (scaleModel === 'relaxmedic' && !CLINICAL_ROLES.includes(user?.role)) {
-		return { allowed: false, reason: 'Avaliações Relaxmedic exigem perfil profissional ou administrador.' };
+	if (['relaxmedic', 'relaxmedic_bodyscan_pro'].includes(scaleModel) && !CLINICAL_ROLES.includes(user?.role)) {
+		return { allowed: false, reason: 'Avaliações importadas exigem perfil profissional ou administrador.' };
 	}
 
 	return { allowed: true, reason: null };

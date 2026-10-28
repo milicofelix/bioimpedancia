@@ -218,7 +218,7 @@ class BioimpedanceModuleTest extends TestCase
         $user = User::factory()->create(['role' => User::ROLE_ADMIN]);
 
         $this->actingAs($user)->patchJson(route('bioimpedance.clinic.update'), [
-            'display_name' => 'Ricosty Emagrecimento e Estética',
+            'display_name' => 'Vita Scan Análise clínica Biológica',
             'legal_name' => 'Ricosty Clinica LTDA',
             'document' => '12.345.678/0001-99',
             'phone' => '(11) 3333-4444',

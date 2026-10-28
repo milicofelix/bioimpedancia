@@ -28,6 +28,7 @@ return [
         'vision_model' => env('OPENAI_VISION_MODEL', env('OPENAI_MODEL', 'gpt-5.1')),
         'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
         'timeout' => (int) env('OPENAI_TIMEOUT', 45),
+        'bodyscan_ocr_timeout' => (int) env('OPENAI_BODYSCAN_OCR_TIMEOUT', 90),
     ],
 
     'ses' => [

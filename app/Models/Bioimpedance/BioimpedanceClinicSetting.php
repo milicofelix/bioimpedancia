@@ -2,27 +2,24 @@
 
 namespace App\Models\Bioimpedance;
 
+use App\Domain\Bioimpedance\ScaleModel;
 use Illuminate\Database\Eloquent\Model;
 
 class BioimpedanceClinicSetting extends Model
 {
-    public const SCALE_MODEL_OMRON_HBF_514C = 'omron_hbf_514c';
+    public const SCALE_MODEL_OMRON_HBF_514C = ScaleModel::OMRON_HBF_514C;
 
-    public const SCALE_MODEL_RELAXMEDIC = 'relaxmedic';
+    public const SCALE_MODEL_RELAXMEDIC = ScaleModel::RELAXMEDIC;
 
-    public const SCALE_MODELS = [
-        self::SCALE_MODEL_OMRON_HBF_514C,
-        self::SCALE_MODEL_RELAXMEDIC,
-    ];
+    public const SCALE_MODEL_BODYSCAN_PRO = ScaleModel::BODYSCAN_PRO;
 
-    public const SCALE_MODEL_NAMES = [
-        self::SCALE_MODEL_OMRON_HBF_514C => 'HBF-514C',
-        self::SCALE_MODEL_RELAXMEDIC => 'Relaxmedic',
-    ];
+    public const SCALE_MODELS = ScaleModel::MODELS;
+
+    public const SCALE_MODEL_NAMES = ScaleModel::NAMES;
 
     public const DEFAULTS = [
-        'display_name' => 'Ricosty Emagrecimento e Estética',
-        'legal_name' => 'Ricosty Emagrecimento e Estética',
+        'display_name' => 'Vita Scan Análise clínica Biológica',
+        'legal_name' => 'Vita Scan Análise clínica Biológica',
         'document' => null,
         'phone' => null,
         'whatsapp' => null,
@@ -34,9 +31,9 @@ class BioimpedanceClinicSetting extends Model
         'secondary_color' => '#4a4a4a',
         'logo_url' => '/images/brand/ricosty-logo.png',
         'contact' => 'Avaliação corporal e acompanhamento estético',
-        'footer_text' => 'Ricosty Emagrecimento e Estética - Avaliação corporal e acompanhamento estético',
+        'footer_text' => 'Vita Scan Análise clínica Biológica - Avaliação corporal e acompanhamento estético',
         'technical_notice' => 'Os resultados de bioimpedância são estimativas e podem variar conforme hidratação, alimentação, ciclo hormonal, medicamentos e condições de medição. Este documento não substitui avaliação médica ou nutricional.',
-        'scale_model' => self::SCALE_MODEL_OMRON_HBF_514C,
+        'scale_model' => self::SCALE_MODEL_BODYSCAN_PRO,
     ];
 
     protected $fillable = [
@@ -69,13 +66,31 @@ class BioimpedanceClinicSetting extends Model
             ...self::DEFAULTS,
             ...$this->only($this->fillable),
             'logo_initials' => $this->initials(),
+            'scale_model_name' => $this->scaleModelName(),
+            'scale_capabilities' => $this->scaleCapabilities(),
+            'scale_reference_version' => $this->scaleReferenceVersion(),
         ];
     }
 
     public function scaleModelName(): string
     {
-        return self::SCALE_MODEL_NAMES[$this->scale_model]
-            ?? self::SCALE_MODEL_NAMES[self::SCALE_MODEL_OMRON_HBF_514C];
+        return ScaleModel::name($this->scale_model);
+    }
+
+    /** @return list<string> */
+    public function scaleCapabilities(): array
+    {
+        return ScaleModel::capabilities($this->scale_model);
+    }
+
+    public function scaleSupports(string $capability): bool
+    {
+        return ScaleModel::supports($this->scale_model, $capability);
+    }
+
+    public function scaleReferenceVersion(): string
+    {
+        return ScaleModel::referenceVersion($this->scale_model);
     }
 
     private function initials(): string

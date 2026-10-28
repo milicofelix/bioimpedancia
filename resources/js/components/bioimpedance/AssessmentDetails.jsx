@@ -5,6 +5,8 @@ import {
 	relaxmedicMetricMetadata,
 } from '../../domain/bioimpedance/relaxmedic';
 import { formatDate, numberBr } from '../../shared/formatters';
+import SegmentalBodyMap from './SegmentalBodyMap';
+import SegmentalComparison from './SegmentalComparison';
 
 function metricValue(field, value) {
 	if (value === null || value === undefined || value === '') return '-';
@@ -14,10 +16,10 @@ function metricValue(field, value) {
 	return numberBr(value, 1);
 }
 
-export default function AssessmentDetails({ assessment }) {
+export default function AssessmentDetails({ assessment, previousAssessment }) {
 	if (!assessment) return null;
 
-	const isRelaxmedic = assessment.device_model === 'Relaxmedic';
+	const isRelaxmedic = ['Relaxmedic', 'Bodyscan Pro'].includes(assessment.device_model);
 	const metrics = isRelaxmedic
 		? relaxmedicAdditionalMetricFields.filter((field) => assessment[field] !== null && assessment[field] !== undefined && assessment[field] !== '')
 		: [];
@@ -46,6 +48,9 @@ export default function AssessmentDetails({ assessment }) {
 					))}
 				</div>
 			) : null}
+
+			{assessment.segmental_measurements?.length ? <div className="mt-4 grid gap-4 xl:grid-cols-2"><SegmentalBodyMap measurements={assessment.segmental_measurements} type="fat" /><SegmentalBodyMap measurements={assessment.segmental_measurements} type="muscle" /></div> : null}
+			{assessment.segmental_measurements?.length ? <SegmentalComparison current={assessment.segmental_measurements} previous={previousAssessment?.segmental_measurements ?? []} previousDate={previousAssessment ? formatDate(previousAssessment.evaluated_at) : null} /> : null}
 
 			{isRelaxmedic && assessment.source_metadata ? (
 				<div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-900">

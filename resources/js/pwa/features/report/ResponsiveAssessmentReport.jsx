@@ -2,18 +2,23 @@ import React from 'react';
 import { formatDate } from '../../../shared/formatters';
 import { formatMetric, metricDelta, metricsForAssessment } from './reportMetrics';
 import PwaIcon from '../../components/ui/PwaIcon';
+import SegmentalBodyMap from '../../../components/bioimpedance/SegmentalBodyMap';
+import SegmentalComparison from '../../../components/bioimpedance/SegmentalComparison';
+import VitaScanBrand from '../../../components/brand/VitaScanBrand';
 
 export default function ResponsiveAssessmentReport({ client, assessment, previous }) {
 	const metrics = metricsForAssessment(assessment);
 	const primaryFields = new Set(['weight_kg', 'calculated_bmi', 'scale_bmi', 'body_fat_percentage']);
 	const primaryMetrics = metrics.filter((metric) => primaryFields.has(metric.field)).slice(0, 3);
 	const secondaryMetrics = metrics.filter((metric) => !primaryMetrics.includes(metric));
+	const specifications = assessment.device_technical_specifications;
+	const informationalReferences = assessment.analysis?.reference?.informational_references ?? [];
 
 	return (
 		<article className="pwa-card overflow-hidden">
 			<header className="bg-white">
 				<div className="flex flex-wrap items-center justify-between gap-4 border-b border-ricosty-100 px-5 py-4 sm:px-6">
-					<img src="/images/brand/ricosty-logo.png" alt="Ricosty Emagrecimento e Estética" className="h-11 w-32 object-contain object-left" />
+					<VitaScanBrand headingLevel="h2" size="compact" showTagline={false} />
 					<div className="text-right"><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ricosty-700">Documento clínico</p><p className="mt-1 text-xs font-semibold text-slate-600">Avaliação #{assessment.id}</p></div>
 				</div>
 				<div className="relative overflow-hidden bg-gradient-to-br from-ricosty-950 via-ricosty-900 to-amber-800 p-5 text-white sm:p-6">
@@ -29,6 +34,7 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 			</header>
 
 			<div className="p-4 sm:p-5">
+				{specifications ? <p className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-700"><strong>Especificações do equipamento:</strong> {specifications.electrodes} eletrodos · dupla frequência de {specifications.frequencies_khz.join(' kHz + ')} kHz · temperatura operacional de {specifications.minimum_temperature_c} °C a {specifications.maximum_temperature_c} °C. O manual não informa margem de erro; os valores são apresentados conforme o relatório importado.</p> : null}
 				<p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-ricosty-600">Principais resultados</p>
 				<div className="grid gap-3 sm:grid-cols-3">
 					{primaryMetrics.map((metric) => (
@@ -43,7 +49,10 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 				</div>
 				<div className="mt-3 grid gap-3 sm:grid-cols-2">{secondaryMetrics.map((metric) => <div key={metric.field} className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{metric.label}</p><p className="mt-1 break-words text-base font-bold text-slate-950">{formatMetric(assessment[metric.field], metric)}</p>{metric.type ? <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-sky-700">{metric.type}</p> : null}{metric.note ? <p className="mt-1 text-xs leading-5 text-slate-600">{metric.note}</p> : null}</div>)}</div>
 
-				{assessment.device_model === 'Relaxmedic' ? <section className="mt-5 rounded-xl border border-sky-200 bg-sky-50 p-4 text-xs leading-5 text-sky-950"><strong>Como interpretar:</strong> os dados de composição corporal são estimativas produzidas por algoritmos do equipamento. Coerência matemática entre massa gorda, massa magra e peso não comprova precisão fisiológica. Compare tendências em condições semelhantes e não use IMC ou “peso ideal” isoladamente para definir objetivos.</section> : null}
+				{['Relaxmedic', 'Bodyscan Pro'].includes(assessment.device_model) ? <section className="mt-5 rounded-xl border border-sky-200 bg-sky-50 p-4 text-xs leading-5 text-sky-950"><strong>Como interpretar:</strong> os dados de composição corporal são estimativas produzidas por algoritmos do equipamento. Coerência matemática entre massa gorda, massa magra e peso não comprova precisão fisiológica. Compare tendências em condições semelhantes e não use IMC ou “peso ideal” isoladamente para definir objetivos.</section> : null}
+				{informationalReferences.length ? <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-4"><h3 className="font-bold text-slate-950">Referências informativas do manual</h3><p className="mt-1 text-xs leading-5 text-slate-600">Faixas genéricas, sem separação por sexo ou idade e sem classificação clínica. O manual descreve uso doméstico e não apresenta validação clínica. Apenas o IMC utiliza classificação automática convencional.</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{informationalReferences.map((reference) => <div key={reference.key} className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-bold text-slate-800">{reference.label}</p><p className="mt-1 text-base font-extrabold text-slate-950">{reference.manual_range}</p><p className="mt-1 text-xs leading-5 text-slate-600">{reference.note}</p></div>)}</div></section> : null}
+				{assessment.segmental_measurements?.length ? <section className="mt-5"><p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-ricosty-600">Análise segmentar Bodyscan</p><div className="grid gap-4 xl:grid-cols-2"><SegmentalBodyMap measurements={assessment.segmental_measurements} type="fat" /><SegmentalBodyMap measurements={assessment.segmental_measurements} type="muscle" /></div></section> : null}
+				{assessment.segmental_measurements?.length ? <SegmentalComparison current={assessment.segmental_measurements} previous={previous?.segmental_measurements ?? []} previousDate={previous ? formatDate(previous.evaluated_at) : null} /> : null}
 				{assessment.age_at_assessment >= 60 ? <section className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-950"><strong>Atenção à funcionalidade:</strong> em pessoas com 60 anos ou mais, o planejamento deve considerar preservação de massa, força, equilíbrio, mobilidade e autonomia. O percentual muscular estimado não comprova, isoladamente, força ou função preservada.</section> : null}
 
 				<section className="mt-5 rounded-2xl border border-ricosty-100 bg-ricosty-50/60 p-4">

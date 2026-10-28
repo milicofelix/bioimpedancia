@@ -22,6 +22,11 @@ class BioimpedanceAssessment extends Model
         'biological_sex_at_assessment',
         'device_model',
         'reference_version',
+        'athlete_mode_at_assessment',
+        'measurement_application',
+        'device_model_code',
+        'device_manual_version',
+        'measurement_protocol',
         'evaluated_at',
         'weight_kg',
         'scale_bmi',
@@ -66,6 +71,8 @@ class BioimpedanceAssessment extends Model
             'canceled_at' => 'datetime',
             'report_issued_at' => 'datetime',
             'height_cm_at_assessment' => 'decimal:1',
+            'athlete_mode_at_assessment' => 'boolean',
+            'measurement_protocol' => 'array',
             'weight_kg' => 'decimal:2',
             'scale_bmi' => 'decimal:1',
             'calculated_bmi' => 'decimal:1',
@@ -124,6 +131,11 @@ class BioimpedanceAssessment extends Model
     public function audits(): HasMany
     {
         return $this->hasMany(BioimpedanceAssessmentAudit::class);
+    }
+
+    public function segmentalMeasurements(): HasMany
+    {
+        return $this->hasMany(BioimpedanceSegmentalMeasurement::class, 'bioimpedance_assessment_id');
     }
 
     public function shares(): HasMany

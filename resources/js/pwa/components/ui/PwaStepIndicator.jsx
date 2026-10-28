@@ -3,7 +3,7 @@ import PwaIcon from './PwaIcon';
 
 export default function PwaStepIndicator({ steps, current }) {
 	return (
-		<ol className="grid grid-cols-4 gap-1 rounded-2xl border border-ricosty-100 bg-white p-2 shadow-sm" aria-label="Etapas da jornada">
+		<ol className={`grid ${steps.length === 5 ? 'grid-cols-5' : 'grid-cols-4'} gap-1 rounded-2xl border border-ricosty-100 bg-white p-2 shadow-sm`} aria-label="Etapas da jornada">
 			{steps.map((label, index) => {
 				const number = index + 1;
 				const done = number < current;

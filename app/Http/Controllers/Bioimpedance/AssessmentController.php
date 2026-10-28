@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Services\Bioimpedance\BioimpedanceAnalyzer;
 use App\Services\Bioimpedance\BioimpedanceWorkflow;
+use App\Services\Bioimpedance\BodyscanProImageProcessor;
 use App\Services\Bioimpedance\RelaxmedicImageProcessor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,11 +17,12 @@ class AssessmentController extends Controller
         private readonly BioimpedanceWorkflow $workflow,
         private readonly BioimpedanceAnalyzer $analyzer,
         private readonly RelaxmedicImageProcessor $imageProcessor,
+        private readonly BodyscanProImageProcessor $bodyscanProcessor,
     ) {}
 
     public function store(Request $request): JsonResponse
     {
-        return $this->workflow->storeAssessment($request, $this->analyzer, $this->imageProcessor);
+        return $this->workflow->storeAssessment($request, $this->analyzer, $this->imageProcessor, $this->bodyscanProcessor);
     }
 
     public function update(Request $request, BioimpedanceAssessment $assessment): JsonResponse

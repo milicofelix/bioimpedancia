@@ -2,13 +2,14 @@
 
 namespace App\Services\Bioimpedance;
 
+use App\Domain\Bioimpedance\ScaleModel;
 use Carbon\CarbonImmutable;
 
 class BioimpedanceAnalyzer
 {
-    public const DEVICE_MODEL = 'HBF-514C';
+    public const DEVICE_MODEL = ScaleModel::OMRON_NAME;
 
-    public const REFERENCE_VERSION = '1.1.0';
+    public const REFERENCE_VERSION = ScaleModel::OMRON_REFERENCE_VERSION;
 
     private const BODY_FAT_RANGES = [
         'female' => [
@@ -47,11 +48,30 @@ class BioimpedanceAnalyzer
         $age = $this->ageAtAssessment($client, $assessment);
         $sex = $assessment['biological_sex_at_assessment'] ?? $client['biological_sex'];
         $deviceModel = $assessment['device_model'] ?? self::DEVICE_MODEL;
-        $isRelaxmedic = $deviceModel === 'Relaxmedic';
+        $isRelaxmedic = in_array($deviceModel, [ScaleModel::RELAXMEDIC_NAME, ScaleModel::BODYSCAN_PRO_NAME], true);
+        $reference = $isRelaxmedic ? $this->relaxmedicReference() : $this->reference();
+        if ($deviceModel === ScaleModel::BODYSCAN_PRO_NAME) {
+            $reference['model'] = ScaleModel::BODYSCAN_PRO_NAME;
+            $reference['model_code'] = ScaleModel::BODYSCAN_PRO_MODEL_CODE;
+            $reference['manual_code'] = ScaleModel::BODYSCAN_PRO_MANUAL_VERSION;
+            $reference['version'] = 'Manual do equipamento';
+            $reference['classification_version'] = ScaleModel::BODYSCAN_REFERENCE_VERSION;
+            $reference['bmi_classification'] = [
+                'applied' => true,
+                'source' => 'Tabela convencional de IMC',
+                'note' => 'Única referência desta seção aplicada automaticamente pelo sistema.',
+            ];
+            $reference['manual_scope'] = [
+                'intended_use' => 'doméstico',
+                'medical_purpose' => false,
+                'clinical_validation_presented' => false,
+            ];
+            $reference['informational_references'] = ScaleModel::bodyscanInformationalReferences();
+        }
 
         return [
-            'source' => $isRelaxmedic ? 'Relaxmedic/RelaxFit' : 'Omron HBF-514C',
-            'reference' => $isRelaxmedic ? $this->relaxmedicReference() : $this->reference(),
+            'source' => $isRelaxmedic ? ($deviceModel === ScaleModel::BODYSCAN_PRO_NAME ? 'Bodyscan Pro/RelaxFit' : 'Relaxmedic/RelaxFit') : 'Omron HBF-514C',
+            'reference' => $reference,
             'age' => $age,
             'snapshot' => [
                 'age_at_assessment' => $age,
@@ -115,7 +135,7 @@ class BioimpedanceAnalyzer
                 'tone' => 'neutral',
             ],
             'body_age' => [
-                'label' => 'Idade corporal',
+                'label' => 'Índice de idade corporal do aparelho',
                 'value' => isset($assessment['body_age']) ? ((int) $assessment['body_age']).' anos' : 'Nao informada',
                 'classification' => null,
                 'tone' => 'neutral',
