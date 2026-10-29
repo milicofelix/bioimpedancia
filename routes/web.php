@@ -12,6 +12,8 @@ use App\Http\Controllers\Bioimpedance\ClinicSettingsController;
 use App\Http\Controllers\Bioimpedance\KnowledgeDocumentController;
 use App\Http\Controllers\Bioimpedance\UserController;
 use App\Http\Controllers\Bioimpedance\WorkspaceController;
+use App\Http\Controllers\Screening\PublicScreeningController;
+use App\Http\Controllers\Screening\ScreeningInvitationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -19,6 +21,14 @@ Route::get('/', function () {
 });
 
 Route::get('/r/{token}', [AssessmentShareController::class, 'publicReport'])->name('bioimpedance.public-report');
+Route::get('/triagem/{token}', [PublicScreeningController::class, 'show'])
+    ->middleware('throttle:30,1')
+    ->where('token', '[A-Za-z0-9]{64}')
+    ->name('screening.public.show');
+Route::post('/triagem/{token}/identidade', [PublicScreeningController::class, 'verify'])
+    ->middleware('throttle:10,1')
+    ->where('token', '[A-Za-z0-9]{64}')
+    ->name('screening.public.verify');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
@@ -43,6 +53,10 @@ Route::middleware('auth')->group(function () {
     Route::patch('/bioimpedance/clients/{client}/inactivate', [ClientController::class, 'inactivate'])->name('bioimpedance.clients.inactivate');
     Route::get('/bioimpedance/clients/{client}/privacy-export', [ClientController::class, 'exportPrivacyData'])->name('bioimpedance.clients.privacy-export');
     Route::patch('/bioimpedance/clients/{client}/anonymize', [ClientController::class, 'anonymize'])->name('bioimpedance.clients.anonymize');
+    Route::get('/screening/clients/{client}/invitations', [ScreeningInvitationController::class, 'index'])->name('screening.invitations.index');
+    Route::post('/screening/invitations', [ScreeningInvitationController::class, 'store'])->name('screening.invitations.store');
+    Route::post('/screening/invitations/{session}/resend', [ScreeningInvitationController::class, 'resend'])->name('screening.invitations.resend');
+    Route::patch('/screening/invitations/{session}/revoke', [ScreeningInvitationController::class, 'revoke'])->name('screening.invitations.revoke');
     Route::post('/bioimpedance/assessments', [AssessmentController::class, 'store'])->name('bioimpedance.assessments.store');
     Route::post('/bioimpedance/relaxmedic/process-image', [AssessmentImportController::class, 'processRelaxmedicImage'])
         ->middleware('throttle:5,1')

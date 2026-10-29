@@ -1248,13 +1248,7 @@ export default function DashboardPage({ userName }) {
 		<main className="min-h-screen bg-slate-50 text-slate-900">
 			<header className="no-print border-b border-slate-200 bg-white">
 				<div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-					<div className="flex items-center gap-4">
-						<VitaScanBrand headingLevel="h1" showTagline={false} />
-						<div>
-							<p className="text-sm font-semibold text-slate-950">{clinic.display_name}</p>
-							<p className="text-xs text-slate-500">{clinic.contact}</p>
-						</div>
-					</div>
+					<VitaScanBrand headingLevel="h1" showTagline={false} descriptor={clinic.contact || 'Avaliação corporal e acompanhamento estético'} />
 					<div className="flex items-center gap-3">
 						<span className={`rounded-full px-3 py-1 text-xs font-bold ${isOnline ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
 							{isOnline ? 'Online' : 'Offline'}

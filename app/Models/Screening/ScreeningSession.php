@@ -42,6 +42,19 @@ class ScreeningSession extends Model
         'screening_range_id',
         'result_description',
         'result_message',
+        'public_token_hash',
+        'access_mode',
+        'token_created_at',
+        'expires_at',
+        'revoked_at',
+        'revoked_by_user_id',
+        'identity_verified_at',
+        'identity_attempts',
+        'last_identity_attempt_at',
+        'last_accessed_at',
+        'access_count',
+        'last_sent_at',
+        'send_count',
     ];
 
     protected function casts(): array
@@ -52,6 +65,16 @@ class ScreeningSession extends Model
             'finalized_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'total_score' => 'integer',
+            'token_created_at' => 'datetime',
+            'expires_at' => 'datetime',
+            'revoked_at' => 'datetime',
+            'identity_verified_at' => 'datetime',
+            'last_identity_attempt_at' => 'datetime',
+            'last_accessed_at' => 'datetime',
+            'last_sent_at' => 'datetime',
+            'identity_attempts' => 'integer',
+            'access_count' => 'integer',
+            'send_count' => 'integer',
         ];
     }
 
@@ -90,6 +113,11 @@ class ScreeningSession extends Model
         return $this->belongsTo(User::class, 'cancelled_by_user_id');
     }
 
+    public function revokedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'revoked_by_user_id');
+    }
+
     public function resultRange(): BelongsTo
     {
         return $this->belongsTo(ScreeningRange::class, 'screening_range_id');
@@ -113,6 +141,14 @@ class ScreeningSession extends Model
     public function statusIsTerminal(): bool
     {
         return in_array($this->status, [self::STATUS_FINALIZED, self::STATUS_CANCELLED], true);
+    }
+
+    public function publicAccessIsAvailable(): bool
+    {
+        return $this->status === self::STATUS_PENDING
+            && $this->revoked_at === null
+            && $this->expires_at?->isFuture()
+            && filled($this->public_token_hash);
     }
 
     private function originalStatusIsTerminal(): bool

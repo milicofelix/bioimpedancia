@@ -101,6 +101,11 @@ class User extends Authenticatable
         return $this->hasMany(ScreeningSession::class, 'cancelled_by_user_id');
     }
 
+    public function revokedScreeningSessions(): HasMany
+    {
+        return $this->hasMany(ScreeningSession::class, 'revoked_by_user_id');
+    }
+
     public function isActive(): bool
     {
         return $this->inactivated_at === null;
