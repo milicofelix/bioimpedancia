@@ -32,7 +32,7 @@ class VerifyScreeningIdentityRequest extends FormRequest
             'identity_confirmation' => ['required', 'string', 'max:20'],
             'consent' => ['accepted'],
             'guardian_name' => ['nullable', 'string', 'max:160'],
-            'guardian_consent' => ['nullable', 'accepted'],
+            'guardian_consent' => ['sometimes', 'accepted'],
         ];
     }
 
