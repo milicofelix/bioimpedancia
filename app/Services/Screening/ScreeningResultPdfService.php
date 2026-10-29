@@ -11,16 +11,22 @@ use Illuminate\Support\Str;
 
 class ScreeningResultPdfService
 {
-    public function stream(Request $request, ScreeningSession $session): Response
+    public function stream(
+        Request $request,
+        ScreeningSession $session,
+        string $auditAction = 'screening.result_pdf.opened',
+    ): Response
     {
         $session->loadMissing(['answers', 'client']);
 
         AppAudit::query()->create([
-            'user_id' => null,
-            'action' => 'screening.result_pdf.opened',
+            'user_id' => $request->user()?->id,
+            'action' => $auditAction,
             'auditable_type' => ScreeningSession::class,
             'auditable_id' => $session->id,
-            'description' => 'Resultado público da triagem aberto em PDF',
+            'description' => $auditAction === 'screening.result_pdf.downloaded'
+                ? 'PDF da triagem baixado pelo profissional'
+                : 'Resultado público da triagem aberto em PDF',
             'new_values' => [
                 'questionnaire_code' => $session->questionnaire_code,
                 'questionnaire_version' => $session->questionnaire_version,

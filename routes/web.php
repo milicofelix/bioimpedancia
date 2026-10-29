@@ -17,6 +17,7 @@ use App\Http\Controllers\Screening\PublicScreeningResultPdfController;
 use App\Http\Controllers\Screening\ScreeningInvitationController;
 use App\Http\Controllers\Screening\ScreeningProfessionalReviewController;
 use App\Http\Controllers\Screening\ScreeningQuestionnaireApprovalController;
+use App\Http\Controllers\Screening\ScreeningResultPdfController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -70,6 +71,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/screening/invitations/{session}/revoke', [ScreeningInvitationController::class, 'revoke'])->name('screening.invitations.revoke');
     Route::get('/screening/sessions/{session}', [ScreeningProfessionalReviewController::class, 'show'])->name('screening.sessions.show');
     Route::patch('/screening/sessions/{session}/professional-review', [ScreeningProfessionalReviewController::class, 'update'])->name('screening.sessions.professional-review.update');
+    Route::get('/screening/sessions/{session}/client-pdf', ScreeningResultPdfController::class)->name('screening.sessions.client-pdf');
     Route::patch('/screening/questionnaires/{questionnaire}/approve', ScreeningQuestionnaireApprovalController::class)->name('screening.questionnaires.approve');
     Route::post('/bioimpedance/assessments', [AssessmentController::class, 'store'])->name('bioimpedance.assessments.store');
     Route::post('/bioimpedance/relaxmedic/process-image', [AssessmentImportController::class, 'processRelaxmedicImage'])

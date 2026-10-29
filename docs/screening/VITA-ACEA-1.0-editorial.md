@@ -125,6 +125,14 @@ As faixas são próprias deste questionário, não são pontos de corte validado
 - Observações e encaminhamentos são registros internos separados da aplicação finalizada e cada alteração gera auditoria.
 - O conteúdo interno não deve ser incorporado ao PDF entregue ao cliente.
 
+## Histórico e comparação longitudinal
+
+- Exibir aplicações em ordem cronológica inversa, preservando status, versão, solicitante e datas.
+- Comparar somente aplicações finalizadas consecutivas do mesmo código e versão.
+- Quando as versões forem diferentes, informar que não existe comparação direta válida.
+- Descrever apenas aumento, diminuição ou estabilidade da pontuação, sem concluir melhora ou piora clínica.
+- Registrar em auditoria quem abriu o resultado interno e quem solicitou a entrega do PDF.
+
 ## Aprovação profissional necessária
 
 Antes de ativar esta versão, registrar:

@@ -202,15 +202,23 @@ class ScreeningInvitationService
     {
         return [
             'id' => $session->id,
+            'questionnaire_code' => $session->questionnaire_code,
             'questionnaire_name' => $session->questionnaire_name,
             'questionnaire_version' => $session->questionnaire_version,
             'status' => $session->status,
             'access_mode' => $session->access_mode,
+            'requested_by_name' => $session->requested_by_name,
             'expires_at' => $session->expires_at?->toIso8601String(),
             'revoked_at' => $session->revoked_at?->toIso8601String(),
             'send_count' => $session->send_count,
             'is_available' => $session->publicAccessIsAvailable(),
             'created_at' => $session->created_at?->toIso8601String(),
+            'started_at' => $session->started_at?->toIso8601String(),
+            'finalized_at' => $session->finalized_at?->toIso8601String(),
+            'total_score' => $session->total_score,
+            'result_description' => $session->result_description,
+            'document_authenticity_code' => $session->document_authenticity_code,
+            'comparison' => ['state' => 'unavailable', 'message' => 'A comparação ficará disponível após a conclusão.'],
         ];
     }
 

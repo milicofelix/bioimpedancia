@@ -9,12 +9,16 @@ use App\Models\Bioimpedance\BioimpedanceClient;
 use App\Models\Screening\ScreeningQuestionnaire;
 use App\Models\Screening\ScreeningSession;
 use App\Services\Screening\ScreeningInvitationService;
+use App\Services\Screening\ScreeningHistoryPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ScreeningInvitationController extends Controller
 {
-    public function __construct(private readonly ScreeningInvitationService $invitations) {}
+    public function __construct(
+        private readonly ScreeningInvitationService $invitations,
+        private readonly ScreeningHistoryPresenter $history,
+    ) {}
 
     public function index(Request $request, BioimpedanceClient $client): JsonResponse
     {
@@ -52,13 +56,11 @@ class ScreeningInvitationController extends Controller
 
         $sessions = $sessionsQuery
             ->latest()
-            ->limit(20)
-            ->get()
-            ->map(fn (ScreeningSession $session) => $this->invitations->sessionPayload($session));
+            ->get();
 
         return response()->json([
             'questionnaires' => $questionnaires,
-            'sessions' => $sessions,
+            'sessions' => $this->history->present($sessions),
             'defaults' => ['expires_in_minutes' => 1440, 'access_mode' => 'remote'],
         ]);
     }

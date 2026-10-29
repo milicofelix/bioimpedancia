@@ -5,7 +5,7 @@ import PwaCard from '../../components/ui/PwaCard';
 import PwaIcon from '../../components/ui/PwaIcon';
 import ScreeningApprovalForm from './ScreeningApprovalForm';
 import ScreeningQrCode from './ScreeningQrCode';
-import ScreeningProfessionalDetails from './ScreeningProfessionalDetails';
+import ScreeningHistoryPanel from './ScreeningHistoryPanel';
 
 const durationOptions = [
 	{ value: 60, label: '1 hora' },
@@ -13,15 +13,6 @@ const durationOptions = [
 	{ value: 4320, label: '3 dias' },
 	{ value: 10080, label: '7 dias' },
 ];
-
-const sessionStatus = (session) => {
-	if (session.revoked_at) return { label: 'Revogado', classes: 'bg-slate-200 text-slate-700' };
-	if (session.status === 'pending') return { label: 'Pendente', classes: 'bg-amber-100 text-amber-900' };
-	if (session.status === 'finalized') return { label: 'Finalizado', classes: 'bg-emerald-100 text-emerald-800' };
-	if (session.status === 'cancelled') return { label: 'Cancelado', classes: 'bg-rose-100 text-rose-800' };
-
-	return { label: 'Iniciado', classes: 'bg-sky-100 text-sky-800' };
-};
 
 function errorMessage(error) {
 	const errors = error?.response?.data?.errors;
@@ -39,7 +30,7 @@ export default function ScreeningInvitationPanel({ client }) {
 	const [invitation, setInvitation] = useState(null);
 	const [feedback, setFeedback] = useState('');
 	const [error, setError] = useState('');
-	const [selectedSessionId, setSelectedSessionId] = useState(null);
+	const [activeTab, setActiveTab] = useState('new');
 
 	const availableQuestionnaires = useMemo(() => questionnaires.filter((item) => item.is_available), [questionnaires]);
 	const pendingQuestionnaire = questionnaires.find((item) => item.status === 'pending_professional_approval') ?? null;
@@ -47,7 +38,7 @@ export default function ScreeningInvitationPanel({ client }) {
 	useEffect(() => {
 		let active = true;
 		setLoading(true);
-		setSelectedSessionId(null);
+		setActiveTab('new');
 		window.axios.get(`/screening/clients/${client.id}/invitations`).then(({ data }) => {
 			if (!active) return;
 			setQuestionnaires(data.questionnaires ?? []);
@@ -131,7 +122,9 @@ export default function ScreeningInvitationPanel({ client }) {
 
 			{error ? <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800" role="alert">{error}</p> : null}
 			{feedback ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800" role="status">{feedback}</p> : null}
+			<div className="mt-4 grid grid-cols-2 rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Triagens do cliente"><button type="button" role="tab" aria-selected={activeTab === 'new'} onClick={() => setActiveTab('new')} className={`pwa-focus min-h-11 rounded-lg text-sm font-bold ${activeTab === 'new' ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-600'}`}>Nova aplicação</button><button type="button" role="tab" aria-selected={activeTab === 'history'} onClick={() => setActiveTab('history')} className={`pwa-focus min-h-11 rounded-lg text-sm font-bold ${activeTab === 'history' ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-600'}`}>Triagens ({sessions.length})</button></div>
 
+			{activeTab === 'new' ? <>
 			<div className="mt-4 grid gap-3 sm:grid-cols-2">
 				<label className="text-sm font-bold text-slate-700 sm:col-span-2">Questionário<select value={questionnaireId} onChange={(event) => setQuestionnaireId(event.target.value)} className="pwa-focus mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3"><option value="">Selecione</option>{questionnaires.map((item) => <option key={item.id} value={item.id} disabled={!item.is_available}>{item.name} · {item.version}{item.is_available ? '' : ' (aguardando aprovação)'}</option>)}</select></label>
 				<label className="text-sm font-bold text-slate-700">Validade<select value={expiresInMinutes} onChange={(event) => setExpiresInMinutes(Number(event.target.value))} className="pwa-focus mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3">{durationOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
@@ -143,13 +136,7 @@ export default function ScreeningInvitationPanel({ client }) {
 			<PwaButton type="button" onClick={createInvitation} disabled={!questionnaireId || Boolean(busyAction)} loading={busyAction === 'create'} icon="share" className="mt-4 w-full">Criar link temporário</PwaButton>
 
 			{invitation ? <div className="mt-4 rounded-2xl border border-teal-200 bg-teal-50/70 p-4"><p className="text-xs font-bold uppercase text-teal-800">Link exibido somente agora</p><p className="mt-2 break-all rounded-lg bg-white p-2 text-xs text-slate-700">{invitation.url}</p><p className="mt-2 text-xs text-slate-600">Expira em {formatDate(invitation.expires_at)}. O QR Code abaixo é gerado localmente, sem enviar o token a terceiros.</p><ScreeningQrCode payload={invitation.qr_payload} questionnaireVersion={invitation.questionnaire_version} /><div className="mt-3 grid gap-2 sm:grid-cols-2"><PwaButton type="button" onClick={copyLink} icon="copy" variant="secondary">Copiar link</PwaButton><PwaButton type="button" onClick={shareLink} icon="share">Compartilhar</PwaButton></div></div> : null}
-
-			{sessions.length ? <div className="mt-5 border-t border-slate-100 pt-4"><h4 className="text-sm font-extrabold text-slate-800">Aplicações recentes</h4><div className="mt-2 space-y-2">{sessions.map((session) => {
-				const status = sessionStatus(session);
-
-				return <div key={session.id} className="rounded-xl border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-bold text-slate-800">{session.questionnaire_name}</p><p className="text-xs text-slate-500">{session.access_mode === 'reception' ? 'Recepção' : 'Remoto'} · expira {formatDate(session.expires_at)}</p></div><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${status.classes}`}>{status.label}</span></div>{session.status === 'pending' ? <div className="mt-3 flex flex-wrap gap-2"><PwaButton type="button" onClick={() => resend(session)} disabled={Boolean(busyAction)} loading={busyAction === `resend-${session.id}`} variant="secondary" icon="refresh" className="text-xs">Reenviar</PwaButton>{!session.revoked_at ? <PwaButton type="button" onClick={() => revoke(session)} disabled={Boolean(busyAction)} loading={busyAction === `revoke-${session.id}`} variant="danger" icon="minus" className="text-xs">Revogar</PwaButton> : null}</div> : null}{session.status === 'finalized' ? <PwaButton type="button" onClick={() => setSelectedSessionId(session.id)} variant="secondary" icon="fileText" className="mt-3 w-full text-xs">Ver detalhes profissionais</PwaButton> : null}</div>;
-			})}</div></div> : null}
-			{selectedSessionId ? <ScreeningProfessionalDetails sessionId={selectedSessionId} onClose={() => setSelectedSessionId(null)} /> : null}
+			</> : <ScreeningHistoryPanel key={client.id} sessions={sessions} busyAction={busyAction} onNewApplication={() => setActiveTab('new')} onResend={resend} onRevoke={revoke} />}
 		</PwaCard>
 	);
 }

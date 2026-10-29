@@ -5,7 +5,6 @@ namespace App\Services\Screening;
 use App\Models\AppAudit;
 use App\Models\Screening\ScreeningSession;
 use App\Models\Screening\ScreeningSessionReview;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -14,9 +13,25 @@ use Illuminate\Validation\ValidationException;
 
 class ScreeningProfessionalReviewService
 {
-    public function details(Request $request, ScreeningSession $session): array
+    public function __construct(private readonly ScreeningSessionAccessAuthorizer $access) {}
+
+    public function details(Request $request, ScreeningSession $session, bool $recordView = true): array
     {
-        $this->authorize($request, $session);
+        $user = $this->access->authorize($request, $session);
+
+        if ($recordView) {
+            AppAudit::query()->create([
+                'user_id' => $user->id,
+                'action' => 'screening.session.viewed',
+                'auditable_type' => ScreeningSession::class,
+                'auditable_id' => $session->id,
+                'description' => 'Resultado interno da triagem visualizado',
+                'new_values' => ['viewer_name' => $user->name],
+                'ip_address' => $request->ip(),
+                'user_agent' => Str::limit((string) $request->userAgent(), 500, ''),
+            ]);
+        }
+
         $session->loadMissing(['answers', 'client', 'professionalReview.updatedBy']);
 
         $audits = AppAudit::query()
@@ -31,7 +46,7 @@ class ScreeningProfessionalReviewService
 
     public function update(Request $request, ScreeningSession $session, array $data): array
     {
-        $user = $this->authorize($request, $session);
+        $user = $this->access->authorize($request, $session);
 
         if ($session->status !== ScreeningSession::STATUS_FINALIZED) {
             throw ValidationException::withMessages([
@@ -71,20 +86,7 @@ class ScreeningProfessionalReviewService
             ]);
         });
 
-        return $this->details($request, $session->refresh());
-    }
-
-    private function authorize(Request $request, ScreeningSession $session): User
-    {
-        $user = $request->user();
-        abort_unless(
-            $user?->isClinicalProfessional()
-                && $user->isActive()
-                && ($user->isAdmin() || $session->requested_by_user_id === $user->id),
-            403,
-        );
-
-        return $user;
+        return $this->details($request, $session->refresh(), false);
     }
 
     private function payload(ScreeningSession $session, Collection $audits): array
