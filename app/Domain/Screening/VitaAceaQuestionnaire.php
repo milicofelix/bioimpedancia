@@ -197,16 +197,28 @@ final class VitaAceaQuestionnaire
             'requires_individual_attention' => false,
             'instructions' => 'Escolha uma forma sem pensar por muito tempo. Esta escolha é apenas um convite à reflexão, não altera sua pontuação e não possui validade diagnóstica.',
             'options' => [
-                ['value' => 1, 'visual_key' => 'grid_dense', 'title' => 'Sensação de prisão', 'description' => 'Esta escolha pode servir como convite para refletir sobre medo de errar, pressão por corresponder às expectativas e espaço reservado às próprias necessidades.'],
-                ['value' => 2, 'visual_key' => 'rings_irregular', 'title' => 'Preocupação com o futuro', 'description' => 'Esta escolha pode servir como convite para observar antecipações sobre o amanhã e possíveis dificuldades para relaxar ou permanecer no presente.'],
-                ['value' => 3, 'visual_key' => 'grid_irregular', 'title' => 'Sobrecarga mental', 'description' => 'Esta escolha pode servir como convite para perceber excesso de pensamentos, tentativas de prever problemas e busca constante por respostas.'],
-                ['value' => 4, 'visual_key' => 'spirals_group', 'title' => 'Agitação constante', 'description' => 'Esta escolha pode servir como convite para refletir sobre ocupação contínua, culpa ao descansar e a sensação de nunca ter feito o suficiente.'],
-                ['value' => 5, 'visual_key' => 'scribble', 'title' => 'Estado de alerta permanente', 'description' => 'Esta escolha pode servir como convite para observar quanto espaço existe na rotina para autocuidado e necessidades pessoais.'],
-                ['value' => 6, 'visual_key' => 'squares', 'title' => 'Medo da mudança', 'description' => 'Esta escolha pode servir como convite para refletir sobre insegurança diante de mudanças, novos ciclos e recomeços.'],
-                ['value' => 7, 'visual_key' => 'spiral_open', 'title' => 'Perfeccionismo e controle', 'description' => 'Esta escolha pode servir como convite para observar autocobrança e dificuldade para aceitar erros ou situações fora do próprio controle.'],
-                ['value' => 8, 'visual_key' => 'zigzag', 'title' => 'Expectativa do pior', 'description' => 'Esta escolha pode servir como convite para perceber a tendência de permanecer em alerta para algo dar errado, mesmo quando tudo parece bem.'],
+                ['value' => 1, 'visual_key' => 'grid_dense', 'title' => 'Sensação de prisão', 'description' => 'Talvez você se identifique com o medo de errar, decepcionar ou fazer a escolha perfeita. Vale refletir se, ao longo da vida, você aprendeu a atender mais às expectativas dos outros do que às suas próprias necessidades.'],
+                ['value' => 2, 'visual_key' => 'rings_irregular', 'title' => 'Preocupação com o futuro', 'description' => 'Essa escolha pode indicar uma tendência a pensar no amanhã antes de viver o presente. Observe se você encontra dificuldade para relaxar ou confiar no fluxo da vida.'],
+                ['value' => 3, 'visual_key' => 'grid_irregular', 'title' => 'Sobrecarga mental', 'description' => 'Você pode se reconhecer em um padrão de pensar demais antes de agir. Sua mente parece estar sempre tentando prever problemas e encontrar todas as respostas.'],
+                ['value' => 4, 'visual_key' => 'spirals_group', 'title' => 'Agitação constante', 'description' => 'Talvez você tenha aprendido que estar sempre ocupada significa ser produtiva. Reflita se descansar ainda desperta culpa ou a sensação de que nunca fez o suficiente.'],
+                ['value' => 5, 'visual_key' => 'scribble', 'title' => 'Estado de alerta permanente', 'description' => 'Essa imagem pode ter chamado sua atenção porque você costuma cuidar de todos antes de cuidar de si. Observe quanto espaço existe na sua rotina para as suas próprias necessidades.'],
+                ['value' => 6, 'visual_key' => 'squares', 'title' => 'Medo da mudança', 'description' => 'Mudanças podem despertar mais insegurança do que entusiasmo. Talvez seja um convite para refletir sobre como você lida com novos ciclos e recomeços.'],
+                ['value' => 7, 'visual_key' => 'spiral_open', 'title' => 'Perfeccionismo e controle', 'description' => 'Você pode se cobrar além do necessário e sentir dificuldade para aceitar erros ou situações fora do seu controle.'],
+                ['value' => 8, 'visual_key' => 'zigzag', 'title' => 'Expectativa do pior', 'description' => 'Talvez você tenha desenvolvido o hábito de estar sempre preparada para o que pode dar errado, mesmo quando tudo está bem.'],
             ],
         ];
+    }
+
+    /** @return array{value: int, visual_key: string, title: string, description: string}|null */
+    public static function visualResult(int $value): ?array
+    {
+        foreach (self::visualQuestion()['options'] as $option) {
+            if ($option['value'] === $value) {
+                return $option;
+            }
+        }
+
+        return null;
     }
 
     public static function isProfessionallyApproved(): bool

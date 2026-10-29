@@ -2,6 +2,7 @@
 
 namespace App\Services\Screening;
 
+use App\Domain\Screening\VitaAceaQuestionnaire;
 use App\Models\AppAudit;
 use App\Models\Screening\ScreeningSession;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -39,9 +40,16 @@ class ScreeningResultPdfService
 
         config(['dompdf.public_path' => public_path()]);
 
+        $visualAnswer = $session->answers->firstWhere('question_code', VitaAceaQuestionnaire::VISUAL_QUESTION_CODE);
+        $visualChoiceResult = $visualAnswer
+            ? VitaAceaQuestionnaire::visualResult((int) $visualAnswer->response_value)
+            : null;
+
         $pdf = Pdf::loadView('screening.result-pdf', [
             'screeningSession' => $session,
             'issuedAt' => now(),
+            'visualChoiceResult' => $visualChoiceResult,
+            'visualChoiceThumbnail' => $this->visualChoiceThumbnail($visualChoiceResult),
         ])->setPaper('a4');
 
         $response = $pdf->stream('resultado-triagem-vita-acea.pdf');
@@ -53,5 +61,19 @@ class ScreeningResultPdfService
         $response->headers->set('Content-Security-Policy', 'sandbox');
 
         return $response;
+    }
+
+    /** @param array{value: int, visual_key: string, title: string, description: string}|null $visualChoiceResult */
+    private function visualChoiceThumbnail(?array $visualChoiceResult): ?string
+    {
+        if (! $visualChoiceResult) {
+            return null;
+        }
+
+        $svg = view('screening.partials.visual-choice-symbol', [
+            'visualChoiceResult' => $visualChoiceResult,
+        ])->render();
+
+        return 'data:image/svg+xml;base64,'.base64_encode($svg);
     }
 }

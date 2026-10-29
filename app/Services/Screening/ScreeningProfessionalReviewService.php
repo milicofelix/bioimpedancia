@@ -2,6 +2,7 @@
 
 namespace App\Services\Screening;
 
+use App\Domain\Screening\VitaAceaQuestionnaire;
 use App\Models\AppAudit;
 use App\Models\Screening\ScreeningSession;
 use App\Models\Screening\ScreeningSessionReview;
@@ -124,13 +125,21 @@ class ScreeningProfessionalReviewService
                 'message' => $session->result_message,
                 'document_authenticity_code' => $session->document_authenticity_code,
             ],
-            'answers' => $session->answers->map(fn ($answer) => [
-                'question_code' => $answer->question_code,
-                'question_text' => $answer->question_text_snapshot,
-                'response_label' => $answer->response_label_snapshot,
-                'score' => $answer->score,
-                'requires_individual_attention' => $answer->requires_individual_attention,
-            ])->values(),
+            'answers' => $session->answers->map(function ($answer): array {
+                $visualResult = $answer->question_code === VitaAceaQuestionnaire::VISUAL_QUESTION_CODE
+                    ? VitaAceaQuestionnaire::visualResult((int) $answer->response_value)
+                    : null;
+
+                return [
+                    'question_code' => $answer->question_code,
+                    'question_text' => $answer->question_text_snapshot,
+                    'response_label' => $visualResult
+                        ? $visualResult['title'].' — '.$visualResult['description']
+                        : $answer->response_label_snapshot,
+                    'score' => $answer->score,
+                    'requires_individual_attention' => $answer->requires_individual_attention,
+                ];
+            })->values(),
             'professional_review' => [
                 'professional_notes' => $session->professionalReview?->professional_notes,
                 'referral_notes' => $session->professionalReview?->referral_notes,

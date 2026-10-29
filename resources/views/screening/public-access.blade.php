@@ -50,6 +50,8 @@
         .visual-option svg { width: 100%; max-width: 130px; height: 92px; color: #17324d; }
         .visual-option strong { color: #17324d; font-size: .95rem; }
         .visual-result { margin: 18px 0; padding: 18px; border: 1px solid #b9ddd5; border-radius: 16px; background: #f0fbf8; text-align: left; }
+        .visual-result-symbol { display: grid; width: 132px; min-height: 112px; margin: 0 auto 14px; place-items: center; border: 1px solid #b9ddd5; border-radius: 14px; background: #fff; color: #087f73; }
+        .visual-result-symbol svg { width: 112px; height: 84px; }
         .completion { margin: 20px 0; padding: 16px; border: 1px solid #b9ddd5; border-radius: 14px; background: #f0fbf8; }
         button:disabled { cursor: wait; opacity: .72; }
         footer { margin-top: 18px; color: #64748b; text-align: center; font-size: .78rem; }
@@ -77,8 +79,11 @@
                         @php($visualAnswer = $screeningSession->answers->firstWhere('question_code', 'VIS01'))
                         @if ($visualAnswer)
                             <div class="visual-result">
-                                <strong>Reflexão associada à forma escolhida</strong>
-                                <p>{{ $visualAnswer->response_label_snapshot }}</p>
+                                <div class="visual-result-symbol">
+                                    @include('screening.partials.visual-choice-symbol', ['visualChoiceResult' => $visualChoiceResult])
+                                </div>
+                                <strong>Imagem {{ $visualAnswer->response_value }} · {{ $visualChoiceResult['title'] ?? 'Escolha visual descritiva' }}</strong>
+                                <p>{{ $visualChoiceResult['description'] ?? $visualAnswer->response_label_snapshot }}</p>
                                 <p class="attempts">Esta escolha é descritiva, não altera a pontuação e não diagnostica ansiedade ou qualquer condição de saúde.</p>
                             </div>
                         @endif

@@ -55,12 +55,20 @@ class ScreeningScoringEngine
                 $attentionQuestionCodes[] = $question->code;
             }
 
+            $responseLabel = $option->label;
+            if ($question->code === VitaAceaQuestionnaire::VISUAL_QUESTION_CODE) {
+                $visualResult = VitaAceaQuestionnaire::visualResult((int) $option->value);
+                $responseLabel = $visualResult
+                    ? $visualResult['title'].' — '.$visualResult['description']
+                    : $responseLabel;
+            }
+
             $answers[] = [
                 'question_id' => $question->id,
                 'question_code' => $question->code,
                 'question_text' => $question->text,
                 'option_id' => $option->id,
-                'response_label' => $option->label,
+                'response_label' => $responseLabel,
                 'response_value' => $option->value,
                 'score' => $score,
                 'requires_individual_attention' => $requiresAttention,

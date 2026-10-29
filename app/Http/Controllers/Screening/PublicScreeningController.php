@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Screening;
 
+use App\Domain\Screening\VitaAceaQuestionnaire;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Screening\CompletePublicScreeningRequest;
 use App\Http\Requests\Screening\VerifyScreeningIdentityRequest;
@@ -25,12 +26,17 @@ class PublicScreeningController extends Controller
             $this->invitations->recordAccess($session);
         }
 
+        $visualAnswer = $session->answers->firstWhere('question_code', VitaAceaQuestionnaire::VISUAL_QUESTION_CODE);
+
         return response()->view('screening.public-access', [
             'screeningSession' => $session,
             'identityPrompt' => $this->invitations->identityPrompt($session),
             'identityVerified' => $this->invitations->isVerifiedInBrowser($request, $session),
             'completed' => $session->status === ScreeningSession::STATUS_FINALIZED,
             'remainingAttempts' => max(0, ScreeningInvitationService::MAX_IDENTITY_ATTEMPTS - $session->identity_attempts),
+            'visualChoiceResult' => $visualAnswer
+                ? VitaAceaQuestionnaire::visualResult((int) $visualAnswer->response_value)
+                : null,
         ], 200, [
             'Cache-Control' => 'no-store, private',
             'Pragma' => 'no-cache',
