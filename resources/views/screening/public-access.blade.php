@@ -26,6 +26,15 @@
         button { width: 100%; min-height: 52px; border: 0; border-radius: 14px; background: #087f73; color: #fff; font: inherit; font-weight: 800; cursor: pointer; } button:hover { background: #07695f; }
         .error { margin: 8px 0; color: #a51d35; font-weight: 700; } .attempts { color: #64748b; font-size: .82rem; }
         .success { display: grid; place-items: center; min-height: 220px; text-align: center; } .success-mark { display: grid; width: 64px; height: 64px; place-items: center; border-radius: 50%; background: #d9f8ed; color: #087f73; font-size: 2rem; font-weight: 900; }
+        .instructions { margin: 0 0 20px; padding: 14px 16px; border-radius: 14px; background: #eef7fb; color: #29485d; }
+        .question-list { display: grid; gap: 18px; margin: 24px 0; }
+        .question { margin: 0; padding: 18px; border: 1px solid #d7e7e7; border-radius: 18px; background: #fff; }
+        .question legend { padding: 0 4px; font-weight: 800; line-height: 1.45; }
+        .option { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: center; min-height: 48px; margin: 8px 0 0; padding: 10px 12px; border: 1px solid #dce8ec; border-radius: 12px; background: #f9fcfc; font-weight: 600; cursor: pointer; }
+        .option:has(input:checked) { border-color: #159889; background: #eafaf6; box-shadow: 0 0 0 2px #bcecdf; }
+        .option input { width: 19px; height: 19px; margin: 0; accent-color: #087f73; }
+        .completion { margin: 20px 0; padding: 16px; border: 1px solid #b9ddd5; border-radius: 14px; background: #f0fbf8; }
+        button:disabled { cursor: wait; opacity: .72; }
         footer { margin-top: 18px; color: #64748b; text-align: center; font-size: .78rem; }
     </style>
 </head>
@@ -38,15 +47,56 @@
             <p class="version">Versão {{ $screeningSession->questionnaire_version }}</p>
         </header>
         <div class="content">
-            @if ($identityVerified)
+            @if ($completed)
                 <section class="success" aria-live="polite">
                     <div>
                         <span class="success-mark" aria-hidden="true">✓</span>
-                        <h2 style="margin-top: 18px">Acesso confirmado</h2>
-                        <p>Sua identidade e seu consentimento foram registrados com segurança.</p>
-                        <p class="notice">As perguntas serão disponibilizadas na próxima etapa deste módulo. Não compartilhe este aparelho enquanto a aplicação estiver aberta.</p>
+                        <h2 style="margin-top: 18px">Questionário finalizado</h2>
+                        <p>Suas respostas foram registradas com segurança e não podem ser enviadas novamente.</p>
+                        <p class="notice">O resultado descritivo será apresentado na próxima etapa deste módulo. Esta triagem não constitui diagnóstico.</p>
                     </div>
                 </section>
+            @elseif ($identityVerified)
+                <h2>Responda ao questionário</h2>
+                <p class="instructions">Considere os últimos {{ $screeningSession->questionnaire->recall_period_days }} dias. Não existem respostas certas ou erradas. Selecione uma alternativa em cada pergunta.</p>
+                <p class="attempts">Este acesso expira em {{ $screeningSession->expires_at?->format('d/m/Y \à\s H:i') }}.</p>
+
+                <form id="screening-form" method="post" action="{{ route('screening.public.complete', ['token' => request()->route('token')]) }}">
+                    @csrf
+                    <div class="question-list">
+                        @foreach ($screeningSession->questionnaire->questions as $question)
+                            <fieldset class="question">
+                                <legend>{{ $question->position }}. {{ $question->text }}</legend>
+                                @foreach ($question->options as $option)
+                                    <label class="option" for="question-{{ $question->id }}-option-{{ $option->id }}">
+                                        <input
+                                            id="question-{{ $question->id }}-option-{{ $option->id }}"
+                                            type="radio"
+                                            name="answers[{{ $question->id }}]"
+                                            value="{{ $option->id }}"
+                                            required
+                                            @checked((string) old("answers.{$question->id}") === (string) $option->id)
+                                        >
+                                        <span>{{ $option->label }}</span>
+                                    </label>
+                                @endforeach
+                            </fieldset>
+                        @endforeach
+                    </div>
+
+                    @error('answers')<p class="error" role="alert">{{ $message }}</p>@enderror
+                    @error('answers.*')<p class="error" role="alert">{{ $message }}</p>@enderror
+                    @error('session')<p class="error" role="alert">{{ $message }}</p>@enderror
+
+                    <div class="completion">
+                        <label class="consent" for="completion_confirmed" style="margin: 0">
+                            <input id="completion_confirmed" name="completion_confirmed" type="checkbox" value="1" required @checked(old('completion_confirmed'))>
+                            <span>Revisei minhas respostas e confirmo o envio definitivo deste questionário.</span>
+                        </label>
+                        @error('completion_confirmed')<p class="error" role="alert">{{ $message }}</p>@enderror
+                    </div>
+                    <button id="screening-submit" type="submit">Finalizar e enviar respostas</button>
+                </form>
             @else
                 <h2>Confirmação de acesso</h2>
                 <p>Antes de iniciar, confirme uma informação pessoal. Ela será usada apenas para verificar se este convite pertence a você.</p>
@@ -71,5 +121,13 @@
     </article>
     <footer>Este acesso é temporário, individual e não permite entrar no restante do sistema.</footer>
 </main>
+<script>
+    document.getElementById('screening-form')?.addEventListener('submit', function () {
+        const button = document.getElementById('screening-submit');
+        if (!button || button.disabled) return;
+        button.disabled = true;
+        button.textContent = 'Enviando respostas…';
+    });
+</script>
 </body>
 </html>

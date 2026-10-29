@@ -109,7 +109,7 @@ class ScreeningInvitationService
     public function findPublicSession(string $plainToken): ScreeningSession
     {
         return ScreeningSession::query()
-            ->with(['questionnaire', 'client'])
+            ->with(['questionnaire.questions.options', 'client'])
             ->where('public_token_hash', hash('sha256', $plainToken))
             ->firstOrFail();
     }
@@ -189,12 +189,13 @@ class ScreeningInvitationService
 
     public function canOpen(Request $request, ScreeningSession $session): bool
     {
-        if ($session->revoked_at || ! $session->expires_at?->isFuture() || $session->statusIsTerminal()) {
+        if ($session->revoked_at || ! $session->expires_at?->isFuture() || $session->status === ScreeningSession::STATUS_CANCELLED) {
             return false;
         }
 
         return $session->status === ScreeningSession::STATUS_PENDING
-            || ($session->status === ScreeningSession::STATUS_STARTED && $this->isVerifiedInBrowser($request, $session));
+            || (in_array($session->status, [ScreeningSession::STATUS_STARTED, ScreeningSession::STATUS_FINALIZED], true)
+                && $this->isVerifiedInBrowser($request, $session));
     }
 
     public function sessionPayload(ScreeningSession $session): array

@@ -30,6 +30,10 @@ Route::post('/triagem/{token}/identidade', [PublicScreeningController::class, 'v
     ->middleware('throttle:10,1')
     ->where('token', '[A-Za-z0-9]{64}')
     ->name('screening.public.verify');
+Route::post('/triagem/{token}/finalizar', [PublicScreeningController::class, 'complete'])
+    ->middleware('throttle:6,1')
+    ->where('token', '[A-Za-z0-9]{64}')
+    ->name('screening.public.complete');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
