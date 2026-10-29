@@ -109,7 +109,7 @@ class ScreeningInvitationService
     public function findPublicSession(string $plainToken): ScreeningSession
     {
         return ScreeningSession::query()
-            ->with(['questionnaire.questions.options', 'client'])
+            ->with(['questionnaire.questions.options', 'client', 'answers'])
             ->where('public_token_hash', hash('sha256', $plainToken))
             ->firstOrFail();
     }

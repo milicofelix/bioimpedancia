@@ -56,6 +56,10 @@ class ScreeningSessionFinalizer
                 'screening_range_id' => $score->rangeId,
                 'result_description' => $score->rangeDescription,
                 'result_message' => $score->rangeMessage,
+                'scoring_rules_version' => $score->rulesVersion,
+                'scoring_rules_snapshot' => $score->rulesSnapshot,
+                'attention_question_codes' => $score->attentionQuestionCodes,
+                'attention_notice_snapshot' => $score->attentionNotice,
             ]);
 
             AppAudit::query()->create([
@@ -70,6 +74,11 @@ class ScreeningSessionFinalizer
                     'total_score' => $score->total,
                     'result_description' => $score->rangeDescription,
                     'attention_question_codes' => $score->attentionQuestionCodes,
+                    'attention_notice' => $score->attentionNotice,
+                    'scoring_rules_version' => $score->rulesVersion,
+                    'scoring_rules_snapshot' => $score->rulesSnapshot,
+                    'calculation_source' => 'deterministic_internal_engine',
+                    'uses_artificial_intelligence' => false,
                     'answers_count' => count($score->answers),
                 ],
                 'ip_address' => $request->ip(),

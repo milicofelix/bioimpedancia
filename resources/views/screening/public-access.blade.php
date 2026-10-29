@@ -26,6 +26,11 @@
         button { width: 100%; min-height: 52px; border: 0; border-radius: 14px; background: #087f73; color: #fff; font: inherit; font-weight: 800; cursor: pointer; } button:hover { background: #07695f; }
         .error { margin: 8px 0; color: #a51d35; font-weight: 700; } .attempts { color: #64748b; font-size: .82rem; }
         .success { display: grid; place-items: center; min-height: 220px; text-align: center; } .success-mark { display: grid; width: 64px; height: 64px; place-items: center; border-radius: 50%; background: #d9f8ed; color: #087f73; font-size: 2rem; font-weight: 900; }
+        .result-score { margin: 18px 0 4px; color: #063e62; font-size: 2.25rem; font-weight: 900; line-height: 1; }
+        .result-range { margin: 8px 0; color: #087f73; font-size: 1.2rem; font-weight: 850; }
+        .attention-list { margin: 14px 0 0; padding-left: 22px; text-align: left; }
+        .attention-list li { margin: 8px 0; line-height: 1.45; }
+        .trace { margin-top: 18px; color: #64748b; font-size: .76rem; }
         .instructions { margin: 0 0 20px; padding: 14px 16px; border-radius: 14px; background: #eef7fb; color: #29485d; }
         .question-list { display: grid; gap: 18px; margin: 24px 0; }
         .question { margin: 0; padding: 18px; border: 1px solid #d7e7e7; border-radius: 18px; background: #fff; }
@@ -53,7 +58,29 @@
                         <span class="success-mark" aria-hidden="true">✓</span>
                         <h2 style="margin-top: 18px">Questionário finalizado</h2>
                         <p>Suas respostas foram registradas com segurança e não podem ser enviadas novamente.</p>
-                        <p class="notice">O resultado descritivo será apresentado na próxima etapa deste módulo. Esta triagem não constitui diagnóstico.</p>
+                        <p class="result-score">{{ $screeningSession->total_score }} <small style="font-size: .9rem">de 30 pontos</small></p>
+                        <p class="result-range">{{ $screeningSession->result_description }}</p>
+                        <p>{{ $screeningSession->result_message }}</p>
+
+                        @php($attentionAnswers = $screeningSession->answers->where('requires_individual_attention', true))
+                        @if ($attentionAnswers->isNotEmpty())
+                            <div class="notice">
+                                <strong>Respostas para conversar com o profissional</strong>
+                                <ul class="attention-list">
+                                    @foreach ($attentionAnswers as $answer)
+                                        <li>{{ $answer->question_text_snapshot }} — <strong>{{ $answer->response_label_snapshot }}</strong></li>
+                                    @endforeach
+                                </ul>
+                                <p>{{ $screeningSession->attention_notice_snapshot ?: 'Estas respostas merecem conversa individual com profissional habilitado e, isoladamente, não constituem diagnóstico.' }}</p>
+                            </div>
+                        @else
+                            <p class="notice">Nenhuma das perguntas de atenção individual foi marcada nesta aplicação. Isso não substitui conversa ou avaliação profissional.</p>
+                        @endif
+
+                        <p class="notice"><strong>Importante:</strong> {{ $screeningSession->disclaimer_snapshot }}</p>
+                        @if ($screeningSession->scoring_rules_version)
+                            <p class="trace">Cálculo determinístico · regras {{ $screeningSession->scoring_rules_version }} · sem uso de inteligência artificial</p>
+                        @endif
                     </div>
                 </section>
             @elseif ($identityVerified)

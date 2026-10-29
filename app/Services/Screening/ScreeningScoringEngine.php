@@ -3,6 +3,7 @@
 namespace App\Services\Screening;
 
 use App\Domain\Screening\ScreeningScore;
+use App\Domain\Screening\VitaAceaQuestionnaire;
 use App\Models\Screening\ScreeningQuestion;
 use App\Models\Screening\ScreeningQuestionnaire;
 use DomainException;
@@ -63,6 +64,11 @@ class ScreeningScoringEngine
             ];
         }
 
+        if ($total < VitaAceaQuestionnaire::MINIMUM_TOTAL_SCORE
+            || $total > VitaAceaQuestionnaire::MAXIMUM_TOTAL_SCORE) {
+            throw new DomainException('A pontuação calculada deve permanecer entre 0 e 30 pontos.');
+        }
+
         $matchingRanges = $questionnaire->ranges
             ->filter(fn ($range) => $total >= $range->minimum_score && $total <= $range->maximum_score)
             ->values();
@@ -80,6 +86,9 @@ class ScreeningScoringEngine
             rangeMessage: $range->display_message,
             answers: $answers,
             attentionQuestionCodes: $attentionQuestionCodes,
+            rulesVersion: VitaAceaQuestionnaire::SCORING_RULES_VERSION,
+            rulesSnapshot: VitaAceaQuestionnaire::scoringRulesSnapshot(),
+            attentionNotice: VitaAceaQuestionnaire::ATTENTION_NOTICE,
         );
     }
 
@@ -88,6 +97,8 @@ class ScreeningScoringEngine
         $questionnaire->loadMissing(['questions.options', 'ranges']);
         $questions = $questionnaire->questions;
         $ranges = $questionnaire->ranges->sortBy('minimum_score')->values();
+
+        $this->assertSupportedQuestionnaire($questionnaire);
 
         if ($questions->isEmpty()) {
             throw new DomainException('O questionário precisa possuir pelo menos uma pergunta.');
@@ -132,6 +143,47 @@ class ScreeningScoringEngine
 
         if ($expectedMinimum - 1 !== $maximumTotal) {
             throw new DomainException('As faixas de resultado não terminam na pontuação máxima possível.');
+        }
+
+        if ($minimumTotal !== VitaAceaQuestionnaire::MINIMUM_TOTAL_SCORE
+            || $maximumTotal !== VitaAceaQuestionnaire::MAXIMUM_TOTAL_SCORE) {
+            throw new DomainException('A definição deve produzir uma pontuação total entre 0 e 30.');
+        }
+    }
+
+    private function assertSupportedQuestionnaire(ScreeningQuestionnaire $questionnaire): void
+    {
+        if ($questionnaire->code !== VitaAceaQuestionnaire::CODE
+            || $questionnaire->version !== VitaAceaQuestionnaire::VERSION) {
+            throw new DomainException('Esta versão do motor não reconhece as regras do questionário informado.');
+        }
+
+        $questions = $questionnaire->questions;
+
+        if ($questions->count() !== VitaAceaQuestionnaire::EXPECTED_QUESTION_COUNT) {
+            throw new DomainException('O VITA-ACEA-1.0 deve possuir exatamente dez perguntas.');
+        }
+
+        $expectedCodes = collect(range(1, VitaAceaQuestionnaire::EXPECTED_QUESTION_COUNT))
+            ->map(fn (int $position): string => sprintf('Q%02d', $position))
+            ->all();
+        $actualCodes = $questions->pluck('code')->values()->all();
+
+        if ($actualCodes !== $expectedCodes) {
+            throw new DomainException('As perguntas do VITA-ACEA-1.0 não correspondem à sequência versionada Q01–Q10.');
+        }
+
+        foreach ($questions as $question) {
+            $optionScores = $question->options->pluck('value')->map(fn ($value): int => (int) $value)->sort()->values()->all();
+
+            if ($optionScores !== range(VitaAceaQuestionnaire::MINIMUM_OPTION_SCORE, VitaAceaQuestionnaire::MAXIMUM_OPTION_SCORE)) {
+                throw new DomainException("A pergunta {$question->code} deve possuir exclusivamente as pontuações 0, 1, 2 e 3.");
+            }
+
+            $shouldRequireAttention = in_array($question->code, VitaAceaQuestionnaire::ATTENTION_QUESTION_CODES, true);
+            if ((bool) $question->requires_individual_attention !== $shouldRequireAttention) {
+                throw new DomainException("A regra de atenção individual de {$question->code} diverge da versão aprovada.");
+            }
         }
     }
 }

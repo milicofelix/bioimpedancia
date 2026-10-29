@@ -16,6 +16,7 @@ final readonly class ScreeningScore
      *     requires_individual_attention: bool
      * }>  $answers
      * @param  list<string>  $attentionQuestionCodes
+     * @param  array<string, mixed>  $rulesSnapshot
      */
     public function __construct(
         public int $total,
@@ -24,5 +25,8 @@ final readonly class ScreeningScore
         public string $rangeMessage,
         public array $answers,
         public array $attentionQuestionCodes,
+        public string $rulesVersion,
+        public array $rulesSnapshot,
+        public string $attentionNotice,
     ) {}
 }

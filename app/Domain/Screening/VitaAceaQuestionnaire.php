@@ -16,6 +16,22 @@ final class VitaAceaQuestionnaire
 
     public const RECALL_PERIOD_DAYS = 14;
 
+    public const SCORING_RULES_VERSION = 'VITA-ACEA-SCORING-1.0';
+
+    public const EXPECTED_QUESTION_COUNT = 10;
+
+    public const MINIMUM_OPTION_SCORE = 0;
+
+    public const MAXIMUM_OPTION_SCORE = 3;
+
+    public const MINIMUM_TOTAL_SCORE = 0;
+
+    public const MAXIMUM_TOTAL_SCORE = 30;
+
+    public const ATTENTION_QUESTION_CODES = ['Q02', 'Q05', 'Q06', 'Q09', 'Q10'];
+
+    public const ATTENTION_NOTICE = 'Uma resposta marcada nestes itens merece conversa individual com profissional habilitado. Isoladamente, ela não diagnostica ansiedade, compulsão alimentar ou qualquer outra condição de saúde.';
+
     public const APPLICATION_ROLES = [
         User::ROLE_ADMIN,
         User::ROLE_PROFESSIONAL,
@@ -53,6 +69,23 @@ final class VitaAceaQuestionnaire
                 'professional_registration' => null,
                 'approved_at' => null,
             ],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public static function scoringRulesSnapshot(): array
+    {
+        return [
+            'rules_version' => self::SCORING_RULES_VERSION,
+            'calculation_method' => 'deterministic_sum',
+            'question_count' => self::EXPECTED_QUESTION_COUNT,
+            'allowed_option_scores' => range(self::MINIMUM_OPTION_SCORE, self::MAXIMUM_OPTION_SCORE),
+            'minimum_total_score' => self::MINIMUM_TOTAL_SCORE,
+            'maximum_total_score' => self::MAXIMUM_TOTAL_SCORE,
+            'attention_question_codes' => self::ATTENTION_QUESTION_CODES,
+            'attention_trigger' => 'selected_option_score_greater_than_zero',
+            'classification_source' => 'versioned_screening_ranges',
+            'uses_artificial_intelligence' => false,
         ];
     }
 

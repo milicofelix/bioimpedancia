@@ -92,6 +92,9 @@ As faixas são próprias deste questionário, não são pontos de corte validado
 
 ## Regra determinística de pontuação
 
+- Versão das regras: `VITA-ACEA-SCORING-1.0`.
+- Método: soma determinística interna, sem inteligência artificial.
+
 - Cada uma das dez perguntas exige exatamente uma alternativa cadastrada na mesma versão.
 - A pontuação de cada resposta vem exclusivamente do valor persistido da alternativa; valores enviados pelo navegador não são aceitos como fonte de verdade.
 - A pontuação total é a soma simples das dez alternativas, de 0 a 30 pontos.
@@ -100,6 +103,7 @@ As faixas são próprias deste questionário, não são pontos de corte validado
 - A marcação individual não modifica a soma e não representa diagnóstico ou classificação clínica.
 - Perguntas, alternativas e faixas tornam-se imutáveis após a ativação ou primeira aplicação da versão.
 - A finalização grava respostas, snapshots, pontuação, faixa e auditoria na mesma transação e só pode ocorrer uma vez.
+- A aplicação finalizada preserva a versão e um snapshot das regras utilizadas, inclusive códigos das perguntas de atenção e limites da pontuação.
 
 ## Aviso obrigatório ao cliente
 

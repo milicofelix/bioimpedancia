@@ -42,6 +42,10 @@ class ScreeningSession extends Model
         'screening_range_id',
         'result_description',
         'result_message',
+        'scoring_rules_version',
+        'scoring_rules_snapshot',
+        'attention_question_codes',
+        'attention_notice_snapshot',
         'public_token_hash',
         'access_mode',
         'token_created_at',
@@ -75,6 +79,8 @@ class ScreeningSession extends Model
             'identity_attempts' => 'integer',
             'access_count' => 'integer',
             'send_count' => 'integer',
+            'scoring_rules_snapshot' => 'array',
+            'attention_question_codes' => 'array',
         ];
     }
 
