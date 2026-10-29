@@ -2,12 +2,15 @@
 
 namespace App\Models\Screening;
 
+use App\Models\Screening\Concerns\GuardsLockedQuestionnaireDefinition;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ScreeningQuestion extends Model
 {
+    use GuardsLockedQuestionnaireDefinition;
+
     public const RESPONSE_SINGLE_CHOICE = 'single_choice';
 
     protected $fillable = [

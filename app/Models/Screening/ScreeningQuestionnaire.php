@@ -3,6 +3,7 @@
 namespace App\Models\Screening;
 
 use App\Models\User;
+use DomainException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -45,6 +46,28 @@ class ScreeningQuestionnaire extends Model
             'approval_attestations' => 'array',
             'approved_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::updating(function (self $questionnaire): void {
+            $originalStatus = $questionnaire->getOriginal('status');
+            $locked = in_array($originalStatus, [self::STATUS_ACTIVE, self::STATUS_RETIRED], true)
+                || $questionnaire->sessions()->exists();
+            $dirtyFields = array_keys($questionnaire->getDirty());
+            $onlyRetiring = $questionnaire->status === self::STATUS_RETIRED
+                && array_diff($dirtyFields, ['status', 'updated_at']) === [];
+
+            if ($locked && ! $onlyRetiring) {
+                throw new DomainException('Uma versão ativa, descontinuada ou já aplicada é imutável. Crie uma nova versão para alterar sua definição.');
+            }
+        });
+
+        static::deleting(function (self $questionnaire): void {
+            if ($questionnaire->status !== self::STATUS_DRAFT || $questionnaire->sessions()->exists()) {
+                throw new DomainException('Somente versões em rascunho e nunca aplicadas podem ser excluídas.');
+            }
+        });
     }
 
     public function questions(): HasMany

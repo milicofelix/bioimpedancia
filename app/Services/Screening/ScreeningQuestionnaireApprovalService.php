@@ -11,6 +11,8 @@ use Illuminate\Validation\ValidationException;
 
 class ScreeningQuestionnaireApprovalService
 {
+    public function __construct(private readonly ScreeningScoringEngine $scoringEngine) {}
+
     public function approve(Request $request, ScreeningQuestionnaire $questionnaire, array $data): ScreeningQuestionnaire
     {
         return DB::transaction(function () use ($request, $questionnaire, $data): ScreeningQuestionnaire {
@@ -26,6 +28,12 @@ class ScreeningQuestionnaireApprovalService
 
             if ($lockedQuestionnaire->isAvailableForApplication()) {
                 throw ValidationException::withMessages(['questionnaire' => 'Esta versão já está aprovada e ativa.']);
+            }
+
+            try {
+                $this->scoringEngine->assertDefinitionIsDeterministic($lockedQuestionnaire);
+            } catch (\DomainException $exception) {
+                throw ValidationException::withMessages(['questionnaire' => $exception->getMessage()]);
             }
 
             $approvedAt = now();

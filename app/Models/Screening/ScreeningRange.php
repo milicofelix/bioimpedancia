@@ -2,12 +2,15 @@
 
 namespace App\Models\Screening;
 
+use App\Models\Screening\Concerns\GuardsLockedQuestionnaireDefinition;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ScreeningRange extends Model
 {
+    use GuardsLockedQuestionnaireDefinition;
+
     protected $fillable = [
         'screening_questionnaire_id',
         'position',
