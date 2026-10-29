@@ -2,14 +2,13 @@
 
 namespace App\Http\Requests\Screening;
 
-use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ResendScreeningInvitationRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->role === User::ROLE_PROFESSIONAL
+        return $this->user()?->isClinicalProfessional()
             && $this->user()->isActive();
     }
 

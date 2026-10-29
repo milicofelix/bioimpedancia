@@ -8,7 +8,6 @@ use App\Http\Requests\Screening\StoreScreeningInvitationRequest;
 use App\Models\Bioimpedance\BioimpedanceClient;
 use App\Models\Screening\ScreeningQuestionnaire;
 use App\Models\Screening\ScreeningSession;
-use App\Models\User;
 use App\Services\Screening\ScreeningInvitationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,7 +18,7 @@ class ScreeningInvitationController extends Controller
 
     public function index(Request $request, BioimpedanceClient $client): JsonResponse
     {
-        abort_unless($request->user()?->role === User::ROLE_PROFESSIONAL && $request->user()->isActive(), 403);
+        abort_unless($request->user()?->isClinicalProfessional() && $request->user()->isActive(), 403);
 
         $questionnaires = ScreeningQuestionnaire::query()
             ->orderBy('name')
@@ -36,8 +35,12 @@ class ScreeningInvitationController extends Controller
                     : 'Aguardando aprovação e ativação por profissional habilitado.',
             ]);
 
-        $sessions = $client->screeningSessions()
-            ->where('requested_by_user_id', $request->user()->id)
+        $sessionsQuery = $client->screeningSessions();
+        if (! $request->user()->isAdmin()) {
+            $sessionsQuery->where('requested_by_user_id', $request->user()->id);
+        }
+
+        $sessions = $sessionsQuery
             ->latest()
             ->limit(20)
             ->get()

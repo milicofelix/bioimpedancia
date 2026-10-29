@@ -17,10 +17,12 @@ final class VitaAceaQuestionnaire
     public const RECALL_PERIOD_DAYS = 14;
 
     public const APPLICATION_ROLES = [
+        User::ROLE_ADMIN,
         User::ROLE_PROFESSIONAL,
     ];
 
     public const INTERPRETATION_ROLES = [
+        User::ROLE_ADMIN,
         User::ROLE_PROFESSIONAL,
     ];
 

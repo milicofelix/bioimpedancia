@@ -23,6 +23,7 @@ import BodyscanReview from '../pwa/features/assessment/BodyscanReview';
 import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocolComplete, emptyBodyscanProtocol, updateBodyscanSegment } from '../pwa/features/assessment/bodyscanAssessmentForm';
 import BodyscanProtocolChecklist from '../pwa/features/assessment/BodyscanProtocolChecklist';
 import VitaScanBrand from '../components/brand/VitaScanBrand';
+import ScreeningInvitationPanel from '../pwa/features/clients/ScreeningInvitationPanel';
 
 const emptyClient = {
 	full_name: '',
@@ -1559,6 +1560,7 @@ export default function DashboardPage({ userName }) {
 					) : null}
 
 					{selectedClient ? (
+						<>
 						<div className="no-print rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
 							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 								<div>
@@ -1718,6 +1720,17 @@ export default function DashboardPage({ userName }) {
 								</div>
 							) : null}
 						</div>
+						{selectedClient.is_active && !selectedClient.is_anonymized ? (
+							['admin', 'professional'].includes(currentUser?.role) ? (
+								<ScreeningInvitationPanel client={selectedClient} />
+							) : (
+								<div className="no-print rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+									<strong>Questionário de triagem indisponível para este perfil.</strong>
+									<p className="mt-1">Somente contas de administrador ou profissional podem criar e acompanhar aplicações.</p>
+								</div>
+							)
+						) : null}
+						</>
 					) : null}
 
 					<EvolutionPanel client={selectedClient} selectedAssessment={selectedAssessment} />

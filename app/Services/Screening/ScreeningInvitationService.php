@@ -18,25 +18,25 @@ class ScreeningInvitationService
 
     public function create(Request $request, array $data): array
     {
-        $professional = $this->professional($request);
+        $requester = $this->authorizedRequester($request);
         $client = BioimpedanceClient::query()->findOrFail($data['bioimpedance_client_id']);
         $questionnaire = ScreeningQuestionnaire::query()->findOrFail($data['screening_questionnaire_id']);
 
         $this->ensureClientCanReceiveInvitation($client);
         $this->ensureQuestionnaireIsAvailable($questionnaire);
 
-        return DB::transaction(function () use ($request, $data, $professional, $client, $questionnaire): array {
+        return DB::transaction(function () use ($request, $data, $requester, $client, $questionnaire): array {
             $plainToken = $this->newToken();
             $now = now();
             $session = ScreeningSession::query()->create([
                 'bioimpedance_client_id' => $client->id,
                 'screening_questionnaire_id' => $questionnaire->id,
-                'requested_by_user_id' => $professional->id,
+                'requested_by_user_id' => $requester->id,
                 'status' => ScreeningSession::STATUS_PENDING,
                 'questionnaire_code' => $questionnaire->code,
                 'questionnaire_version' => $questionnaire->version,
                 'questionnaire_name' => $questionnaire->name,
-                'requested_by_name' => $professional->name,
+                'requested_by_name' => $requester->name,
                 'consent_text_snapshot' => $questionnaire->consent_text,
                 'disclaimer_snapshot' => $questionnaire->disclaimer,
                 'public_token_hash' => hash('sha256', $plainToken),
@@ -60,8 +60,8 @@ class ScreeningInvitationService
 
     public function resend(Request $request, ScreeningSession $session, ?int $expiresInMinutes = null): array
     {
-        $professional = $this->professional($request);
-        $this->ensureOwnedPendingSession($session, $professional);
+        $requester = $this->authorizedRequester($request);
+        $this->ensureOwnedPendingSession($session, $requester);
 
         return DB::transaction(function () use ($request, $session, $expiresInMinutes): array {
             $plainToken = $this->newToken();
@@ -90,13 +90,13 @@ class ScreeningInvitationService
 
     public function revoke(Request $request, ScreeningSession $session): array
     {
-        $professional = $this->professional($request);
-        $this->ensureOwnedPendingSession($session, $professional);
+        $requester = $this->authorizedRequester($request);
+        $this->ensureOwnedPendingSession($session, $requester);
 
-        return DB::transaction(function () use ($request, $session, $professional): array {
+        return DB::transaction(function () use ($request, $session, $requester): array {
             $session->update([
                 'revoked_at' => now(),
-                'revoked_by_user_id' => $professional->id,
+                'revoked_by_user_id' => $requester->id,
                 'public_token_hash' => null,
             ]);
 
@@ -223,10 +223,10 @@ class ScreeningInvitationService
         ];
     }
 
-    private function professional(Request $request): User
+    private function authorizedRequester(Request $request): User
     {
         $user = $request->user();
-        abort_unless($user?->role === User::ROLE_PROFESSIONAL && $user->isActive(), 403);
+        abort_unless($user?->isClinicalProfessional() && $user->isActive(), 403);
 
         return $user;
     }
@@ -249,9 +249,9 @@ class ScreeningInvitationService
         }
     }
 
-    private function ensureOwnedPendingSession(ScreeningSession $session, User $professional): void
+    private function ensureOwnedPendingSession(ScreeningSession $session, User $requester): void
     {
-        abort_unless($session->requested_by_user_id === $professional->id, 403);
+        abort_unless($requester->isAdmin() || $session->requested_by_user_id === $requester->id, 403);
 
         if ($session->status !== ScreeningSession::STATUS_PENDING) {
             throw ValidationException::withMessages(['session' => 'Somente aplicações pendentes podem ter o convite alterado.']);

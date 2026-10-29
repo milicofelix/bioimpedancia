@@ -38,8 +38,8 @@ O instrumento não pode ser apresentado como teste diagnóstico, avaliação psi
 ### Administrador
 
 - Pode administrar configurações e versões do instrumento.
-- Não pode interpretar clinicamente o resultado apenas por possuir perfil administrativo.
-- Caso também atue como profissional habilitado, deve utilizar uma conta ou atribuição clínica identificável e auditável.
+- Pode solicitar aplicações, acompanhar respostas e interpretar resultados quando também atuar no atendimento da unidade.
+- Toda criação, interpretação, aprovação ou correção permanece vinculada nominalmente à conta administradora e registrada em auditoria.
 
 ### Recepção
 
