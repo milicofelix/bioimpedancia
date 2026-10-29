@@ -13,7 +13,7 @@ class ScreeningResultPdfService
 {
     public function stream(Request $request, ScreeningSession $session): Response
     {
-        $session->loadMissing(['answers', 'resultRange']);
+        $session->loadMissing(['answers', 'client']);
 
         AppAudit::query()->create([
             'user_id' => null,
@@ -25,6 +25,7 @@ class ScreeningResultPdfService
                 'questionnaire_code' => $session->questionnaire_code,
                 'questionnaire_version' => $session->questionnaire_version,
                 'scoring_rules_version' => $session->scoring_rules_version,
+                'document_authenticity_code' => $session->document_authenticity_code,
             ],
             'ip_address' => $request->ip(),
             'user_agent' => Str::limit((string) $request->userAgent(), 500, ''),
@@ -34,7 +35,6 @@ class ScreeningResultPdfService
 
         $pdf = Pdf::loadView('screening.result-pdf', [
             'screeningSession' => $session,
-            'hasAttentionAnswers' => $session->answers->contains('requires_individual_attention', true),
             'issuedAt' => now(),
         ])->setPaper('a4');
 

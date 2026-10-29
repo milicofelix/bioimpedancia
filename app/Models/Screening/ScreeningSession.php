@@ -8,6 +8,7 @@ use DomainException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ScreeningSession extends Model
 {
@@ -46,6 +47,7 @@ class ScreeningSession extends Model
         'scoring_rules_snapshot',
         'attention_question_codes',
         'attention_notice_snapshot',
+        'document_authenticity_code',
         'public_token_hash',
         'access_mode',
         'token_created_at',
@@ -142,6 +144,11 @@ class ScreeningSession extends Model
     public function answers(): HasMany
     {
         return $this->hasMany(ScreeningAnswer::class)->orderBy('id');
+    }
+
+    public function professionalReview(): HasOne
+    {
+        return $this->hasOne(ScreeningSessionReview::class);
     }
 
     public function statusIsTerminal(): bool

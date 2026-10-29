@@ -5,6 +5,7 @@ import PwaCard from '../../components/ui/PwaCard';
 import PwaIcon from '../../components/ui/PwaIcon';
 import ScreeningApprovalForm from './ScreeningApprovalForm';
 import ScreeningQrCode from './ScreeningQrCode';
+import ScreeningProfessionalDetails from './ScreeningProfessionalDetails';
 
 const durationOptions = [
 	{ value: 60, label: '1 hora' },
@@ -38,6 +39,7 @@ export default function ScreeningInvitationPanel({ client }) {
 	const [invitation, setInvitation] = useState(null);
 	const [feedback, setFeedback] = useState('');
 	const [error, setError] = useState('');
+	const [selectedSessionId, setSelectedSessionId] = useState(null);
 
 	const availableQuestionnaires = useMemo(() => questionnaires.filter((item) => item.is_available), [questionnaires]);
 	const pendingQuestionnaire = questionnaires.find((item) => item.status === 'pending_professional_approval') ?? null;
@@ -45,6 +47,7 @@ export default function ScreeningInvitationPanel({ client }) {
 	useEffect(() => {
 		let active = true;
 		setLoading(true);
+		setSelectedSessionId(null);
 		window.axios.get(`/screening/clients/${client.id}/invitations`).then(({ data }) => {
 			if (!active) return;
 			setQuestionnaires(data.questionnaires ?? []);
@@ -144,8 +147,9 @@ export default function ScreeningInvitationPanel({ client }) {
 			{sessions.length ? <div className="mt-5 border-t border-slate-100 pt-4"><h4 className="text-sm font-extrabold text-slate-800">Aplicações recentes</h4><div className="mt-2 space-y-2">{sessions.map((session) => {
 				const status = sessionStatus(session);
 
-				return <div key={session.id} className="rounded-xl border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-bold text-slate-800">{session.questionnaire_name}</p><p className="text-xs text-slate-500">{session.access_mode === 'reception' ? 'Recepção' : 'Remoto'} · expira {formatDate(session.expires_at)}</p></div><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${status.classes}`}>{status.label}</span></div>{session.status === 'pending' ? <div className="mt-3 flex flex-wrap gap-2"><PwaButton type="button" onClick={() => resend(session)} disabled={Boolean(busyAction)} loading={busyAction === `resend-${session.id}`} variant="secondary" icon="refresh" className="text-xs">Reenviar</PwaButton>{!session.revoked_at ? <PwaButton type="button" onClick={() => revoke(session)} disabled={Boolean(busyAction)} loading={busyAction === `revoke-${session.id}`} variant="danger" icon="minus" className="text-xs">Revogar</PwaButton> : null}</div> : null}</div>;
+				return <div key={session.id} className="rounded-xl border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-bold text-slate-800">{session.questionnaire_name}</p><p className="text-xs text-slate-500">{session.access_mode === 'reception' ? 'Recepção' : 'Remoto'} · expira {formatDate(session.expires_at)}</p></div><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${status.classes}`}>{status.label}</span></div>{session.status === 'pending' ? <div className="mt-3 flex flex-wrap gap-2"><PwaButton type="button" onClick={() => resend(session)} disabled={Boolean(busyAction)} loading={busyAction === `resend-${session.id}`} variant="secondary" icon="refresh" className="text-xs">Reenviar</PwaButton>{!session.revoked_at ? <PwaButton type="button" onClick={() => revoke(session)} disabled={Boolean(busyAction)} loading={busyAction === `revoke-${session.id}`} variant="danger" icon="minus" className="text-xs">Revogar</PwaButton> : null}</div> : null}{session.status === 'finalized' ? <PwaButton type="button" onClick={() => setSelectedSessionId(session.id)} variant="secondary" icon="fileText" className="mt-3 w-full text-xs">Ver detalhes profissionais</PwaButton> : null}</div>;
 			})}</div></div> : null}
+			{selectedSessionId ? <ScreeningProfessionalDetails sessionId={selectedSessionId} onClose={() => setSelectedSessionId(null)} /> : null}
 		</PwaCard>
 	);
 }

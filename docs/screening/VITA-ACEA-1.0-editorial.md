@@ -115,7 +115,15 @@ As faixas são próprias deste questionário, não são pontos de corte validado
 - Orientar sempre a conversa com o profissional responsável.
 - Quando houver marcação em pergunta de atenção, informar apenas que algumas respostas merecem conversa individual, sem apresentar diagnóstico ou mensagem alarmista.
 - Permitir abrir o mesmo conteúdo em PDF enquanto o acesso temporário verificado estiver válido.
-- Não revelar nome, identificador interno ou outros dados pessoais na devolutiva pública e no PDF.
+- A tela pública não revela identificadores internos; o PDF identificado exibe apenas o nome necessário para vincular o documento ao cliente.
+
+## Separação entre documento do cliente e visão profissional
+
+- O PDF do cliente identifica cliente, preenchimento, questionário, profissional solicitante e código do documento.
+- As respostas aparecem sem pontuação individual, regra de correção, marcador interno de atenção ou histórico de auditoria.
+- A visão profissional autenticada reúne respostas, destaques de atenção, consentimento, datas e auditoria.
+- Observações e encaminhamentos são registros internos separados da aplicação finalizada e cada alteração gera auditoria.
+- O conteúdo interno não deve ser incorporado ao PDF entregue ao cliente.
 
 ## Aprovação profissional necessária
 

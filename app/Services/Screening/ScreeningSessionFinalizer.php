@@ -12,7 +12,10 @@ use Illuminate\Validation\ValidationException;
 
 class ScreeningSessionFinalizer
 {
-    public function __construct(private readonly ScreeningScoringEngine $scoringEngine) {}
+    public function __construct(
+        private readonly ScreeningScoringEngine $scoringEngine,
+        private readonly ScreeningDocumentCodeGenerator $documentCodeGenerator,
+    ) {}
 
     /**
      * @param  list<array{question_id: int, option_id: int}>  $submittedAnswers
@@ -33,6 +36,8 @@ class ScreeningSessionFinalizer
             } catch (\DomainException $exception) {
                 throw ValidationException::withMessages(['answers' => $exception->getMessage()]);
             }
+
+            $documentAuthenticityCode = $this->documentCodeGenerator->generate();
 
             foreach ($score->answers as $answer) {
                 ScreeningAnswer::query()->create([
@@ -60,6 +65,7 @@ class ScreeningSessionFinalizer
                 'scoring_rules_snapshot' => $score->rulesSnapshot,
                 'attention_question_codes' => $score->attentionQuestionCodes,
                 'attention_notice_snapshot' => $score->attentionNotice,
+                'document_authenticity_code' => $documentAuthenticityCode,
             ]);
 
             AppAudit::query()->create([
@@ -79,6 +85,7 @@ class ScreeningSessionFinalizer
                     'scoring_rules_snapshot' => $score->rulesSnapshot,
                     'calculation_source' => 'deterministic_internal_engine',
                     'uses_artificial_intelligence' => false,
+                    'document_authenticity_code' => $documentAuthenticityCode,
                     'answers_count' => count($score->answers),
                 ],
                 'ip_address' => $request->ip(),

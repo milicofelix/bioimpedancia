@@ -19,6 +19,11 @@
         .section { margin-top: 18px; padding: 16px; border-left: 4px solid #17a28f; background: #f5fbfa; }
         .section h2 { margin: 0 0 6px; color: #063e62; font-size: 13px; }
         .important { border-left-color: #4b6b82; background: #f4f7f9; }
+        table { width: 100%; margin-top: 12px; border-collapse: collapse; }
+        th, td { padding: 9px 8px; border-bottom: 1px solid #d8e4e8; text-align: left; vertical-align: top; }
+        th { color: #506176; font-size: 9px; text-transform: uppercase; }
+        .answer { width: 28%; font-weight: bold; }
+        tr { page-break-inside: avoid; }
         .trace { margin-top: 26px; padding-top: 12px; border-top: 1px solid #d8e4e8; color: #64748b; font-size: 9px; }
         footer { position: fixed; right: 0; bottom: -18px; left: 0; color: #718096; font-size: 8px; text-align: center; }
     </style>
@@ -30,7 +35,11 @@
     </div>
 
     <h1>{{ $screeningSession->questionnaire_name }}</h1>
-    <p class="meta">Versão {{ $screeningSession->questionnaire_version }} · concluído em {{ $screeningSession->finalized_at?->format('d/m/Y \à\s H:i') }}</p>
+    <p class="meta">
+        Cliente: {{ $screeningSession->client->full_name }}<br>
+        Preenchimento concluído em {{ $screeningSession->finalized_at?->format('d/m/Y \à\s H:i') }}<br>
+        Questionário {{ $screeningSession->questionnaire_version }} · solicitado por {{ $screeningSession->requested_by_name ?: 'Profissional responsável' }}
+    </p>
 
     <div class="result">
         <p class="score">{{ $screeningSession->total_score }} <span style="font-size: 13px">de 30 pontos</span></p>
@@ -38,18 +47,25 @@
         <p>{{ $screeningSession->result_message }}</p>
     </div>
 
-    @if ($hasAttentionAnswers)
-        <div class="section">
-            <h2>Conversa individual recomendada</h2>
-            <p>Algumas respostas merecem ser conversadas individualmente com o profissional responsável.</p>
-            <p>{{ $screeningSession->attention_notice_snapshot ?: 'Uma resposta isolada não constitui diagnóstico e deve ser contextualizada por profissional habilitado.' }}</p>
-        </div>
-    @else
-        <div class="section">
-            <h2>Acompanhamento</h2>
-            <p>Converse com o profissional responsável para contextualizar este resultado com sua experiência e seu acompanhamento.</p>
-        </div>
-    @endif
+    <div class="section">
+        <h2>Respostas informadas</h2>
+        <table>
+            <thead><tr><th>Pergunta</th><th class="answer">Resposta</th></tr></thead>
+            <tbody>
+                @foreach ($screeningSession->answers as $answer)
+                    <tr>
+                        <td>{{ $answer->question_text_snapshot }}</td>
+                        <td class="answer">{{ $answer->response_label_snapshot }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Acompanhamento</h2>
+        <p>Converse com o profissional responsável para contextualizar este resultado com sua experiência e seu acompanhamento.</p>
+    </div>
 
     <div class="section important">
         <h2>Limites desta devolutiva</h2>
@@ -57,7 +73,7 @@
         <p>Este resultado é descritivo e não substitui entrevista, avaliação clínica ou instrumento validado.</p>
     </div>
 
-    <p class="trace">Cálculo determinístico@if ($screeningSession->scoring_rules_version) · regras {{ $screeningSession->scoring_rules_version }}@endif · sem uso de inteligência artificial · PDF emitido em {{ $issuedAt->format('d/m/Y \à\s H:i') }}</p>
-    <footer>Documento de devolutiva descritiva · Vita Scan</footer>
+    <p class="trace">Documento {{ $screeningSession->document_authenticity_code }} · emitido em {{ $issuedAt->format('d/m/Y \à\s H:i') }}</p>
+    <footer>Documento de devolutiva descritiva · Vita Scan · {{ $screeningSession->document_authenticity_code }}</footer>
 </body>
 </html>
