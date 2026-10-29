@@ -13,6 +13,7 @@ use App\Http\Controllers\Bioimpedance\KnowledgeDocumentController;
 use App\Http\Controllers\Bioimpedance\UserController;
 use App\Http\Controllers\Bioimpedance\WorkspaceController;
 use App\Http\Controllers\Screening\PublicScreeningController;
+use App\Http\Controllers\Screening\PublicScreeningResultPdfController;
 use App\Http\Controllers\Screening\ScreeningInvitationController;
 use App\Http\Controllers\Screening\ScreeningQuestionnaireApprovalController;
 use Illuminate\Support\Facades\Route;
@@ -34,6 +35,10 @@ Route::post('/triagem/{token}/finalizar', [PublicScreeningController::class, 'co
     ->middleware('throttle:6,1')
     ->where('token', '[A-Za-z0-9]{64}')
     ->name('screening.public.complete');
+Route::get('/triagem/{token}/resultado.pdf', PublicScreeningResultPdfController::class)
+    ->middleware('throttle:10,1')
+    ->where('token', '[A-Za-z0-9]{64}')
+    ->name('screening.public.result-pdf');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');

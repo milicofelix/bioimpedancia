@@ -109,6 +109,14 @@ As faixas são próprias deste questionário, não são pontos de corte validado
 
 > Este questionário é uma triagem descritiva informal e não foi validado clinicamente. A pontuação não diagnostica ansiedade, compulsão alimentar ou qualquer outra condição de saúde. O resultado deve ser contextualizado por profissional habilitado e não substitui entrevista, avaliação clínica ou instrumento validado.
 
+## Devolutiva imediata ao cliente
+
+- Exibir confirmação da conclusão, pontuação total, faixa descritiva e mensagem neutra da faixa.
+- Orientar sempre a conversa com o profissional responsável.
+- Quando houver marcação em pergunta de atenção, informar apenas que algumas respostas merecem conversa individual, sem apresentar diagnóstico ou mensagem alarmista.
+- Permitir abrir o mesmo conteúdo em PDF enquanto o acesso temporário verificado estiver válido.
+- Não revelar nome, identificador interno ou outros dados pessoais na devolutiva pública e no PDF.
+
 ## Aprovação profissional necessária
 
 Antes de ativar esta versão, registrar:
