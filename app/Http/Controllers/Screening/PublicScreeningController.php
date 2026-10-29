@@ -36,13 +36,17 @@ class PublicScreeningController extends Controller
             'Pragma' => 'no-cache',
             'Referrer-Policy' => 'no-referrer',
             'X-Robots-Tag' => 'noindex, nofollow, noarchive',
+            'X-Content-Type-Options' => 'nosniff',
+            'X-Frame-Options' => 'DENY',
+            'Permissions-Policy' => 'camera=(), microphone=(), geolocation=()',
+            'Content-Security-Policy' => "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
         ]);
     }
 
     public function verify(VerifyScreeningIdentityRequest $request, string $token): RedirectResponse
     {
         $session = $this->invitations->findPublicSession($token);
-        $this->invitations->verifyIdentity($request, $session, $request->string('identity_confirmation')->toString());
+        $this->invitations->verifyIdentity($request, $session, $request->validated());
 
         return redirect()->route('screening.public.show', ['token' => $token]);
     }

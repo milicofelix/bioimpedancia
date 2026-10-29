@@ -32,6 +32,11 @@ class ScreeningQuestionnaireSeeder extends Seeder
                         'validation_status' => 'not_clinically_validated',
                     ],
                     [
+                        'title' => 'Material visual descritivo fornecido pela clínica — oito formas e reflexões associadas',
+                        'type' => 'editorial_visual_source',
+                        'validation_status' => 'not_clinically_validated',
+                    ],
+                    [
                         'title' => 'Sistema de Avaliação de Testes Psicológicos — SATEPSI',
                         'url' => 'https://satepsi.cfp.org.br/',
                         'type' => 'professional_guidance',
@@ -65,6 +70,11 @@ class ScreeningQuestionnaireSeeder extends Seeder
                             'validation_status' => 'not_clinically_validated',
                         ],
                         [
+                            'title' => 'Material visual descritivo fornecido pela clínica — oito formas e reflexões associadas',
+                            'type' => 'editorial_visual_source',
+                            'validation_status' => 'not_clinically_validated',
+                        ],
+                        [
                             'title' => 'Sistema de Avaliação de Testes Psicológicos — SATEPSI',
                             'url' => 'https://satepsi.cfp.org.br/',
                             'type' => 'professional_guidance',
@@ -89,8 +99,37 @@ class ScreeningQuestionnaireSeeder extends Seeder
                     ], [
                         'label' => $optionDefinition['label'],
                         'position' => $position + 1,
+                        'display_metadata' => null,
                     ]);
                 }
+            }
+
+            $visualDefinition = $definition['visual_question'];
+            $visualQuestion = $questionnaire->questions()->updateOrCreate([
+                'code' => $visualDefinition['code'],
+            ], [
+                'position' => $visualDefinition['position'],
+                'text' => $visualDefinition['text'],
+                'response_type' => $visualDefinition['response_type'],
+                'requires_individual_attention' => false,
+            ]);
+
+            foreach ($visualDefinition['options'] as $position => $optionDefinition) {
+                $visualQuestion->options()->updateOrCreate([
+                    'value' => $optionDefinition['value'],
+                ], [
+                    'label' => $optionDefinition['title'].' — '.$optionDefinition['description'],
+                    'position' => $position + 1,
+                    'display_metadata' => [
+                        'choice_label' => 'Imagem '.$optionDefinition['value'],
+                        'visual_key' => $optionDefinition['visual_key'],
+                        'result_title' => $optionDefinition['title'],
+                        'result_text' => $optionDefinition['description'],
+                        'instructions' => $visualDefinition['instructions'],
+                        'non_diagnostic' => true,
+                        'affects_score' => false,
+                    ],
+                ]);
             }
 
             $rangeMessages = [

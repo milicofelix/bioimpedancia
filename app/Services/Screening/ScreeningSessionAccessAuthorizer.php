@@ -17,6 +17,7 @@ class ScreeningSessionAccessAuthorizer
                 && ($user->isAdmin() || $session->requested_by_user_id === $user->id),
             403,
         );
+        abort_if($session->anonymized_at || ! $session->bioimpedance_client_id, 410, 'Esta triagem foi anonimizada conforme a política de retenção.');
 
         return $user;
     }

@@ -49,10 +49,12 @@
 
     <div class="section">
         <h2>Respostas informadas</h2>
+        @php($visualAnswer = $screeningSession->answers->firstWhere('question_code', 'VIS01'))
         <table>
             <thead><tr><th>Pergunta</th><th class="answer">Resposta</th></tr></thead>
             <tbody>
                 @foreach ($screeningSession->answers as $answer)
+                    @continue($answer->question_code === 'VIS01')
                     <tr>
                         <td>{{ $answer->question_text_snapshot }}</td>
                         <td class="answer">{{ $answer->response_label_snapshot }}</td>
@@ -61,6 +63,14 @@
             </tbody>
         </table>
     </div>
+
+    @if ($visualAnswer)
+        <div class="section">
+            <h2>Escolha visual descritiva</h2>
+            <p><strong>{{ $visualAnswer->response_label_snapshot }}</strong></p>
+            <p>Esta reflexão não altera a pontuação e não possui finalidade diagnóstica.</p>
+        </div>
+    @endif
 
     <div class="section">
         <h2>Acompanhamento</h2>

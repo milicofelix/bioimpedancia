@@ -13,6 +13,8 @@ class ScreeningQuestion extends Model
 
     public const RESPONSE_SINGLE_CHOICE = 'single_choice';
 
+    public const RESPONSE_DESCRIPTIVE_IMAGE_CHOICE = 'descriptive_image_choice';
+
     protected $fillable = [
         'screening_questionnaire_id',
         'code',

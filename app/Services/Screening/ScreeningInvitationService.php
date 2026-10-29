@@ -24,8 +24,9 @@ class ScreeningInvitationService
 
         $this->ensureClientCanReceiveInvitation($client);
         $this->ensureQuestionnaireIsAvailable($questionnaire);
+        $minorContext = $this->minorContext($client, $data);
 
-        return DB::transaction(function () use ($request, $data, $requester, $client, $questionnaire): array {
+        return DB::transaction(function () use ($request, $data, $requester, $client, $questionnaire, $minorContext): array {
             $plainToken = $this->newToken();
             $now = now();
             $session = ScreeningSession::query()->create([
@@ -45,6 +46,11 @@ class ScreeningInvitationService
                 'expires_at' => $now->copy()->addMinutes((int) $data['expires_in_minutes']),
                 'last_sent_at' => $now,
                 'send_count' => 1,
+                'is_minor_at_application' => $minorContext['is_minor'],
+                'guardian_name' => $minorContext['guardian_name'],
+                'guardian_relationship' => $minorContext['guardian_relationship'],
+                'guardian_consent_text_snapshot' => $minorContext['consent_text'],
+                'retention_expires_at' => $now->copy()->addDays(max(1, (int) config('screening.retention_days'))),
             ]);
 
             $this->audit($request, 'screening.invitation.created', $session, 'Convite de triagem criado', [
@@ -52,6 +58,7 @@ class ScreeningInvitationService
                 'questionnaire_version' => $session->questionnaire_version,
                 'access_mode' => $session->access_mode,
                 'expires_at' => $session->expires_at?->toIso8601String(),
+                'minor_flow' => $session->is_minor_at_application,
             ]);
 
             return $this->invitationPayload($session, $plainToken);
@@ -122,7 +129,7 @@ class ScreeningInvitationService
         ])->save();
     }
 
-    public function verifyIdentity(Request $request, ScreeningSession $session, string $confirmation): void
+    public function verifyIdentity(Request $request, ScreeningSession $session, array $data): void
     {
         if (! $session->publicAccessIsAvailable()) {
             throw ValidationException::withMessages(['identity_confirmation' => 'Este convite expirou, foi revogado ou já não está disponível.']);
@@ -143,8 +150,18 @@ class ScreeningInvitationService
 
         $session->refresh()->loadMissing('client');
 
-        if (! $this->identityMatches($session->client, $confirmation)) {
+        if (! $this->identityMatches($session->client, $data['identity_confirmation'])) {
             throw ValidationException::withMessages(['identity_confirmation' => 'A informação não confere. Revise os dados ou solicite ajuda à clínica.']);
+        }
+
+        if ($session->is_minor_at_application) {
+            if (! $this->guardianMatches($session, (string) ($data['guardian_name'] ?? ''))) {
+                throw ValidationException::withMessages(['guardian_name' => 'O nome do responsável não confere com o convite.']);
+            }
+
+            if (! filter_var($data['guardian_consent'] ?? false, FILTER_VALIDATE_BOOL)) {
+                throw ValidationException::withMessages(['guardian_consent' => 'O consentimento do responsável é obrigatório para continuar.']);
+            }
         }
 
         DB::transaction(function () use ($request, $session): void {
@@ -156,6 +173,7 @@ class ScreeningInvitationService
                     'status' => ScreeningSession::STATUS_STARTED,
                     'identity_verified_at' => $verifiedAt,
                     'consent_accepted_at' => $verifiedAt,
+                    'guardian_consent_accepted_at' => $session->is_minor_at_application ? $verifiedAt : null,
                     'started_at' => $verifiedAt,
                 ]);
 
@@ -166,6 +184,8 @@ class ScreeningInvitationService
             $session->refresh();
             $this->audit($request, 'screening.invitation.identity_verified', $session, 'Identidade mínima e consentimento confirmados', [
                 'access_mode' => $session->access_mode,
+                'minor_flow' => $session->is_minor_at_application,
+                'guardian_consent_confirmed' => (bool) $session->guardian_consent_accepted_at,
             ], null);
         });
 
@@ -189,7 +209,7 @@ class ScreeningInvitationService
 
     public function canOpen(Request $request, ScreeningSession $session): bool
     {
-        if ($session->revoked_at || ! $session->expires_at?->isFuture() || $session->status === ScreeningSession::STATUS_CANCELLED) {
+        if ($session->anonymized_at || ! $session->bioimpedance_client_id || $session->revoked_at || ! $session->expires_at?->isFuture() || $session->status === ScreeningSession::STATUS_CANCELLED) {
             return false;
         }
 
@@ -218,6 +238,8 @@ class ScreeningInvitationService
             'total_score' => $session->total_score,
             'result_description' => $session->result_description,
             'document_authenticity_code' => $session->document_authenticity_code,
+            'is_minor_at_application' => $session->is_minor_at_application,
+            'retention_expires_at' => $session->retention_expires_at?->toIso8601String(),
             'comparison' => ['state' => 'unavailable', 'message' => 'A comparação ficará disponível após a conclusão.'],
         ];
     }
@@ -258,6 +280,34 @@ class ScreeningInvitationService
         }
     }
 
+    private function minorContext(BioimpedanceClient $client, array $data): array
+    {
+        $isMinor = $client->birth_date !== null && $client->birth_date->age < 18;
+
+        if (! $isMinor) {
+            return ['is_minor' => false, 'guardian_name' => null, 'guardian_relationship' => null, 'consent_text' => null];
+        }
+
+        if (! config('screening.minor_applications_enabled')) {
+            throw ValidationException::withMessages(['bioimpedance_client_id' => 'Aplicações para menores estão desabilitadas nesta unidade.']);
+        }
+
+        $guardianName = trim((string) ($data['guardian_name'] ?? ''));
+        $relationship = trim((string) ($data['guardian_relationship'] ?? ''));
+        if ($guardianName === '' || $relationship === '') {
+            throw ValidationException::withMessages([
+                'guardian_name' => 'Informe o nome e o vínculo do responsável legal para criar a aplicação de um menor.',
+            ]);
+        }
+
+        return [
+            'is_minor' => true,
+            'guardian_name' => $guardianName,
+            'guardian_relationship' => $relationship,
+            'consent_text' => 'Declaro ser responsável legal pelo menor, ter lido os limites deste questionário e consentir com o preenchimento e tratamento destes dados para triagem e acompanhamento profissional.',
+        ];
+    }
+
     private function ensureOwnedPendingSession(ScreeningSession $session, User $requester): void
     {
         abort_unless($requester->isAdmin() || $session->requested_by_user_id === $requester->id, 403);
@@ -279,6 +329,15 @@ class ScreeningInvitationService
         $provided = preg_replace('/\D+/', '', $confirmation);
 
         return strlen($provided) === 4 && hash_equals(substr($phone, -4), $provided);
+    }
+
+    private function guardianMatches(ScreeningSession $session, string $providedName): bool
+    {
+        $normalize = static fn (string $value): string => Str::lower((string) preg_replace('/\s+/u', ' ', trim($value)));
+        $expected = $normalize((string) $session->guardian_name);
+        $provided = $normalize($providedName);
+
+        return $expected !== '' && $provided !== '' && hash_equals($expected, $provided);
     }
 
     private function newToken(): string

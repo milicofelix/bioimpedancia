@@ -49,6 +49,8 @@ class ScreeningResultPdfService
         $response->headers->set('Pragma', 'no-cache');
         $response->headers->set('Referrer-Policy', 'no-referrer');
         $response->headers->set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+        $response->headers->set('X-Content-Type-Options', 'nosniff');
+        $response->headers->set('Content-Security-Policy', 'sandbox');
 
         return $response;
     }

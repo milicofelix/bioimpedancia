@@ -1,5 +1,7 @@
 # VITA-ACEA-1.0 — definição clínica e editorial
 
+> Esta definição permanece preservada para o histórico. A escolha visual descritiva foi acrescentada somente na versão 1.1, documentada em `VITA-ACEA-1.1-visual-choice.md`.
+
 ## Situação editorial
 
 - Código: `VITA-ACEA`.
@@ -132,6 +134,20 @@ As faixas são próprias deste questionário, não são pontos de corte validado
 - Quando as versões forem diferentes, informar que não existe comparação direta válida.
 - Descrever apenas aumento, diminuição ou estabilidade da pontuação, sem concluir melhora ou piora clínica.
 - Registrar em auditoria quem abriu o resultado interno e quem solicitou a entrega do PDF.
+
+## Segurança, privacidade e retenção
+
+- O consentimento específico deve ser aceito antes da primeira resposta; em aplicações de menores, o responsável legal também deve se identificar e aceitar um consentimento próprio.
+- Somente administradores ativos e profissionais ativos podem criar convites e consultar resultados internos. Recepção e visualização não acessam respostas ou pontuação.
+- Convites usam token aleatório armazenado apenas como hash, possuem expiração, limite de tentativas, revogação e uma única finalização.
+- Páginas e PDFs públicos usam cabeçalhos de não indexação e não cache; o PDF é renderizado sob demanda e não é salvo em diretório público.
+- Textos das respostas, observações e encaminhamentos profissionais são criptografados em repouso. Pontuação e faixa permanecem estruturadas para cálculo determinístico, comparação e auditoria autorizada.
+- A chave `APP_KEY` usada pela criptografia deve permanecer protegida, estável e disponível nos procedimentos de backup e recuperação; sua perda torna o conteúdo criptografado irrecuperável.
+- Logs e auditorias não recebem o conteúdo integral das respostas, observações ou encaminhamentos. Notificações e textos de compartilhamento não incluem pontuação.
+- A retenção padrão é de 1.825 dias e pode ser ajustada por `SCREENING_RETENTION_DAYS`. Após o prazo, a rotina diária desvincula a triagem do cliente, revoga o token, remove anotações livres e higieniza metadados de auditoria.
+- A anonimização LGPD do cadastro executa a mesma rotina imediatamente para todas as triagens vinculadas.
+- A aplicação finalizada é imutável. Ajustes de observações e encaminhamentos são registrados separadamente e auditados sem copiar o conteúdo sensível para o evento.
+- Aplicações para menores podem ser desabilitadas por `SCREENING_MINOR_APPLICATIONS_ENABLED=false`.
 
 ## Aprovação profissional necessária
 

@@ -27,6 +27,8 @@ class ScreeningAnswer extends Model
             'response_value' => 'integer',
             'score' => 'integer',
             'requires_individual_attention' => 'boolean',
+            'question_text_snapshot' => 'encrypted',
+            'response_label_snapshot' => 'encrypted',
         ];
     }
 

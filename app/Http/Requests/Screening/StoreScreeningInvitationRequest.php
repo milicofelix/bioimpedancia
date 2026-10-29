@@ -19,6 +19,8 @@ class StoreScreeningInvitationRequest extends FormRequest
             'screening_questionnaire_id' => ['required', 'integer', 'exists:screening_questionnaires,id'],
             'expires_in_minutes' => ['required', 'integer', 'min:15', 'max:10080'],
             'access_mode' => ['required', 'in:remote,reception'],
+            'guardian_name' => ['nullable', 'string', 'max:160'],
+            'guardian_relationship' => ['nullable', 'string', 'max:100'],
         ];
     }
 }

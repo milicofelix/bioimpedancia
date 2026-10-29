@@ -66,6 +66,7 @@ class ScreeningSessionFinalizer
                 'attention_question_codes' => $score->attentionQuestionCodes,
                 'attention_notice_snapshot' => $score->attentionNotice,
                 'document_authenticity_code' => $documentAuthenticityCode,
+                'retention_expires_at' => now()->addDays(max(1, (int) config('screening.retention_days'))),
             ]);
 
             AppAudit::query()->create([
@@ -73,20 +74,16 @@ class ScreeningSessionFinalizer
                 'action' => 'screening.session.finalized',
                 'auditable_type' => ScreeningSession::class,
                 'auditable_id' => $lockedSession->id,
-                'description' => 'Triagem pontuada e finalizada pelo motor determinístico',
+                'description' => 'Respostas recebidas e triagem finalizada pelo motor determinístico',
                 'new_values' => [
                     'questionnaire_code' => $lockedSession->questionnaire_code,
                     'questionnaire_version' => $lockedSession->questionnaire_version,
-                    'total_score' => $score->total,
-                    'result_description' => $score->rangeDescription,
-                    'attention_question_codes' => $score->attentionQuestionCodes,
-                    'attention_notice' => $score->attentionNotice,
                     'scoring_rules_version' => $score->rulesVersion,
-                    'scoring_rules_snapshot' => $score->rulesSnapshot,
                     'calculation_source' => 'deterministic_internal_engine',
                     'uses_artificial_intelligence' => false,
                     'document_authenticity_code' => $documentAuthenticityCode,
                     'answers_count' => count($score->answers),
+                    'response_content_logged' => false,
                 ],
                 'ip_address' => $request->ip(),
                 'user_agent' => Str::limit((string) $request->userAgent(), 500, ''),
@@ -104,6 +101,10 @@ class ScreeningSessionFinalizer
 
         if (! $session->identity_verified_at || ! $session->consent_accepted_at) {
             throw ValidationException::withMessages(['session' => 'A identidade e o consentimento precisam ser confirmados antes da finalização.']);
+        }
+
+        if ($session->is_minor_at_application && ! $session->guardian_consent_accepted_at) {
+            throw ValidationException::withMessages(['session' => 'O consentimento do responsável legal é obrigatório para finalizar a aplicação do menor.']);
         }
 
         if ($session->revoked_at || ! $session->expires_at?->isFuture()) {

@@ -15,6 +15,14 @@ class ScreeningSessionReview extends Model
         'updated_by_user_id',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'professional_notes' => 'encrypted',
+            'referral_notes' => 'encrypted',
+        ];
+    }
+
     public function session(): BelongsTo
     {
         return $this->belongsTo(ScreeningSession::class, 'screening_session_id');

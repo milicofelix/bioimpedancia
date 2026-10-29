@@ -16,6 +16,7 @@ class ScreeningOption extends Model
         'label',
         'value',
         'position',
+        'display_metadata',
     ];
 
     protected function casts(): array
@@ -23,6 +24,7 @@ class ScreeningOption extends Model
         return [
             'value' => 'integer',
             'position' => 'integer',
+            'display_metadata' => 'array',
         ];
     }
 

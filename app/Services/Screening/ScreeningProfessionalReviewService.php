@@ -59,7 +59,10 @@ class ScreeningProfessionalReviewService
                 ->where('screening_session_id', $session->id)
                 ->lockForUpdate()
                 ->first();
-            $oldValues = $existing?->only(['professional_notes', 'referral_notes']) ?? [];
+            $oldValues = [
+                'had_professional_notes' => filled($existing?->professional_notes),
+                'had_referral_notes' => filled($existing?->referral_notes),
+            ];
 
             ScreeningSessionReview::query()->updateOrCreate(
                 ['screening_session_id' => $session->id],
@@ -72,14 +75,19 @@ class ScreeningProfessionalReviewService
 
             AppAudit::query()->create([
                 'user_id' => $user->id,
-                'action' => 'screening.professional_review.updated',
+                'action' => $existing
+                    ? 'screening.professional_review.corrected'
+                    : 'screening.professional_review.created',
                 'auditable_type' => ScreeningSession::class,
                 'auditable_id' => $session->id,
-                'description' => 'Observação profissional e encaminhamento da triagem atualizados',
+                'description' => $existing
+                    ? 'Registro profissional da triagem corrigido'
+                    : 'Registro profissional da triagem criado',
                 'old_values' => $oldValues,
                 'new_values' => [
-                    'professional_notes' => $data['professional_notes'] ?? null,
-                    'referral_notes' => $data['referral_notes'] ?? null,
+                    'has_professional_notes' => filled($data['professional_notes'] ?? null),
+                    'has_referral_notes' => filled($data['referral_notes'] ?? null),
+                    'sensitive_content_logged' => false,
                 ],
                 'ip_address' => $request->ip(),
                 'user_agent' => Str::limit((string) $request->userAgent(), 500, ''),
@@ -104,7 +112,12 @@ class ScreeningProfessionalReviewService
             'consent' => [
                 'text' => $session->consent_text_snapshot,
                 'accepted_at' => $session->consent_accepted_at?->toIso8601String(),
+                'minor_flow' => $session->is_minor_at_application,
+                'guardian_name' => $session->is_minor_at_application ? $session->guardian_name : null,
+                'guardian_relationship' => $session->is_minor_at_application ? $session->guardian_relationship : null,
+                'guardian_consent_accepted_at' => $session->guardian_consent_accepted_at?->toIso8601String(),
             ],
+            'retention_expires_at' => $session->retention_expires_at?->toIso8601String(),
             'result' => [
                 'total_score' => $session->total_score,
                 'description' => $session->result_description,

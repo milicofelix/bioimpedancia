@@ -11,7 +11,9 @@ use App\Models\Bioimpedance\BioimpedanceSegmentalMeasurement;
 use App\Models\Bioimpedance\BioimpedanceClient;
 use App\Models\Bioimpedance\BioimpedanceClinicSetting;
 use App\Models\Bioimpedance\BioimpedanceReportShare;
+use App\Models\Screening\ScreeningSession;
 use App\Models\User;
+use App\Services\Screening\ScreeningPrivacyService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -39,6 +41,7 @@ class BioimpedanceWorkflow
         private readonly RelaxmedicValueNormalizer $relaxmedicValueNormalizer,
         private readonly BioimpedanceWorkspacePresenter $workspacePresenter,
         private readonly BioimpedanceAdminDashboard $adminDashboard,
+        private readonly ScreeningPrivacyService $screeningPrivacyService,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -116,6 +119,31 @@ class BioimpedanceWorkflow
             'exported_at' => now()->toIso8601String(),
             'exported_by' => $this->userPayload($request->user()),
             'client' => $this->clientPayload($this->loadClientAssessments($client->refresh())),
+            'screenings' => ScreeningSession::query()
+                ->with('answers')
+                ->where('bioimpedance_client_id', $client->id)
+                ->oldest()
+                ->get()
+                ->map(fn (ScreeningSession $session): array => [
+                    'questionnaire' => $session->questionnaire_name,
+                    'version' => $session->questionnaire_version,
+                    'status' => $session->status,
+                    'requested_by' => $session->requested_by_name,
+                    'minor_flow' => $session->is_minor_at_application,
+                    'guardian_name' => $session->guardian_name,
+                    'guardian_relationship' => $session->guardian_relationship,
+                    'consent_accepted_at' => $session->consent_accepted_at?->toIso8601String(),
+                    'guardian_consent_accepted_at' => $session->guardian_consent_accepted_at?->toIso8601String(),
+                    'finalized_at' => $session->finalized_at?->toIso8601String(),
+                    'total_score' => $session->total_score,
+                    'result_description' => $session->result_description,
+                    'answers' => $session->answers->map(fn ($answer): array => [
+                        'question_code' => $answer->question_code,
+                        'question' => $answer->question_text_snapshot,
+                        'response' => $answer->response_label_snapshot,
+                        'score' => $answer->score,
+                    ])->values(),
+                ])->values(),
             'clinic' => $this->clinicPayload(),
             'purpose' => 'Exportação de dados pessoais e avaliações para atendimento de solicitação LGPD.',
         ];
@@ -123,6 +151,9 @@ class BioimpedanceWorkflow
         return response(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), 200, [
             'Content-Type' => 'application/json; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="'.$this->privacyExportFileName($client).'"',
+            'Cache-Control' => 'no-store, private',
+            'Pragma' => 'no-cache',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
@@ -141,34 +172,42 @@ class BioimpedanceWorkflow
         ]);
         $anonymizedName = 'Cliente anonimizado #'.str_pad((string) $client->id, 4, '0', STR_PAD_LEFT);
 
-        $client->update([
-            'full_name' => $anonymizedName,
-            'birth_date' => '1900-01-01',
-            'biological_sex' => 'female',
-            'height_cm' => 100,
-            'phone' => null,
-            'phone_digits' => null,
-            'email' => null,
-            'cpf' => null,
-            'address' => null,
-            'emergency_contact_name' => null,
-            'emergency_contact_phone' => null,
-            'consent_accepted_at' => null,
-            'next_assessment_at' => null,
-            'inactivated_at' => now(),
-            'anonymized_at' => now(),
-            'anonymized_by_user_id' => $request->user()->id,
-            'notes' => 'Registro anonimizado por solicitação LGPD.',
-        ]);
+        DB::transaction(function () use ($request, $client, $anonymizedName): void {
+            $screeningsAnonymized = $this->screeningPrivacyService->anonymizeClientScreenings(
+                $client,
+                'Solicitação LGPD vinculada à anonimização do cadastro do cliente.',
+            );
 
-        $this->revokeClientPublicShares($client);
-        $this->scrubClientAuditPersonalData($client);
-        $this->audit($request, 'bioimpedance_client.anonymized', $client, 'Cliente anonimizado para atendimento LGPD', null, [
-            'client_id' => $client->id,
-            'anonymized_at' => $client->fresh()->anonymized_at?->toIso8601String(),
-            'shares_revoked' => true,
-            'reason_registered' => true,
-        ]);
+            $client->update([
+                'full_name' => $anonymizedName,
+                'birth_date' => '1900-01-01',
+                'biological_sex' => 'female',
+                'height_cm' => 100,
+                'phone' => null,
+                'phone_digits' => null,
+                'email' => null,
+                'cpf' => null,
+                'address' => null,
+                'emergency_contact_name' => null,
+                'emergency_contact_phone' => null,
+                'consent_accepted_at' => null,
+                'next_assessment_at' => null,
+                'inactivated_at' => now(),
+                'anonymized_at' => now(),
+                'anonymized_by_user_id' => $request->user()->id,
+                'notes' => 'Registro anonimizado por solicitação LGPD.',
+            ]);
+
+            $this->revokeClientPublicShares($client);
+            $this->scrubClientAuditPersonalData($client);
+            $this->audit($request, 'bioimpedance_client.anonymized', $client, 'Cliente anonimizado para atendimento LGPD', null, [
+                'client_id' => $client->id,
+                'anonymized_at' => $client->fresh()->anonymized_at?->toIso8601String(),
+                'shares_revoked' => true,
+                'screenings_anonymized' => $screeningsAnonymized,
+                'reason_registered' => true,
+            ]);
+        });
 
         return response()->json([
             'client' => $this->clientPayload($this->loadClientAssessments($client)),

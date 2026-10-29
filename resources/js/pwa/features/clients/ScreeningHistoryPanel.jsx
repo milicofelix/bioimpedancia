@@ -36,7 +36,7 @@ export default function ScreeningHistoryPanel({ sessions, busyAction, onNewAppli
 			const status = statusPresentation(session);
 
 			return <li key={session.id} className="rounded-2xl border border-slate-200 bg-white p-4">
-				<div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-extrabold text-slate-900">{session.questionnaire_name}</p><p className="mt-1 text-xs text-slate-500">{session.questionnaire_version} · criada em {formatDate(session.created_at)}</p><p className="mt-1 text-xs text-slate-600">Solicitada por {session.requested_by_name || 'Profissional não informado'}</p></div><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${status.classes}`}>{status.label}</span></div>
+				<div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-extrabold text-slate-900">{session.questionnaire_name}</p><p className="mt-1 text-xs text-slate-500">{session.questionnaire_version} · criada em {formatDate(session.created_at)}</p><p className="mt-1 text-xs text-slate-600">Solicitada por {session.requested_by_name || 'Profissional não informado'}{session.is_minor_at_application ? ' · menor com responsável legal' : ''}</p></div><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${status.classes}`}>{status.label}</span></div>
 
 				{session.status === 'finalized' ? <div className="mt-3 rounded-xl bg-teal-50 p-3"><p className="text-sm font-extrabold text-teal-900">{session.total_score} pontos · {session.result_description}</p><p className="mt-1 text-xs text-teal-800">Concluída em {formatDate(session.finalized_at)}</p></div> : null}
 				<Comparison comparison={session.comparison} />

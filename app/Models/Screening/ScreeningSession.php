@@ -31,9 +31,14 @@ class ScreeningSession extends Model
         'questionnaire_version',
         'questionnaire_name',
         'requested_by_name',
+        'is_minor_at_application',
+        'guardian_name',
+        'guardian_relationship',
+        'guardian_consent_text_snapshot',
         'consent_text_snapshot',
         'disclaimer_snapshot',
         'consent_accepted_at',
+        'guardian_consent_accepted_at',
         'started_at',
         'finalized_at',
         'cancelled_at',
@@ -52,6 +57,8 @@ class ScreeningSession extends Model
         'access_mode',
         'token_created_at',
         'expires_at',
+        'retention_expires_at',
+        'anonymized_at',
         'revoked_at',
         'revoked_by_user_id',
         'identity_verified_at',
@@ -67,12 +74,18 @@ class ScreeningSession extends Model
     {
         return [
             'consent_accepted_at' => 'datetime',
+            'guardian_consent_accepted_at' => 'datetime',
+            'is_minor_at_application' => 'boolean',
+            'guardian_name' => 'encrypted',
+            'guardian_relationship' => 'encrypted',
             'started_at' => 'datetime',
             'finalized_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'total_score' => 'integer',
             'token_created_at' => 'datetime',
             'expires_at' => 'datetime',
+            'retention_expires_at' => 'datetime',
+            'anonymized_at' => 'datetime',
             'revoked_at' => 'datetime',
             'identity_verified_at' => 'datetime',
             'last_identity_attempt_at' => 'datetime',
@@ -159,6 +172,8 @@ class ScreeningSession extends Model
     public function publicAccessIsAvailable(): bool
     {
         return $this->status === self::STATUS_PENDING
+            && $this->anonymized_at === null
+            && filled($this->bioimpedance_client_id)
             && $this->revoked_at === null
             && $this->expires_at?->isFuture()
             && filled($this->public_token_hash);

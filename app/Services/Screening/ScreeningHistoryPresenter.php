@@ -40,6 +40,8 @@ class ScreeningHistoryPresenter
                 'total_score' => $session->total_score,
                 'result_description' => $session->result_description,
                 'document_authenticity_code' => $session->document_authenticity_code,
+                'is_minor_at_application' => $session->is_minor_at_application,
+                'retention_expires_at' => $session->retention_expires_at?->toIso8601String(),
                 'comparison' => $comparisons[$session->id],
             ])
             ->all();

@@ -44,9 +44,12 @@ class ScreeningScoringEngine
                 throw new DomainException("A alternativa selecionada para {$question->code} não pertence a esta pergunta.");
             }
 
-            $score = (int) $option->value;
+            $isScoredQuestion = $question->response_type === ScreeningQuestion::RESPONSE_SINGLE_CHOICE;
+            $score = $isScoredQuestion ? (int) $option->value : 0;
             $requiresAttention = $question->requires_individual_attention && $score > 0;
-            $total += $score;
+            if ($isScoredQuestion) {
+                $total += $score;
+            }
 
             if ($requiresAttention) {
                 $attentionQuestionCodes[] = $question->code;
@@ -86,8 +89,8 @@ class ScreeningScoringEngine
             rangeMessage: $range->display_message,
             answers: $answers,
             attentionQuestionCodes: $attentionQuestionCodes,
-            rulesVersion: VitaAceaQuestionnaire::SCORING_RULES_VERSION,
-            rulesSnapshot: VitaAceaQuestionnaire::scoringRulesSnapshot(),
+            rulesVersion: VitaAceaQuestionnaire::scoringRulesVersion($questionnaire->version),
+            rulesSnapshot: VitaAceaQuestionnaire::scoringRulesSnapshot($questionnaire->version),
             attentionNotice: VitaAceaQuestionnaire::ATTENTION_NOTICE,
         );
     }
@@ -112,7 +115,10 @@ class ScreeningScoringEngine
         $maximumTotal = 0;
 
         foreach ($questions as $question) {
-            if ($question->response_type !== ScreeningQuestion::RESPONSE_SINGLE_CHOICE) {
+            if (! in_array($question->response_type, [
+                ScreeningQuestion::RESPONSE_SINGLE_CHOICE,
+                ScreeningQuestion::RESPONSE_DESCRIPTIVE_IMAGE_CHOICE,
+            ], true)) {
                 throw new DomainException("O tipo de resposta de {$question->code} ainda não possui regra determinística.");
             }
 
@@ -124,8 +130,10 @@ class ScreeningScoringEngine
                 throw new DomainException("A pergunta {$question->code} possui alternativas com pontuações duplicadas.");
             }
 
-            $minimumTotal += (int) $question->options->min('value');
-            $maximumTotal += (int) $question->options->max('value');
+            if ($question->response_type === ScreeningQuestion::RESPONSE_SINGLE_CHOICE) {
+                $minimumTotal += (int) $question->options->min('value');
+                $maximumTotal += (int) $question->options->max('value');
+            }
         }
 
         $expectedMinimum = $minimumTotal;
@@ -154,27 +162,45 @@ class ScreeningScoringEngine
     private function assertSupportedQuestionnaire(ScreeningQuestionnaire $questionnaire): void
     {
         if ($questionnaire->code !== VitaAceaQuestionnaire::CODE
-            || $questionnaire->version !== VitaAceaQuestionnaire::VERSION) {
+            || ! in_array($questionnaire->version, [VitaAceaQuestionnaire::LEGACY_VERSION, VitaAceaQuestionnaire::VERSION], true)) {
             throw new DomainException('Esta versão do motor não reconhece as regras do questionário informado.');
         }
 
         $questions = $questionnaire->questions;
 
-        if ($questions->count() !== VitaAceaQuestionnaire::EXPECTED_QUESTION_COUNT) {
-            throw new DomainException('O VITA-ACEA-1.0 deve possuir exatamente dez perguntas.');
-        }
-
         $expectedCodes = collect(range(1, VitaAceaQuestionnaire::EXPECTED_QUESTION_COUNT))
             ->map(fn (int $position): string => sprintf('Q%02d', $position))
             ->all();
+        if ($questionnaire->version === VitaAceaQuestionnaire::VERSION) {
+            $expectedCodes[] = VitaAceaQuestionnaire::VISUAL_QUESTION_CODE;
+        }
         $actualCodes = $questions->pluck('code')->values()->all();
 
         if ($actualCodes !== $expectedCodes) {
-            throw new DomainException('As perguntas do VITA-ACEA-1.0 não correspondem à sequência versionada Q01–Q10.');
+            throw new DomainException('As perguntas não correspondem à sequência prevista para esta versão do VITA-ACEA.');
         }
 
         foreach ($questions as $question) {
             $optionScores = $question->options->pluck('value')->map(fn ($value): int => (int) $value)->sort()->values()->all();
+
+            if ($question->code === VitaAceaQuestionnaire::VISUAL_QUESTION_CODE) {
+                $hasCompleteVisualMetadata = $question->options->every(fn ($option): bool =>
+                    filled(data_get($option->display_metadata, 'choice_label'))
+                    && filled(data_get($option->display_metadata, 'visual_key'))
+                    && filled(data_get($option->display_metadata, 'result_title'))
+                    && filled(data_get($option->display_metadata, 'result_text'))
+                    && data_get($option->display_metadata, 'affects_score') === false
+                    && data_get($option->display_metadata, 'non_diagnostic') === true
+                );
+                if ($question->response_type !== ScreeningQuestion::RESPONSE_DESCRIPTIVE_IMAGE_CHOICE
+                    || $optionScores !== range(1, 8)
+                    || $question->requires_individual_attention
+                    || ! $hasCompleteVisualMetadata) {
+                    throw new DomainException('A escolha visual deve possuir oito opções descritivas, não pontuadas e sem classificação clínica.');
+                }
+
+                continue;
+            }
 
             if ($optionScores !== range(VitaAceaQuestionnaire::MINIMUM_OPTION_SCORE, VitaAceaQuestionnaire::MAXIMUM_OPTION_SCORE)) {
                 throw new DomainException("A pergunta {$question->code} deve possuir exclusivamente as pontuações 0, 1, 2 e 3.");
