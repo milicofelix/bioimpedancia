@@ -8,7 +8,9 @@ final class VitaAceaQuestionnaire
 {
     public const CODE = 'VITA-ACEA';
 
-    public const VERSION = 'VITA-ACEA-1.1';
+    public const VERSION = 'VITA-ACEA-1.2';
+
+    public const PREVIOUS_VERSION = 'VITA-ACEA-1.1';
 
     public const LEGACY_VERSION = 'VITA-ACEA-1.0';
 
@@ -18,7 +20,7 @@ final class VitaAceaQuestionnaire
 
     public const RECALL_PERIOD_DAYS = 14;
 
-    public const SCORING_RULES_VERSION = 'VITA-ACEA-SCORING-1.1';
+    public const SCORING_RULES_VERSION = 'VITA-ACEA-SCORING-1.2';
 
     public const EXPECTED_QUESTION_COUNT = 10;
 
@@ -68,7 +70,6 @@ final class VitaAceaQuestionnaire
             'interpretation_roles' => self::INTERPRETATION_ROLES,
             'options' => self::options(),
             'questions' => self::questions(),
-            'visual_question' => self::visualQuestion(),
             'descriptive_ranges' => self::descriptiveRanges(),
             'professional_approval' => [
                 'required' => true,
@@ -88,7 +89,7 @@ final class VitaAceaQuestionnaire
             'rules_version' => self::scoringRulesVersion($version),
             'calculation_method' => 'deterministic_sum',
             'question_count' => self::EXPECTED_QUESTION_COUNT,
-            'descriptive_question_count' => $version === self::VERSION ? self::EXPECTED_DESCRIPTIVE_QUESTION_COUNT : 0,
+            'descriptive_question_count' => $version === self::PREVIOUS_VERSION ? self::EXPECTED_DESCRIPTIVE_QUESTION_COUNT : 0,
             'descriptive_questions_affect_score' => false,
             'allowed_option_scores' => range(self::MINIMUM_OPTION_SCORE, self::MAXIMUM_OPTION_SCORE),
             'minimum_total_score' => self::MINIMUM_TOTAL_SCORE,
@@ -102,9 +103,11 @@ final class VitaAceaQuestionnaire
 
     public static function scoringRulesVersion(string $questionnaireVersion): string
     {
-        return $questionnaireVersion === self::LEGACY_VERSION
-            ? 'VITA-ACEA-SCORING-1.0'
-            : self::SCORING_RULES_VERSION;
+        return match ($questionnaireVersion) {
+            self::LEGACY_VERSION => 'VITA-ACEA-SCORING-1.0',
+            self::PREVIOUS_VERSION => 'VITA-ACEA-SCORING-1.1',
+            default => self::SCORING_RULES_VERSION,
+        };
     }
 
     /** @return list<array{value: int, label: string}> */

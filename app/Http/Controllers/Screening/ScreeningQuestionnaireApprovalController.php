@@ -20,6 +20,7 @@ class ScreeningQuestionnaireApprovalController extends Controller
         return response()->json([
             'questionnaire' => [
                 'id' => $approved->id,
+                'code' => $approved->code,
                 'name' => $approved->name,
                 'version' => $approved->version,
                 'status' => $approved->status,

@@ -49,19 +49,25 @@
     </p>
 
     <div class="result">
-        <p class="score">{{ $screeningSession->total_score }} <span style="font-size: 13px">de 30 pontos</span></p>
-        <p class="range">{{ $screeningSession->result_description }}</p>
-        <p>{{ $screeningSession->result_message }}</p>
+        @if ($isScoredQuestionnaire)
+            <p class="score">{{ $screeningSession->total_score }} <span style="font-size: 13px">de 30 pontos</span></p>
+            <p class="range">{{ $screeningSession->result_description }}</p>
+            <p>{{ $screeningSession->result_message }}</p>
+        @else
+            <p class="range">Resultado descritivo da escolha visual</p>
+            <p>Esta devolutiva não utiliza pontuação e não representa classificação clínica.</p>
+        @endif
     </div>
 
+    @php($nonVisualAnswers = $screeningSession->answers->where('question_code', '!=', 'VIS01'))
+    @php($visualAnswer = $screeningSession->answers->firstWhere('question_code', 'VIS01'))
+    @if ($nonVisualAnswers->isNotEmpty())
     <div class="section">
         <h2>Respostas informadas</h2>
-        @php($visualAnswer = $screeningSession->answers->firstWhere('question_code', 'VIS01'))
         <table>
             <thead><tr><th>Pergunta</th><th class="answer">Resposta</th></tr></thead>
             <tbody>
-                @foreach ($screeningSession->answers as $answer)
-                    @continue($answer->question_code === 'VIS01')
+                @foreach ($nonVisualAnswers as $answer)
                     <tr>
                         <td>{{ $answer->question_text_snapshot }}</td>
                         <td class="answer">{{ $answer->response_label_snapshot }}</td>
@@ -70,6 +76,7 @@
             </tbody>
         </table>
     </div>
+    @endif
 
     @if ($visualAnswer)
         <div class="section visual-choice">

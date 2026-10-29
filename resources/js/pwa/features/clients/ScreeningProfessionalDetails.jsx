@@ -68,7 +68,7 @@ export default function ScreeningProfessionalDetails({ sessionId, onClose }) {
 					<p><strong>Cliente:</strong> {details.client_name}</p><p><strong>Profissional:</strong> {details.requested_by_name || 'Não informado'}</p>
 					<p className="sm:col-span-2"><strong>Questionário:</strong> {details.questionnaire_name} · {details.questionnaire_version}</p>
 					<p><strong>Criada:</strong> {formatDate(details.created_at)}</p><p><strong>Concluída:</strong> {formatDate(details.finalized_at)}</p>
-					<p><strong>Resultado:</strong> {details.result.total_score} pontos · {details.result.description}</p><p><strong>Documento:</strong> {details.result.document_authenticity_code}</p>
+					<p><strong>Resultado:</strong> {details.questionnaire_code === 'VITA-TAA' ? 'Escolha visual descritiva, sem pontuação' : `${details.result.total_score} pontos · ${details.result.description}`}</p><p><strong>Documento:</strong> {details.result.document_authenticity_code}</p>
 					<p><strong>Retenção prevista:</strong> {formatDate(details.retention_expires_at)}</p><p><strong>Fluxo:</strong> {details.consent.minor_flow ? 'Menor com responsável legal' : 'Cliente adulto'}</p>
 				</div>
 

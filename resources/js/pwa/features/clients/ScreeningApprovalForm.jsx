@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import PwaButton from '../../components/ui/PwaButton';
 
-const confirmations = [
-	['recall_period_confirmed', 'Confirmo o período de recordação proposto.'],
-	['questions_confirmed', 'Revisei e aprovo a redação das perguntas.'],
-	['ranges_confirmed', 'Revisei e aprovo as faixas descritivas.'],
-	['disclaimers_confirmed', 'Revisei os avisos, limites e linguagem não diagnóstica.'],
-	['electronic_signature_confirmed', 'Confirmo esta aprovação eletrônica em meu nome e registro profissional.'],
-];
+function approvalConfirmations(questionnaire) {
+	const isImmediateVisualChoice = !questionnaire.recall_period_days;
+	return [
+		['recall_period_confirmed', isImmediateVisualChoice ? 'Confirmo que esta escolha visual é imediata e não utiliza período de recordação.' : 'Confirmo o período de recordação proposto.'],
+		['questions_confirmed', isImmediateVisualChoice ? 'Revisei e aprovo a pergunta e as oito opções visuais.' : 'Revisei e aprovo a redação das perguntas.'],
+		['ranges_confirmed', isImmediateVisualChoice ? 'Revisei e aprovo a devolutiva descritiva sem pontuação.' : 'Revisei e aprovo as faixas descritivas.'],
+		['disclaimers_confirmed', 'Revisei os avisos, limites e linguagem não diagnóstica.'],
+		['electronic_signature_confirmed', 'Confirmo esta aprovação eletrônica em meu nome e registro profissional.'],
+	];
+}
 
 function requestError(error) {
 	const errors = error?.response?.data?.errors;
@@ -15,6 +18,7 @@ function requestError(error) {
 }
 
 export default function ScreeningApprovalForm({ questionnaire, onApproved }) {
+	const confirmations = approvalConfirmations(questionnaire);
 	const [form, setForm] = useState({
 		profession: '',
 		professional_registration: '',
@@ -51,7 +55,7 @@ export default function ScreeningApprovalForm({ questionnaire, onApproved }) {
 		<form onSubmit={submit} className="mt-4 rounded-2xl border border-amber-300 bg-amber-50/70 p-4">
 			<p className="text-xs font-extrabold uppercase tracking-wide text-amber-900">Aprovação clínica/editorial necessária</p>
 			<h4 className="mt-1 font-extrabold text-slate-900">{questionnaire.name}</h4>
-			<p className="mt-1 text-xs leading-5 text-slate-600">{questionnaire.version} · {questionnaire.questions_count} perguntas · período de {questionnaire.recall_period_days} dias · {questionnaire.ranges_count} faixas descritivas</p>
+			<p className="mt-1 text-xs leading-5 text-slate-600">{questionnaire.version} · {questionnaire.questions_count} pergunta(s){questionnaire.recall_period_days ? ` · período de ${questionnaire.recall_period_days} dias` : ' · escolha visual imediata'} · {questionnaire.ranges_count} resultado(s) descritivo(s)</p>
 			<p className="mt-3 rounded-xl bg-white/80 p-3 text-xs leading-5 text-slate-700"><strong>Limite obrigatório:</strong> {questionnaire.disclaimer}</p>
 
 			<div className="mt-3 grid gap-3 sm:grid-cols-2">

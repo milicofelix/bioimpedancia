@@ -57,6 +57,16 @@ class ScreeningQuestionnaireApprovalService
                 'approved_at' => $approvedAt,
             ]);
 
+            $retiredVersions = ScreeningQuestionnaire::query()
+                ->where('code', $lockedQuestionnaire->code)
+                ->where('id', '!=', $lockedQuestionnaire->id)
+                ->where('status', ScreeningQuestionnaire::STATUS_ACTIVE)
+                ->get();
+
+            $retiredVersions->each(fn (ScreeningQuestionnaire $previousVersion) => $previousVersion->update([
+                    'status' => ScreeningQuestionnaire::STATUS_RETIRED,
+                ]));
+
             AppAudit::query()->create([
                 'user_id' => $request->user()->id,
                 'action' => 'screening.questionnaire.approved',
@@ -71,6 +81,7 @@ class ScreeningQuestionnaireApprovalService
                     'approved_profession' => $lockedQuestionnaire->approved_profession,
                     'professional_registration' => $lockedQuestionnaire->professional_registration,
                     'approval_attestations' => $attestations,
+                    'retired_version_ids' => $retiredVersions->pluck('id')->all(),
                 ],
                 'ip_address' => $request->ip(),
                 'user_agent' => Str::limit((string) $request->userAgent(), 500, ''),

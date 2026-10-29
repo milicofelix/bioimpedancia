@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Screening;
 
+use App\Domain\Screening\CurrentAnxietyQuestionnaire;
 use App\Domain\Screening\VitaAceaQuestionnaire;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Screening\CompletePublicScreeningRequest;
@@ -37,6 +38,7 @@ class PublicScreeningController extends Controller
             'visualChoiceResult' => $visualAnswer
                 ? VitaAceaQuestionnaire::visualResult((int) $visualAnswer->response_value)
                 : null,
+            'isScoredQuestionnaire' => $session->questionnaire_code !== CurrentAnxietyQuestionnaire::CODE,
         ], 200, [
             'Cache-Control' => 'no-store, private',
             'Pragma' => 'no-cache',

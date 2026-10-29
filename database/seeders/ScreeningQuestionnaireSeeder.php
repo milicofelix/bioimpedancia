@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Domain\Screening\CurrentAnxietyQuestionnaire;
 use App\Domain\Screening\VitaAceaQuestionnaire;
 use App\Models\Screening\ScreeningQuestionnaire;
 use Illuminate\Database\Seeder;
@@ -12,6 +13,7 @@ class ScreeningQuestionnaireSeeder extends Seeder
     public function run(): void
     {
         DB::transaction(function (): void {
+            $this->seedCurrentAnxietyQuestionnaire();
             $definition = VitaAceaQuestionnaire::definition();
 
             $questionnaire = ScreeningQuestionnaire::query()->firstOrCreate([
@@ -29,11 +31,6 @@ class ScreeningQuestionnaireSeeder extends Seeder
                     [
                         'title' => 'VitaScan — Questionário de Triagem — Ansiedade e Comportamento Alimentar',
                         'type' => 'editorial_source',
-                        'validation_status' => 'not_clinically_validated',
-                    ],
-                    [
-                        'title' => 'Material visual descritivo fornecido pela clínica — oito formas e reflexões associadas',
-                        'type' => 'editorial_visual_source',
                         'validation_status' => 'not_clinically_validated',
                     ],
                     [
@@ -70,11 +67,6 @@ class ScreeningQuestionnaireSeeder extends Seeder
                             'validation_status' => 'not_clinically_validated',
                         ],
                         [
-                            'title' => 'Material visual descritivo fornecido pela clínica — oito formas e reflexões associadas',
-                            'type' => 'editorial_visual_source',
-                            'validation_status' => 'not_clinically_validated',
-                        ],
-                        [
                             'title' => 'Sistema de Avaliação de Testes Psicológicos — SATEPSI',
                             'url' => 'https://satepsi.cfp.org.br/',
                             'type' => 'professional_guidance',
@@ -104,34 +96,6 @@ class ScreeningQuestionnaireSeeder extends Seeder
                 }
             }
 
-            $visualDefinition = $definition['visual_question'];
-            $visualQuestion = $questionnaire->questions()->updateOrCreate([
-                'code' => $visualDefinition['code'],
-            ], [
-                'position' => $visualDefinition['position'],
-                'text' => $visualDefinition['text'],
-                'response_type' => $visualDefinition['response_type'],
-                'requires_individual_attention' => false,
-            ]);
-
-            foreach ($visualDefinition['options'] as $position => $optionDefinition) {
-                $visualQuestion->options()->updateOrCreate([
-                    'value' => $optionDefinition['value'],
-                ], [
-                    'label' => $optionDefinition['title'].' — '.$optionDefinition['description'],
-                    'position' => $position + 1,
-                    'display_metadata' => [
-                        'choice_label' => 'Imagem '.$optionDefinition['value'],
-                        'visual_key' => $optionDefinition['visual_key'],
-                        'result_title' => $optionDefinition['title'],
-                        'result_text' => $optionDefinition['description'],
-                        'instructions' => $visualDefinition['instructions'],
-                        'non_diagnostic' => true,
-                        'affects_score' => false,
-                    ],
-                ]);
-            }
-
             $rangeMessages = [
                 'Poucos sinais relatados' => 'Foram relatados poucos sinais neste questionário. O resultado é apenas descritivo e deve ser considerado junto ao contexto individual.',
                 'Alguns sinais de atenção' => 'Foram relatados alguns sinais que podem ser conversados com o profissional responsável.',
@@ -150,5 +114,71 @@ class ScreeningQuestionnaireSeeder extends Seeder
                 ]);
             }
         });
+    }
+
+    private function seedCurrentAnxietyQuestionnaire(): void
+    {
+        $definition = CurrentAnxietyQuestionnaire::definition();
+        $questionnaire = ScreeningQuestionnaire::query()->firstOrCreate([
+            'code' => $definition['code'],
+            'version' => $definition['version'],
+        ], [
+            'name' => $definition['title'],
+            'description' => $definition['description'],
+            'status' => ScreeningQuestionnaire::STATUS_PENDING_PROFESSIONAL_APPROVAL,
+            'recall_period_days' => null,
+            'consent_text' => $definition['consent_text'],
+            'disclaimer' => $definition['disclaimer'],
+            'professional_review_notice' => $definition['professional_review_notice'],
+            'reference_sources' => [[
+                'title' => 'VitaScan — Transtorno Atual da Ansiedade — oito formas e reflexões associadas',
+                'type' => 'editorial_visual_source',
+                'validation_status' => 'not_clinically_validated',
+            ]],
+        ]);
+
+        if (! $questionnaire->wasRecentlyCreated
+            && ($questionnaire->status !== ScreeningQuestionnaire::STATUS_PENDING_PROFESSIONAL_APPROVAL || $questionnaire->sessions()->exists())) {
+            return;
+        }
+
+        $visualDefinition = $definition['visual_question'];
+        $visualQuestion = $questionnaire->questions()->updateOrCreate([
+            'code' => $visualDefinition['code'],
+        ], [
+            'position' => 1,
+            'text' => $visualDefinition['text'],
+            'response_type' => $visualDefinition['response_type'],
+            'requires_individual_attention' => false,
+        ]);
+
+        foreach ($visualDefinition['options'] as $position => $optionDefinition) {
+            $visualQuestion->options()->updateOrCreate([
+                'value' => $optionDefinition['value'],
+            ], [
+                'label' => $optionDefinition['title'].' — '.$optionDefinition['description'],
+                'position' => $position + 1,
+                'display_metadata' => [
+                    'choice_label' => 'Imagem '.$optionDefinition['value'],
+                    'visual_key' => $optionDefinition['visual_key'],
+                    'result_title' => $optionDefinition['title'],
+                    'result_text' => $optionDefinition['description'],
+                    'instructions' => $visualDefinition['instructions'],
+                    'non_diagnostic' => true,
+                    'affects_score' => false,
+                ],
+            ]);
+        }
+
+        foreach ($definition['descriptive_ranges'] as $position => $range) {
+            $questionnaire->ranges()->updateOrCreate([
+                'position' => $position + 1,
+            ], [
+                'minimum_score' => $range['minimum'],
+                'maximum_score' => $range['maximum'],
+                'description' => $range['label'],
+                'display_message' => $range['message'],
+            ]);
+        }
     }
 }

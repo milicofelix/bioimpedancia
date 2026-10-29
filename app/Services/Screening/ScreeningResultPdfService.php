@@ -2,6 +2,7 @@
 
 namespace App\Services\Screening;
 
+use App\Domain\Screening\CurrentAnxietyQuestionnaire;
 use App\Domain\Screening\VitaAceaQuestionnaire;
 use App\Models\AppAudit;
 use App\Models\Screening\ScreeningSession;
@@ -50,9 +51,11 @@ class ScreeningResultPdfService
             'issuedAt' => now(),
             'visualChoiceResult' => $visualChoiceResult,
             'visualChoiceThumbnail' => $this->visualChoiceThumbnail($visualChoiceResult),
+            'isScoredQuestionnaire' => $session->questionnaire_code !== CurrentAnxietyQuestionnaire::CODE,
         ])->setPaper('a4');
 
-        $response = $pdf->stream('resultado-triagem-vita-acea.pdf');
+        $documentSlug = Str::slug($session->questionnaire_code ?: 'vita-scan');
+        $response = $pdf->stream("resultado-triagem-{$documentSlug}.pdf");
         $response->headers->set('Cache-Control', 'no-store, private');
         $response->headers->set('Pragma', 'no-cache');
         $response->headers->set('Referrer-Policy', 'no-referrer');

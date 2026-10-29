@@ -2,6 +2,7 @@
 
 namespace App\Services\Screening;
 
+use App\Domain\Screening\CurrentAnxietyQuestionnaire;
 use App\Domain\Screening\ScreeningScore;
 use App\Domain\Screening\VitaAceaQuestionnaire;
 use App\Models\Screening\ScreeningQuestion;
@@ -25,7 +26,7 @@ class ScreeningScoringEngine
         $unknownQuestionIds = array_values(array_diff($answeredQuestionIds, $knownQuestionIds));
 
         if ($missingQuestionIds !== []) {
-            throw new DomainException('Todas as perguntas devem ser respondidas antes da pontuação.');
+            throw new DomainException('Todas as perguntas devem ser respondidas antes da finalização.');
         }
 
         if ($unknownQuestionIds !== []) {
@@ -75,9 +76,9 @@ class ScreeningScoringEngine
             ];
         }
 
-        if ($total < VitaAceaQuestionnaire::MINIMUM_TOTAL_SCORE
-            || $total > VitaAceaQuestionnaire::MAXIMUM_TOTAL_SCORE) {
-            throw new DomainException('A pontuação calculada deve permanecer entre 0 e 30 pontos.');
+        [$minimumAllowed, $maximumAllowed] = $this->scoreBounds($questionnaire);
+        if ($total < $minimumAllowed || $total > $maximumAllowed) {
+            throw new DomainException("A pontuação calculada deve permanecer entre {$minimumAllowed} e {$maximumAllowed} pontos.");
         }
 
         $matchingRanges = $questionnaire->ranges
@@ -97,8 +98,12 @@ class ScreeningScoringEngine
             rangeMessage: $range->display_message,
             answers: $answers,
             attentionQuestionCodes: $attentionQuestionCodes,
-            rulesVersion: VitaAceaQuestionnaire::scoringRulesVersion($questionnaire->version),
-            rulesSnapshot: VitaAceaQuestionnaire::scoringRulesSnapshot($questionnaire->version),
+            rulesVersion: $questionnaire->code === CurrentAnxietyQuestionnaire::CODE
+                ? CurrentAnxietyQuestionnaire::RULES_VERSION
+                : VitaAceaQuestionnaire::scoringRulesVersion($questionnaire->version),
+            rulesSnapshot: $questionnaire->code === CurrentAnxietyQuestionnaire::CODE
+                ? CurrentAnxietyQuestionnaire::rulesSnapshot()
+                : VitaAceaQuestionnaire::scoringRulesSnapshot($questionnaire->version),
             attentionNotice: VitaAceaQuestionnaire::ATTENTION_NOTICE,
         );
     }
@@ -161,31 +166,39 @@ class ScreeningScoringEngine
             throw new DomainException('As faixas de resultado não terminam na pontuação máxima possível.');
         }
 
-        if ($minimumTotal !== VitaAceaQuestionnaire::MINIMUM_TOTAL_SCORE
-            || $maximumTotal !== VitaAceaQuestionnaire::MAXIMUM_TOTAL_SCORE) {
-            throw new DomainException('A definição deve produzir uma pontuação total entre 0 e 30.');
+        [$minimumAllowed, $maximumAllowed] = $this->scoreBounds($questionnaire);
+        if ($minimumTotal !== $minimumAllowed || $maximumTotal !== $maximumAllowed) {
+            throw new DomainException("A definição deve produzir uma pontuação total entre {$minimumAllowed} e {$maximumAllowed}.");
         }
     }
 
     private function assertSupportedQuestionnaire(ScreeningQuestionnaire $questionnaire): void
     {
-        if ($questionnaire->code !== VitaAceaQuestionnaire::CODE
-            || ! in_array($questionnaire->version, [VitaAceaQuestionnaire::LEGACY_VERSION, VitaAceaQuestionnaire::VERSION], true)) {
+        $isVitaAcea = $questionnaire->code === VitaAceaQuestionnaire::CODE
+            && in_array($questionnaire->version, [VitaAceaQuestionnaire::LEGACY_VERSION, VitaAceaQuestionnaire::PREVIOUS_VERSION, VitaAceaQuestionnaire::VERSION], true);
+        $isCurrentAnxiety = $questionnaire->code === CurrentAnxietyQuestionnaire::CODE
+            && $questionnaire->version === CurrentAnxietyQuestionnaire::VERSION;
+        if (! $isVitaAcea && ! $isCurrentAnxiety) {
             throw new DomainException('Esta versão do motor não reconhece as regras do questionário informado.');
         }
 
         $questions = $questionnaire->questions;
 
-        $expectedCodes = collect(range(1, VitaAceaQuestionnaire::EXPECTED_QUESTION_COUNT))
-            ->map(fn (int $position): string => sprintf('Q%02d', $position))
-            ->all();
-        if ($questionnaire->version === VitaAceaQuestionnaire::VERSION) {
-            $expectedCodes[] = VitaAceaQuestionnaire::VISUAL_QUESTION_CODE;
-        }
         $actualCodes = $questions->pluck('code')->values()->all();
-
-        if ($actualCodes !== $expectedCodes) {
-            throw new DomainException('As perguntas não correspondem à sequência prevista para esta versão do VITA-ACEA.');
+        if ($isCurrentAnxiety) {
+            if ($actualCodes !== [VitaAceaQuestionnaire::VISUAL_QUESTION_CODE]) {
+                throw new DomainException('O instrumento visual deve conter exclusivamente a pergunta de escolha entre as oito imagens.');
+            }
+        } else {
+            $expectedCodes = collect(range(1, VitaAceaQuestionnaire::EXPECTED_QUESTION_COUNT))
+                ->map(fn (int $position): string => sprintf('Q%02d', $position))
+                ->all();
+            if ($questionnaire->version === VitaAceaQuestionnaire::PREVIOUS_VERSION) {
+                $expectedCodes[] = VitaAceaQuestionnaire::VISUAL_QUESTION_CODE;
+            }
+            if ($actualCodes !== $expectedCodes) {
+                throw new DomainException('As perguntas não correspondem à sequência prevista para esta versão do VITA-ACEA.');
+            }
         }
 
         foreach ($questions as $question) {
@@ -214,10 +227,17 @@ class ScreeningScoringEngine
                 throw new DomainException("A pergunta {$question->code} deve possuir exclusivamente as pontuações 0, 1, 2 e 3.");
             }
 
-            $shouldRequireAttention = in_array($question->code, VitaAceaQuestionnaire::ATTENTION_QUESTION_CODES, true);
+            $shouldRequireAttention = $isVitaAcea
+                && in_array($question->code, VitaAceaQuestionnaire::ATTENTION_QUESTION_CODES, true);
             if ((bool) $question->requires_individual_attention !== $shouldRequireAttention) {
                 throw new DomainException("A regra de atenção individual de {$question->code} diverge da versão aprovada.");
             }
         }
+    }
+
+    /** @return array{0: int, 1: int} */
+    private function scoreBounds(ScreeningQuestionnaire $questionnaire): array
+    {
+        return $questionnaire->code === CurrentAnxietyQuestionnaire::CODE ? [0, 0] : [0, 30];
     }
 }

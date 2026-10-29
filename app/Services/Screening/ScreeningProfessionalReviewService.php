@@ -105,6 +105,7 @@ class ScreeningProfessionalReviewService
             'status' => $session->status,
             'client_name' => $session->client->full_name,
             'questionnaire_name' => $session->questionnaire_name,
+            'questionnaire_code' => $session->questionnaire_code,
             'questionnaire_version' => $session->questionnaire_version,
             'requested_by_name' => $session->requested_by_name,
             'created_at' => $session->created_at?->toIso8601String(),

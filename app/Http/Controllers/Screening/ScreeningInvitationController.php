@@ -31,6 +31,7 @@ class ScreeningInvitationController extends Controller
             ->get()
             ->map(fn (ScreeningQuestionnaire $questionnaire) => [
                 'id' => $questionnaire->id,
+                'code' => $questionnaire->code,
                 'name' => $questionnaire->name,
                 'version' => $questionnaire->version,
                 'status' => $questionnaire->status,
@@ -42,7 +43,9 @@ class ScreeningInvitationController extends Controller
                 'is_available' => $questionnaire->isAvailableForApplication(),
                 'unavailable_reason' => $questionnaire->isAvailableForApplication()
                     ? null
-                    : 'Aguardando aprovação e ativação por profissional habilitado.',
+                    : ($questionnaire->status === ScreeningQuestionnaire::STATUS_RETIRED
+                        ? 'Esta versão foi descontinuada e permanece disponível apenas no histórico.'
+                        : 'Aguardando aprovação e ativação por profissional habilitado.'),
                 'approved_by_name' => $questionnaire->approved_by_name,
                 'approved_profession' => $questionnaire->approved_profession,
                 'professional_registration' => $questionnaire->professional_registration,

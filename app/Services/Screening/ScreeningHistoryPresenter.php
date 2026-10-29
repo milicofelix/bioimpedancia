@@ -2,6 +2,7 @@
 
 namespace App\Services\Screening;
 
+use App\Domain\Screening\CurrentAnxietyQuestionnaire;
 use App\Models\Screening\ScreeningSession;
 use Illuminate\Support\Collection;
 
@@ -55,7 +56,13 @@ class ScreeningHistoryPresenter
             return ['state' => 'unavailable', 'message' => 'A comparação ficará disponível após a conclusão.'];
         }
 
-        $previousApplication = $finalizedSeen->last();
+        if ($current->questionnaire_code === CurrentAnxietyQuestionnaire::CODE) {
+            return ['state' => 'descriptive_only', 'message' => 'Este instrumento é exclusivamente descritivo. As escolhas visuais não recebem comparação automática de melhora ou piora.'];
+        }
+
+        $previousApplication = $finalizedSeen->last(
+            fn (ScreeningSession $candidate): bool => $candidate->questionnaire_code === $current->questionnaire_code,
+        );
         if (! $previousApplication) {
             return ['state' => 'baseline', 'message' => 'Primeira aplicação finalizada desta versão: linha de base descritiva.'];
         }

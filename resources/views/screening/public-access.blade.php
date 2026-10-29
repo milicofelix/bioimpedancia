@@ -72,9 +72,13 @@
                         <span class="success-mark" aria-hidden="true">✓</span>
                         <h2 style="margin-top: 18px">Questionário finalizado</h2>
                         <p>Suas respostas foram registradas com segurança e não podem ser enviadas novamente.</p>
-                        <p class="result-score">{{ $screeningSession->total_score }} <small style="font-size: .9rem">de 30 pontos</small></p>
-                        <p class="result-range">{{ $screeningSession->result_description }}</p>
-                        <p>{{ $screeningSession->result_message }}</p>
+                        @if ($isScoredQuestionnaire)
+                            <p class="result-score">{{ $screeningSession->total_score }} <small style="font-size: .9rem">de 30 pontos</small></p>
+                            <p class="result-range">{{ $screeningSession->result_description }}</p>
+                            <p>{{ $screeningSession->result_message }}</p>
+                        @else
+                            <p class="result-range">Resultado descritivo da escolha visual</p>
+                        @endif
 
                         @php($visualAnswer = $screeningSession->answers->firstWhere('question_code', 'VIS01'))
                         @if ($visualAnswer)
@@ -114,7 +118,7 @@
             @elseif ($identityVerified)
                 <section id="questionario" tabindex="-1" aria-labelledby="questionario-title">
                     <h2 id="questionario-title">Responda ao questionário</h2>
-                    <p class="instructions">Nas perguntas de frequência, considere os últimos {{ $screeningSession->questionnaire->recall_period_days }} dias. Não existem respostas certas ou erradas. Selecione uma alternativa em cada item.</p>
+                    <p class="instructions">@if ($screeningSession->questionnaire->recall_period_days) Nas perguntas de frequência, considere os últimos {{ $screeningSession->questionnaire->recall_period_days }} dias. Não existem respostas certas ou erradas. Selecione uma alternativa em cada item. @else Escolha a forma que mais chama sua atenção neste momento. Não pense por muito tempo; esta escolha é exclusivamente descritiva e não possui finalidade diagnóstica. @endif</p>
                     <p class="attempts">Este acesso expira em {{ $screeningSession->expires_at?->format('d/m/Y \à\s H:i') }}.</p>
 
                     <form id="screening-form" method="post" action="{{ route('screening.public.complete', ['token' => request()->route('token')]) }}">
