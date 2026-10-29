@@ -3,8 +3,11 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Models\Screening\ScreeningQuestionnaire;
+use App\Models\Screening\ScreeningSession;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -81,6 +84,21 @@ class User extends Authenticatable
     public function canCreateClinicalRecords(): bool
     {
         return in_array($this->role, [self::ROLE_ADMIN, self::ROLE_PROFESSIONAL, self::ROLE_RECEPTION], true);
+    }
+
+    public function approvedScreeningQuestionnaires(): HasMany
+    {
+        return $this->hasMany(ScreeningQuestionnaire::class, 'approved_by_user_id');
+    }
+
+    public function requestedScreeningSessions(): HasMany
+    {
+        return $this->hasMany(ScreeningSession::class, 'requested_by_user_id');
+    }
+
+    public function cancelledScreeningSessions(): HasMany
+    {
+        return $this->hasMany(ScreeningSession::class, 'cancelled_by_user_id');
     }
 
     public function isActive(): bool

@@ -16,8 +16,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call(ScreeningQuestionnaireSeeder::class);
+
         if (app()->isProduction()) {
-            $this->command?->warn('Seeders demo ignorados em produção. Use php artisan ricosty:create-admin para criar o primeiro administrador.');
+            $this->command?->warn('Questionários versionados atualizados. Seeders demo ignorados em produção.');
 
             return;
         }

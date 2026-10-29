@@ -2,6 +2,7 @@
 
 namespace App\Models\Bioimpedance;
 
+use App\Models\Screening\ScreeningSession;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -48,5 +49,10 @@ class BioimpedanceClient extends Model
     public function assessments(): HasMany
     {
         return $this->hasMany(BioimpedanceAssessment::class);
+    }
+
+    public function screeningSessions(): HasMany
+    {
+        return $this->hasMany(ScreeningSession::class);
     }
 }
