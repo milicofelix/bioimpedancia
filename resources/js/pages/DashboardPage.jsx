@@ -23,6 +23,7 @@ import BodyscanReview from '../pwa/features/assessment/BodyscanReview';
 import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocolComplete, emptyBodyscanProtocol, updateBodyscanSegment } from '../pwa/features/assessment/bodyscanAssessmentForm';
 import BodyscanProtocolChecklist from '../pwa/features/assessment/BodyscanProtocolChecklist';
 import VitaScanBrand from '../components/brand/VitaScanBrand';
+import ScreeningInvitationPanel from '../pwa/features/clients/ScreeningInvitationPanel';
 
 const emptyClient = {
 	full_name: '',
@@ -1248,13 +1249,7 @@ export default function DashboardPage({ userName }) {
 		<main className="min-h-screen bg-slate-50 text-slate-900">
 			<header className="no-print border-b border-slate-200 bg-white">
 				<div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-					<div className="flex items-center gap-4">
-						<VitaScanBrand headingLevel="h1" showTagline={false} />
-						<div>
-							<p className="text-sm font-semibold text-slate-950">{clinic.display_name}</p>
-							<p className="text-xs text-slate-500">{clinic.contact}</p>
-						</div>
-					</div>
+					<VitaScanBrand headingLevel="h1" showTagline={false} descriptor={clinic.contact || 'Avaliação corporal e acompanhamento estético'} />
 					<div className="flex items-center gap-3">
 						<span className={`rounded-full px-3 py-1 text-xs font-bold ${isOnline ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
 							{isOnline ? 'Online' : 'Offline'}
@@ -1565,6 +1560,7 @@ export default function DashboardPage({ userName }) {
 					) : null}
 
 					{selectedClient ? (
+						<>
 						<div className="no-print rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
 							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 								<div>
@@ -1724,6 +1720,17 @@ export default function DashboardPage({ userName }) {
 								</div>
 							) : null}
 						</div>
+						{selectedClient.is_active && !selectedClient.is_anonymized ? (
+							['admin', 'professional'].includes(currentUser?.role) ? (
+								<ScreeningInvitationPanel client={selectedClient} />
+							) : (
+								<div className="no-print rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+									<strong>Questionário de triagem indisponível para este perfil.</strong>
+									<p className="mt-1">Somente contas de administrador ou profissional podem criar e acompanhar aplicações.</p>
+								</div>
+							)
+						) : null}
+						</>
 					) : null}
 
 					<EvolutionPanel client={selectedClient} selectedAssessment={selectedAssessment} />

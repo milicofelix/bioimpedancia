@@ -19,7 +19,7 @@ function userInitial(name) {
 	return String(name ?? 'P').trim().charAt(0).toUpperCase();
 }
 
-export default function OperationalShell({ activeSection, clinic, currentUser, onLogout, onNavigate, children }) {
+export default function OperationalShell({ activeSection, currentUser, onLogout, onNavigate, children }) {
 	const isOnline = useOnlineStatus();
 	const update = useServiceWorkerUpdate();
 	const mainReference = useRef(null);
@@ -33,13 +33,7 @@ export default function OperationalShell({ activeSection, clinic, currentUser, o
 			<a href="#operational-content" className="pwa-focus fixed left-3 top-3 z-50 -translate-y-24 rounded-xl bg-ricosty-950 px-4 py-3 text-sm font-bold text-white transition focus:translate-y-0">Pular para o conteúdo</a>
 			<header className="pwa-safe-top pwa-safe-inline sticky top-0 z-20 border-b border-ricosty-200/70 bg-white/90 pb-3 backdrop-blur-xl">
 				<div className="mx-auto flex max-w-xl items-center justify-between gap-3">
-					<div className="flex min-w-0 items-center gap-2.5">
-						<VitaScanBrand headingLevel="h1" size="compact" showTagline={false} className="shrink-0" />
-						<div className="hidden min-w-0 border-l border-slate-200 pl-2.5 sm:block">
-							<p className="break-words text-xs font-bold leading-tight text-ricosty-950">{clinic?.display_name ?? 'Ricosty'}</p>
-							<p className="break-words text-[10px] font-medium leading-tight text-slate-600">Atendimento operacional</p>
-						</div>
-					</div>
+					<VitaScanBrand headingLevel="h1" size="compact" showTagline={false} className="shrink-0" />
 					<div className="flex items-center gap-1.5">
 						<span role="status" aria-live="polite" title={isOnline ? 'Conectado' : 'Sem conexão'} className={`pwa-status-enter flex min-h-11 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-bold ${isOnline ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200' : 'bg-rose-50 text-rose-800 ring-1 ring-rose-200'}`}>
 							<PwaIcon name={isOnline ? 'wifi' : 'wifiOff'} size={15} />

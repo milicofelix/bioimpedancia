@@ -1,8 +1,10 @@
 <?php
 
 use App\Models\User;
+use App\Services\Screening\ScreeningPrivacyService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -39,3 +41,12 @@ Artisan::command('ricosty:create-admin', function () {
 
     return 0;
 })->purpose('Create or update the first Ricosty administrator securely');
+
+Artisan::command('screening:apply-retention', function () {
+    $processed = app(ScreeningPrivacyService::class)->applyExpiredRetention();
+    $this->info("Triagens anonimizadas pela política de retenção: {$processed}.");
+
+    return 0;
+})->purpose('Anonymize screening sessions whose retention period has expired');
+
+Schedule::command('screening:apply-retention')->dailyAt('02:30')->withoutOverlapping();

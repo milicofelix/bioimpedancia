@@ -125,7 +125,7 @@ export default function OperationalAppPage() {
 	const scaleModel = workspace.clinic?.scale_model;
 
 	return (
-		<OperationalShell activeSection={section} clinic={workspace.clinic} currentUser={workspace.current_user} onLogout={handleLogout} onNavigate={navigate}>
+		<OperationalShell activeSection={section} currentUser={workspace.current_user} onLogout={handleLogout} onNavigate={navigate}>
 			{section === 'clientes' ? (
 				<ClientsFeature
 					clients={workspace.clients ?? []}

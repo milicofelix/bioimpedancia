@@ -5,6 +5,7 @@ import { assessmentAccess, canUseClinicalFeatures } from './clientAccess';
 import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaIcon from '../../components/ui/PwaIcon';
+import ScreeningInvitationPanel from './ScreeningInvitationPanel';
 
 const sexLabels = { female: 'Feminino', male: 'Masculino' };
 
@@ -53,6 +54,15 @@ export default function ClientDetails({ client, currentUser, scaleModel, onBack,
 				</div>
 				{access.reason ? <p className="mt-2 text-center text-xs font-semibold text-amber-700">{access.reason}</p> : null}
 			</PwaCard>
+
+			{client.is_active && !client.is_anonymized ? (
+				['admin', 'professional'].includes(currentUser?.role) ? <ScreeningInvitationPanel client={client} /> : (
+					<PwaCard className="mt-4 border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+						<strong>Questionário de triagem indisponível para este perfil.</strong>
+						<p className="mt-1">Somente contas de administrador ou profissional podem criar e acompanhar aplicações.</p>
+					</PwaCard>
+				)
+			) : null}
 
 			<PwaCard className="mt-4 p-5">
 				<div className="flex items-center justify-between gap-3">

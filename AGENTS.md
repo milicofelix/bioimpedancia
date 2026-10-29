@@ -2,6 +2,13 @@
 
 Estas instruções se aplicam a todo o repositório e a qualquer tipo de tarefa, incluindo `feature`, `fix`, `refactor`, `docs`, `chore` e alterações emergenciais.
 
+## Execução de fases planejadas
+
+- Quando o usuário solicitar a execução de uma fase numerada, implemente todos os itens listados para essa fase antes de declará-la concluída.
+- Não marque uma fase como concluída se algum item estiver parcial, apenas preparado, simulado ou deixado para uma etapa futura.
+- Se um bloqueio externo impedir a conclusão integral, informe claramente quais itens foram concluídos, quais continuam bloqueados e o que é necessário para prosseguir.
+- Não altere por conta própria o escopo ou a ordem das fases combinadas. Sugestões de reorganização devem ser apresentadas ao usuário sem substituir a execução solicitada.
+
 ## Testes e build
 
 - Não execute testes automatizados.
