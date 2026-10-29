@@ -39,7 +39,7 @@ class PublicScreeningController extends Controller
             'X-Content-Type-Options' => 'nosniff',
             'X-Frame-Options' => 'DENY',
             'Permissions-Policy' => 'camera=(), microphone=(), geolocation=()',
-            'Content-Security-Policy' => "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+            'Content-Security-Policy' => "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
         ]);
     }
 
@@ -48,7 +48,7 @@ class PublicScreeningController extends Controller
         $session = $this->invitations->findPublicSession($token);
         $this->invitations->verifyIdentity($request, $session, $request->validated());
 
-        return redirect()->route('screening.public.show', ['token' => $token]);
+        return redirect()->to(route('screening.public.show', ['token' => $token]).'#questionario', 303);
     }
 
     public function complete(

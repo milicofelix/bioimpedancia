@@ -231,6 +231,7 @@ class ScreeningInvitationService
             'expires_at' => $session->expires_at?->toIso8601String(),
             'revoked_at' => $session->revoked_at?->toIso8601String(),
             'send_count' => $session->send_count,
+            'last_sent_at' => $session->last_sent_at?->toIso8601String(),
             'is_available' => $session->publicAccessIsAvailable(),
             'created_at' => $session->created_at?->toIso8601String(),
             'started_at' => $session->started_at?->toIso8601String(),

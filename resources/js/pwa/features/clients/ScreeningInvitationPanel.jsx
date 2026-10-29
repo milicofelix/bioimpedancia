@@ -58,6 +58,16 @@ export default function ScreeningInvitationPanel({ client }) {
 		return () => { active = false; };
 	}, [client.id]);
 
+	useEffect(() => {
+		if (!invitation?.url || activeTab !== 'new') return;
+
+		window.requestAnimationFrame(() => {
+			const result = document.getElementById('screening-generated-link');
+			result?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+			result?.focus({ preventScroll: true });
+		});
+	}, [activeTab, invitation]);
+
 	async function createInvitation() {
 		if (!questionnaireId || busyAction) return;
 		setBusyAction('create'); setError(''); setFeedback(''); setInvitation(null);
@@ -79,12 +89,17 @@ export default function ScreeningInvitationPanel({ client }) {
 
 	async function resend(session) {
 		if (busyAction) return;
+		const confirmation = session.revoked_at
+			? 'Criar um novo acesso para esta triagem? Um novo link temporário será gerado para compartilhar com o cliente.'
+			: 'Gerar um novo link para esta triagem? O link anterior deixará de funcionar imediatamente e será necessário compartilhar o novo link com o cliente.';
+		if (!window.confirm(confirmation)) return;
 		setBusyAction(`resend-${session.id}`); setError(''); setFeedback('');
 		try {
 			const { data } = await window.axios.post(`/screening/invitations/${session.id}/resend`, { expires_in_minutes: Number(expiresInMinutes) });
 			setInvitation(data.invitation);
 			setSessions((current) => current.map((item) => item.id === session.id ? data.invitation : item));
-			setFeedback('Novo link criado. O link anterior deixou de funcionar.');
+			setActiveTab('new');
+			setFeedback('Novo link criado. Copie ou compartilhe o acesso exibido abaixo; o link anterior não funciona mais.');
 		} catch (requestError) { setError(errorMessage(requestError)); }
 		finally { setBusyAction(null); }
 	}
@@ -144,7 +159,7 @@ export default function ScreeningInvitationPanel({ client }) {
 			{pendingQuestionnaire ? <ScreeningApprovalForm questionnaire={pendingQuestionnaire} onApproved={questionnaireApproved} /> : null}
 			<PwaButton type="button" onClick={createInvitation} disabled={!questionnaireId || Boolean(busyAction) || (isMinor && (!guardianName.trim() || !guardianRelationship.trim()))} loading={busyAction === 'create'} icon="share" className="mt-4 w-full">Criar link temporário</PwaButton>
 
-			{invitation ? <div className="mt-4 rounded-2xl border border-teal-200 bg-teal-50/70 p-4"><p className="text-xs font-bold uppercase text-teal-800">Link exibido somente agora</p><p className="mt-2 break-all rounded-lg bg-white p-2 text-xs text-slate-700">{invitation.url}</p><p className="mt-2 text-xs text-slate-600">Expira em {formatDate(invitation.expires_at)}. O QR Code abaixo é gerado localmente, sem enviar o token a terceiros.</p><ScreeningQrCode payload={invitation.qr_payload} questionnaireVersion={invitation.questionnaire_version} /><div className="mt-3 grid gap-2 sm:grid-cols-2"><PwaButton type="button" onClick={copyLink} icon="copy" variant="secondary">Copiar link</PwaButton><PwaButton type="button" onClick={shareLink} icon="share">Compartilhar</PwaButton></div></div> : null}
+			{invitation ? <div id="screening-generated-link" tabIndex={-1} className="pwa-focus mt-4 rounded-2xl border border-teal-200 bg-teal-50/70 p-4"><p className="text-xs font-bold uppercase text-teal-800">Novo link pronto para envio</p><p className="mt-1 text-sm font-semibold text-teal-950">O sistema não envia mensagens automaticamente. Escolha copiar ou compartilhar abaixo.</p><p className="mt-2 break-all rounded-lg bg-white p-2 text-xs text-slate-700">{invitation.url}</p><p className="mt-2 text-xs text-slate-600">Expira em {formatDate(invitation.expires_at)}. O QR Code abaixo é gerado localmente, sem enviar o token a terceiros.</p><ScreeningQrCode payload={invitation.qr_payload} questionnaireVersion={invitation.questionnaire_version} /><div className="mt-3 grid gap-2 sm:grid-cols-2"><PwaButton type="button" onClick={copyLink} icon="copy" variant="secondary">Copiar link</PwaButton><PwaButton type="button" onClick={shareLink} icon="share">Compartilhar</PwaButton></div></div> : null}
 			</> : <ScreeningHistoryPanel key={client.id} sessions={sessions} busyAction={busyAction} onNewApplication={() => setActiveTab('new')} onResend={resend} onRevoke={revoke} />}
 		</PwaCard>
 	);

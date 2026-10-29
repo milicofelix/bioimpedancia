@@ -37,6 +37,7 @@ class ScreeningHistoryPresenter
                 'expires_at' => $session->expires_at?->toIso8601String(),
                 'revoked_at' => $session->revoked_at?->toIso8601String(),
                 'send_count' => $session->send_count,
+                'last_sent_at' => $session->last_sent_at?->toIso8601String(),
                 'total_score' => $session->total_score,
                 'result_description' => $session->result_description,
                 'document_authenticity_code' => $session->document_authenticity_code,

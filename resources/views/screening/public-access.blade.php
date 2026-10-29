@@ -25,6 +25,9 @@
         .consent { display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: start; margin: 20px 0; line-height: 1.5; } .consent input { width: 20px; height: 20px; margin-top: 2px; }
         button { width: 100%; min-height: 52px; border: 0; border-radius: 14px; background: #087f73; color: #fff; font: inherit; font-weight: 800; cursor: pointer; } button:hover { background: #07695f; }
         .error { margin: 8px 0; color: #a51d35; font-weight: 700; } .attempts { color: #64748b; font-size: .82rem; }
+        .error-summary { margin: 0 0 20px; padding: 16px; border: 2px solid #c94a61; border-radius: 14px; background: #fff1f3; color: #7f1730; }
+        .error-summary strong { display: block; margin-bottom: 6px; }
+        .error-summary ul { margin: 0; padding-left: 20px; }
         .success { display: grid; place-items: center; min-height: 220px; text-align: center; } .success-mark { display: grid; width: 64px; height: 64px; place-items: center; border-radius: 50%; background: #d9f8ed; color: #087f73; font-size: 2rem; font-weight: 900; }
         .result-score { margin: 18px 0 4px; color: #063e62; font-size: 2.25rem; font-weight: 900; line-height: 1; }
         .result-range { margin: 8px 0; color: #087f73; font-size: 1.2rem; font-weight: 850; }
@@ -104,11 +107,12 @@
                     </div>
                 </section>
             @elseif ($identityVerified)
-                <h2>Responda ao questionário</h2>
-                <p class="instructions">Nas perguntas de frequência, considere os últimos {{ $screeningSession->questionnaire->recall_period_days }} dias. Não existem respostas certas ou erradas. Selecione uma alternativa em cada item.</p>
-                <p class="attempts">Este acesso expira em {{ $screeningSession->expires_at?->format('d/m/Y \à\s H:i') }}.</p>
+                <section id="questionario" tabindex="-1" aria-labelledby="questionario-title">
+                    <h2 id="questionario-title">Responda ao questionário</h2>
+                    <p class="instructions">Nas perguntas de frequência, considere os últimos {{ $screeningSession->questionnaire->recall_period_days }} dias. Não existem respostas certas ou erradas. Selecione uma alternativa em cada item.</p>
+                    <p class="attempts">Este acesso expira em {{ $screeningSession->expires_at?->format('d/m/Y \à\s H:i') }}.</p>
 
-                <form id="screening-form" method="post" action="{{ route('screening.public.complete', ['token' => request()->route('token')]) }}">
+                    <form id="screening-form" method="post" action="{{ route('screening.public.complete', ['token' => request()->route('token')]) }}">
                     @csrf
                     <div class="question-list">
                         @foreach ($screeningSession->questionnaire->questions as $question)
@@ -179,10 +183,22 @@
                         @error('completion_confirmed')<p class="error" role="alert">{{ $message }}</p>@enderror
                     </div>
                     <button id="screening-submit" type="submit">Finalizar e enviar respostas</button>
-                </form>
+                    </form>
+                </section>
             @else
-                <h2>Confirmação de acesso</h2>
+                <section id="confirmacao" tabindex="-1" aria-labelledby="confirmacao-title">
+                <h2 id="confirmacao-title">Confirmação de acesso</h2>
                 <p>Antes de iniciar, confirme uma informação pessoal. Ela será usada apenas para verificar se este convite pertence a você.</p>
+                @if ($errors->any())
+                    <div class="error-summary" role="alert" aria-live="assertive">
+                        <strong>Não foi possível continuar:</strong>
+                        <ul>
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
                 @if ($screeningSession->is_minor_at_application)
                     <div class="notice">
                         <strong>Preenchimento de menor de idade</strong>
@@ -195,7 +211,7 @@
                     <p>As respostas serão usadas exclusivamente para esta triagem e acompanhamento profissional, conforme o consentimento abaixo. O questionário não produz diagnóstico.</p>
                 </div>
 
-                <form method="post" action="{{ route('screening.public.verify', ['token' => request()->route('token')]) }}">
+                <form id="identity-form" method="post" action="{{ route('screening.public.verify', ['token' => request()->route('token')]) }}">
                     @csrf
                     <label for="identity_confirmation">{{ $identityPrompt['label'] }}</label>
                     <input id="identity_confirmation" name="identity_confirmation" type="{{ $identityPrompt['type'] }}" placeholder="{{ $identityPrompt['placeholder'] }}" required autocomplete="off" value="{{ old('identity_confirmation') }}">
@@ -208,25 +224,50 @@
                         @error('guardian_name')<p class="error" role="alert">{{ $message }}</p>@enderror
 
                         <label class="consent" for="guardian_consent">
-                            <input id="guardian_consent" name="guardian_consent" type="checkbox" value="1" required @checked(old('guardian_consent'))>
+                            <input id="guardian_consent" name="guardian_consent" type="checkbox" value="yes" required @checked(old('guardian_consent'))>
                             <span>{{ $screeningSession->guardian_consent_text_snapshot }}</span>
                         </label>
                         @error('guardian_consent')<p class="error" role="alert">{{ $message }}</p>@enderror
                     @endif
 
                     <label class="consent" for="consent">
-                        <input id="consent" name="consent" type="checkbox" value="1" required @checked(old('consent'))>
+                        <input id="consent" name="consent" type="checkbox" value="yes" required @checked(old('consent'))>
                         <span>{{ $screeningSession->consent_text_snapshot }}</span>
                     </label>
                     @error('consent')<p class="error" role="alert">{{ $message }}</p>@enderror
-                    <button type="submit">Confirmar e continuar</button>
+                    <button id="identity-submit" type="submit">Confirmar e continuar</button>
                 </form>
+                </section>
             @endif
         </div>
     </article>
     <footer>Este acesso é temporário, individual e não permite entrar no restante do sistema.</footer>
 </main>
 <script>
+    if (['#questionario', '#confirmacao'].includes(window.location.hash)) {
+        window.history.scrollRestoration = 'manual';
+        window.requestAnimationFrame(function () {
+            const target = document.querySelector(window.location.hash);
+            target?.scrollIntoView({ block: 'start' });
+            target?.focus({ preventScroll: true });
+        });
+    }
+
+    document.getElementById('identity-form')?.addEventListener('submit', function () {
+        ['consent', 'guardian_consent'].forEach(function (fieldId) {
+            const checkbox = document.getElementById(fieldId);
+
+            if (checkbox?.checked) {
+                checkbox.value = 'yes';
+            }
+        });
+
+        const button = document.getElementById('identity-submit');
+        if (!button || button.disabled) return;
+        button.disabled = true;
+        button.textContent = 'Confirmando acesso…';
+    });
+
     document.getElementById('screening-form')?.addEventListener('submit', function () {
         const button = document.getElementById('screening-submit');
         if (!button || button.disabled) return;
