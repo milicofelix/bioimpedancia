@@ -14,6 +14,7 @@ use App\Http\Controllers\Bioimpedance\UserController;
 use App\Http\Controllers\Bioimpedance\WorkspaceController;
 use App\Http\Controllers\Screening\PublicScreeningController;
 use App\Http\Controllers\Screening\ScreeningInvitationController;
+use App\Http\Controllers\Screening\ScreeningQuestionnaireApprovalController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -57,6 +58,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/screening/invitations', [ScreeningInvitationController::class, 'store'])->name('screening.invitations.store');
     Route::post('/screening/invitations/{session}/resend', [ScreeningInvitationController::class, 'resend'])->name('screening.invitations.resend');
     Route::patch('/screening/invitations/{session}/revoke', [ScreeningInvitationController::class, 'revoke'])->name('screening.invitations.revoke');
+    Route::patch('/screening/questionnaires/{questionnaire}/approve', ScreeningQuestionnaireApprovalController::class)->name('screening.questionnaires.approve');
     Route::post('/bioimpedance/assessments', [AssessmentController::class, 'store'])->name('bioimpedance.assessments.store');
     Route::post('/bioimpedance/relaxmedic/process-image', [AssessmentImportController::class, 'processRelaxmedicImage'])
         ->middleware('throttle:5,1')

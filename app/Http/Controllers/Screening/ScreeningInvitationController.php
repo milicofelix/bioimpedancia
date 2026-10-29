@@ -21,6 +21,7 @@ class ScreeningInvitationController extends Controller
         abort_unless($request->user()?->isClinicalProfessional() && $request->user()->isActive(), 403);
 
         $questionnaires = ScreeningQuestionnaire::query()
+            ->withCount(['questions', 'ranges'])
             ->orderBy('name')
             ->orderByDesc('version')
             ->get()
@@ -29,10 +30,19 @@ class ScreeningInvitationController extends Controller
                 'name' => $questionnaire->name,
                 'version' => $questionnaire->version,
                 'status' => $questionnaire->status,
+                'description' => $questionnaire->description,
+                'recall_period_days' => $questionnaire->recall_period_days,
+                'questions_count' => $questionnaire->questions_count,
+                'ranges_count' => $questionnaire->ranges_count,
+                'disclaimer' => $questionnaire->disclaimer,
                 'is_available' => $questionnaire->isAvailableForApplication(),
                 'unavailable_reason' => $questionnaire->isAvailableForApplication()
                     ? null
                     : 'Aguardando aprovação e ativação por profissional habilitado.',
+                'approved_by_name' => $questionnaire->approved_by_name,
+                'approved_profession' => $questionnaire->approved_profession,
+                'professional_registration' => $questionnaire->professional_registration,
+                'approved_at' => $questionnaire->approved_at?->toIso8601String(),
             ]);
 
         $sessionsQuery = $client->screeningSessions();

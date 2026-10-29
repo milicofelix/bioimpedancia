@@ -3,6 +3,7 @@ import { formatDate } from '../../../shared/formatters';
 import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaIcon from '../../components/ui/PwaIcon';
+import ScreeningApprovalForm from './ScreeningApprovalForm';
 
 const durationOptions = [
 	{ value: 60, label: '1 hora' },
@@ -29,6 +30,7 @@ export default function ScreeningInvitationPanel({ client }) {
 	const [error, setError] = useState('');
 
 	const availableQuestionnaires = useMemo(() => questionnaires.filter((item) => item.is_available), [questionnaires]);
+	const pendingQuestionnaire = questionnaires.find((item) => item.status === 'pending_professional_approval') ?? null;
 
 	useEffect(() => {
 		let active = true;
@@ -101,6 +103,13 @@ export default function ScreeningInvitationPanel({ client }) {
 		catch (shareError) { if (shareError?.name !== 'AbortError') await copyLink(); }
 	}
 
+	function questionnaireApproved(approvedQuestionnaire) {
+		setQuestionnaires((current) => current.map((item) => item.id === approvedQuestionnaire.id ? { ...item, ...approvedQuestionnaire } : item));
+		setQuestionnaireId(String(approvedQuestionnaire.id));
+		setFeedback(`${approvedQuestionnaire.version} aprovada e ativada. O questionário já pode ser enviado.`);
+		setError('');
+	}
+
 	if (loading) return <PwaCard className="mt-4 p-5"><div className="h-5 w-44 animate-pulse rounded bg-slate-200" /><div className="mt-4 h-24 animate-pulse rounded-2xl bg-slate-100" /></PwaCard>;
 
 	return (
@@ -117,6 +126,7 @@ export default function ScreeningInvitationPanel({ client }) {
 			</div>
 
 			{!availableQuestionnaires.length ? <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900">Nenhuma versão está ativa. O VITA-ACEA-1.0 permanece bloqueado até registrar a aprovação de um profissional habilitado.</p> : null}
+			{!availableQuestionnaires.length && pendingQuestionnaire ? <ScreeningApprovalForm questionnaire={pendingQuestionnaire} onApproved={questionnaireApproved} /> : null}
 			<PwaButton type="button" onClick={createInvitation} disabled={!questionnaireId || Boolean(busyAction)} loading={busyAction === 'create'} icon="share" className="mt-4 w-full">Criar link temporário</PwaButton>
 
 			{invitation ? <div className="mt-4 rounded-2xl border border-teal-200 bg-teal-50/70 p-4"><p className="text-xs font-bold uppercase text-teal-800">Link exibido somente agora</p><p className="mt-2 break-all rounded-lg bg-white p-2 text-xs text-slate-700">{invitation.url}</p><p className="mt-2 text-xs text-slate-600">Expira em {formatDate(invitation.expires_at)}. O mesmo endereço é o conteúdo seguro para gerar o QR Code localmente.</p><div className="mt-3 grid gap-2 sm:grid-cols-2"><PwaButton type="button" onClick={copyLink} icon="copy" variant="secondary">Copiar link</PwaButton><PwaButton type="button" onClick={shareLink} icon="share">Compartilhar</PwaButton></div></div> : null}

@@ -30,7 +30,10 @@ class ScreeningQuestionnaire extends Model
         'reference_sources',
         'approved_by_user_id',
         'approved_by_name',
+        'approved_profession',
         'professional_registration',
+        'approval_attestations',
+        'approval_notes',
         'approved_at',
     ];
 
@@ -39,6 +42,7 @@ class ScreeningQuestionnaire extends Model
         return [
             'recall_period_days' => 'integer',
             'reference_sources' => 'array',
+            'approval_attestations' => 'array',
             'approved_at' => 'datetime',
         ];
     }
