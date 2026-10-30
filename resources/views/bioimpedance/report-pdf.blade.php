@@ -120,9 +120,12 @@
     $isRelaxmedic = in_array(($assessment['device_model'] ?? null), ['Relaxmedic', 'Bodyscan Pro'], true);
     $segmentalMeasurements = $assessment['segmental_measurements'] ?? [];
     $segmentalComparison = $comparison['segmental'] ?? null;
+    $comparability = $comparison['comparability'] ?? null;
     $hasSegmentalComparison = (bool) ($segmentalComparison['has_previous'] ?? false);
     $hasSegmentalPage = $isBodyscan && count($segmentalMeasurements) > 0;
-    $totalSections = 3 + ($hasSegmentalPage ? 1 : 0) + ($hasSegmentalComparison ? 1 : 0);
+    $hasDetailedComparison = count($comparison['metrics'] ?? []) > 0
+        || (!($comparison['impedance']['is_baseline'] ?? true) && count($comparison['impedance']['readings'] ?? []) > 0);
+    $totalSections = 3 + ($hasDetailedComparison ? 1 : 0) + ($hasSegmentalPage ? 1 : 0) + ($hasSegmentalComparison ? 1 : 0);
     $manufacturer = trim((string) ($reference['manufacturer'] ?? ($isRelaxmedic ? 'Relaxmedic' : 'Omron')));
     $deviceModel = trim((string) ($reference['model'] ?? $assessment['device_model'] ?? ''));
     $genericDeviceModels = ['relaxmedic', 'relaxmedic/relaxfit'];
@@ -130,6 +133,26 @@
         && mb_strtolower($deviceModel) !== mb_strtolower($manufacturer)
         && ! in_array(mb_strtolower($deviceModel), $genericDeviceModels, true);
     $measurementApplicationLabels = ['relaxfit' => 'RelaxFit', 'fitdays' => 'Fitdays'];
+    $reportLayoutLabels = [
+        'fitdays_technical_report' => 'relatório técnico',
+        'fitdays_vertical_report' => 'relatório vertical',
+        'relaxfit_vertical_report' => 'relatório vertical',
+    ];
+    $comparisonProfileLabel = function (?array $profile) use ($measurementApplicationLabels, $reportLayoutLabels): string {
+        if (! $profile) {
+            return 'Não informado';
+        }
+
+        $parts = array_filter([
+            $measurementApplicationLabels[$profile['application'] ?? ''] ?? ($profile['application'] ?? null),
+            $reportLayoutLabels[$profile['layout'] ?? ''] ?? ($profile['layout'] ?? null),
+            array_key_exists('athlete_mode', $profile) && $profile['athlete_mode'] !== null
+                ? ($profile['athlete_mode'] ? 'modo atleta' : 'modo padrão')
+                : null,
+        ]);
+
+        return $parts ? implode(' · ', $parts) : 'Origem não informada';
+    };
     $measurementApplication = $measurementApplicationLabels[$assessment['measurement_application'] ?? ''] ?? null;
     $deviceSpecifications = $assessment['device_technical_specifications'] ?? [];
     $informationalReferences = $reference['informational_references'] ?? [];
@@ -271,8 +294,18 @@
             </table>
         @endif
         <div class="section-title" style="color: {{ $secondaryColor }};">Evolução</div>
+        @if($comparability)
+            <div class="notice">
+                <strong>{{ $comparability['label'] }}.</strong> {{ $comparability['message'] }}
+                @if($comparability['previous_profile'] ?? null)
+                    <br><strong>Anterior:</strong> {{ $comparisonProfileLabel($comparability['previous_profile']) }}
+                    <br><strong>Atual:</strong> {{ $comparisonProfileLabel($comparability['current_profile'] ?? null) }}
+                @endif
+                @foreach($comparability['warnings'] ?? [] as $comparisonWarning)<br>{{ $comparisonWarning }}@endforeach
+            </div>
+        @endif
         @if(($comparison['history_count'] ?? 0) >= 2 && count($comparison['trends'] ?? []))
-            <p class="muted">Até seis avaliações não canceladas, realizadas no mesmo modelo de equipamento.</p>
+            <p class="muted">Até seis avaliações não canceladas com o mesmo equipamento, aplicativo e perfil de cálculo. Layouts Fitdays diferentes usam somente campos comuns.</p>
             <table class="trend-grid"><tr>
                 @foreach($comparison['trends'] as $trend)
                     @php
@@ -310,9 +343,43 @@
     </div>
 </section>
 
+@if($hasDetailedComparison)
+<section class="report-section">
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Comparação compatível', 'pageNumber' => 3, 'totalSections' => $totalSections])
+    <div class="content">
+        <div class="notice"><strong>{{ $comparability['label'] ?? 'Comparação descritiva' }}.</strong> Somente valores com tipo e unidade compatíveis são apresentados. As variações não representam automaticamente melhora ou piora clínica.</div>
+        @if(count($comparison['metrics'] ?? []))
+            <div class="section-title" style="color: {{ $secondaryColor }};">Métricas presentes nas duas avaliações</div>
+            <table class="segmental-comparison">
+                <thead><tr><th>Métrica comparável</th><th>Anterior</th><th>Atual</th><th>Variação numérica</th></tr></thead>
+                <tbody>
+                @foreach($comparison['metrics'] as $metric)
+                    <tr><td><strong>{{ $metric['label'] }}</strong></td><td>{{ $br($metric['previous'], $metric['decimals'] ?? 1) }} {{ $metric['unit'] }}</td><td>{{ $br($metric['current'], $metric['decimals'] ?? 1) }} {{ $metric['unit'] }}</td><td>{{ $metric['delta'] > 0 ? '+' : '' }}{{ $br($metric['delta'], $metric['decimals'] ?? 1) }} {{ $metric['unit'] }}</td></tr>
+                @endforeach
+                </tbody>
+            </table>
+        @endif
+        @if(!($comparison['impedance']['is_baseline'] ?? true) && count($comparison['impedance']['readings'] ?? []))
+            <div class="section-title" style="color: {{ $secondaryColor }};">Impedância disponível nas duas avaliações</div>
+            <table class="segmental-comparison">
+                <thead><tr><th>Frequência</th><th>Região</th><th>Anterior</th><th>Atual</th><th>Variação</th></tr></thead>
+                <tbody>
+                @foreach($comparison['impedance']['readings'] as $reading)
+                    @if($reading['previous_ohms'] !== null && $reading['current_ohms'] !== null)
+                        <tr><td>{{ $reading['frequency_khz'] }} kHz</td><td>{{ ucfirst($reading['region']) }} · {{ $reading['side'] }}</td><td>{{ $br($reading['previous_ohms'], 2) }} Ω</td><td>{{ $br($reading['current_ohms'], 2) }} Ω</td><td>{{ $reading['delta_ohms'] > 0 ? '+' : '' }}{{ $br($reading['delta_ohms'], 2) }} Ω</td></tr>
+                    @endif
+                @endforeach
+                </tbody>
+            </table>
+            <p class="muted">Leitura elétrica técnica, preservada como evidência de comparação e sem interpretação diagnóstica.</p>
+        @endif
+    </div>
+</section>
+@endif
+
 @if($hasSegmentalPage)
 <section class="report-section segmental-page">
-    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Análise segmentar', 'pageNumber' => 3, 'totalSections' => $totalSections])
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Análise segmentar', 'pageNumber' => 3 + ($hasDetailedComparison ? 1 : 0), 'totalSections' => $totalSections])
     <div class="content">
         <div class="notice"><strong>Bodyscan Pro · referência {{ $assessment['reference_version'] ?? ($reference['classification_version'] ?? 'não informada') }}.</strong> L representa o lado esquerdo e R o lado direito. Massa, percentual de referência e classificação são apresentados ao redor do corpo e repetidos nas tabelas textuais.</div>
         <table class="segmental-grid"><tr>
@@ -332,9 +399,9 @@
 
 @if($isBodyscan && $hasSegmentalComparison)
 <section class="report-section">
-    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Evolução segmentar', 'pageNumber' => 4, 'totalSections' => $totalSections])
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Evolução segmentar', 'pageNumber' => 3 + ($hasDetailedComparison ? 1 : 0) + ($hasSegmentalPage ? 1 : 0), 'totalSections' => $totalSections])
     <div class="content">
-        <div class="notice"><strong>Comparação do mesmo equipamento.</strong> Os valores mostram mudanças numéricas entre avaliações Bodyscan Pro e não classificam melhora, piora ou problema clínico.</div>
+        <div class="notice"><strong>{{ $comparability['label'] ?? 'Comparação do mesmo equipamento' }}.</strong> Os valores mostram mudanças numéricas e não classificam melhora, piora ou problema clínico.@if($segmentalComparison['reference_warning'] ?? null)<br>{{ $segmentalComparison['reference_warning'] }}@endif</div>
         @foreach(['fat' => 'Gordura segmentar', 'muscle' => 'Equilíbrio muscular'] as $segmentType => $segmentTitle)
             <div class="section-title" style="color: {{ $secondaryColor }};">{{ $segmentTitle }}</div>
             <table class="segmental-comparison">
@@ -345,8 +412,8 @@
                         <td><strong>{{ $region['label'] }}</strong></td>
                         <td>{{ $br($region['mass_kg']['previous'], 2) }} kg → <strong>{{ $br($region['mass_kg']['current'], 2) }} kg</strong></td>
                         <td>{{ $region['mass_kg']['delta'] > 0 ? '+' : '' }}{{ $br($region['mass_kg']['delta'], 2) }} kg</td>
-                        <td>{{ $br($region['reference_percentage']['previous']) }}% → <strong>{{ $br($region['reference_percentage']['current']) }}%</strong></td>
-                        <td>{{ $region['reference_percentage']['delta'] > 0 ? '+' : '' }}{{ $br($region['reference_percentage']['delta']) }} p.p.</td>
+                        <td>{{ $br($region['previous_reference_percentage']) }}% → <strong>{{ $br($region['reference_percentage']['current']) }}%</strong></td>
+                        <td>@if($region['reference_percentage']['delta'] !== null){{ $region['reference_percentage']['delta'] > 0 ? '+' : '' }}{{ $br($region['reference_percentage']['delta']) }} p.p.@else—@endif</td>
                     </tr>
                 @endforeach
                 </tbody>
@@ -373,7 +440,7 @@
 @endif
 
 <section class="report-section page-guidance">
-    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Orientações e validação', 'pageNumber' => $hasSegmentalPage ? ($hasSegmentalComparison ? 5 : 4) : 3, 'totalSections' => $totalSections])
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Orientações e validação', 'pageNumber' => $totalSections, 'totalSections' => $totalSections])
     <div class="content">
         <div class="section-title" style="color: {{ $secondaryColor }};">Interpretação profissional</div>
         <div class="summary">
