@@ -149,7 +149,7 @@ export default function ScreeningInvitationPanel({ client }) {
 	if (loading) return <PwaCard className="mt-4 p-5"><div className="h-5 w-44 animate-pulse rounded bg-slate-200" /><div className="mt-4 h-24 animate-pulse rounded-2xl bg-slate-100" /></PwaCard>;
 
 	return (
-		<PwaCard className="mt-4 p-5" aria-labelledby="screening-invitation-title">
+		<PwaCard className="mt-4 p-4 sm:p-5" aria-labelledby="screening-invitation-title">
 			<div className="flex items-start gap-3"><span className="rounded-xl bg-teal-50 p-2 text-teal-700"><PwaIcon name="clipboard" /></span><div><h3 id="screening-invitation-title" className="font-extrabold text-ricosty-ink">Triagens e questionários</h3><p className="mt-1 text-sm text-slate-600">Crie novas aplicações ou consulte o histórico deste cliente.</p></div></div>
 
 			{error ? <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800" role="alert">{error}</p> : null}

@@ -24,7 +24,7 @@ function ModuleCard({ type, title, description, status, actionLabel, onAction, d
 	const style = moduleStyles[type];
 
 	return (
-		<article className="flex min-h-full flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+		<article role="listitem" className="flex min-h-full w-[82vw] max-w-sm shrink-0 snap-start flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:w-auto md:max-w-none md:shrink">
 			<div className={`flex h-11 w-11 items-center justify-center rounded-xl ${style.iconClasses}`} aria-hidden="true">
 				<PwaIcon name={style.icon} />
 			</div>
@@ -67,7 +67,8 @@ export default function ClientModuleSummary({
 				<p className="mt-1 text-sm leading-6 text-slate-600">Avaliações corporais, triagens e documentos permanecem organizados em fluxos independentes.</p>
 			</div>
 
-			<div className="mt-4 grid gap-3 md:grid-cols-3">
+			<p className="mt-3 text-xs font-semibold text-slate-500 md:hidden">Deslize para ver todos os módulos.</p>
+			<div role="list" aria-label="Módulos disponíveis para o cliente" className="-mx-1 mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-1 pb-2 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0 md:pb-0">
 				<ModuleCard
 					type="assessment"
 					title="Avaliação corporal"

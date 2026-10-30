@@ -33,7 +33,7 @@ export default function ScreeningWorkspaceTabs({ activeTab, historyCount, onChan
 				tabIndex={active ? 0 : -1}
 				onClick={() => onChange(tab.id)}
 				onKeyDown={(event) => handleKeyDown(event, index)}
-				className={`pwa-focus inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-2 text-sm font-bold ${active ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+				className={`pwa-focus inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 text-xs font-bold sm:gap-2 sm:px-2 sm:text-sm ${active ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
 			>
 				<PwaIcon name={tab.icon} size={17} />{tab.label}{tab.id === 'history' ? ` (${historyCount})` : ''}
 			</button>;

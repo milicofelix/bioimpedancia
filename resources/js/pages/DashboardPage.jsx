@@ -1642,13 +1642,13 @@ export default function DashboardPage({ userName }) {
 								<div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
 									<p className="text-xs font-bold uppercase tracking-wide text-slate-500">Ações da avaliação selecionada</p>
 									<div className="mt-2 flex flex-wrap gap-2">
-									<button type="button" disabled={!canCreateClinicalRecords} onClick={() => duplicateAssessment(selectedAssessment)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50">
+									<button type="button" disabled={!canCreateClinicalRecords} onClick={() => duplicateAssessment(selectedAssessment)} className="min-h-11 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
 										Duplicar como base
 									</button>
-									<button type="button" disabled={!canClinicalProfessional || selectedAssessment.is_canceled} onClick={() => startEditAssessment(selectedAssessment)} className="rounded-xl border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50">
+									<button type="button" disabled={!canClinicalProfessional || selectedAssessment.is_canceled} onClick={() => startEditAssessment(selectedAssessment)} className="min-h-11 w-full rounded-xl border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
 										Corrigir avaliação
 									</button>
-									<button type="button" disabled={!canClinicalProfessional || selectedAssessment.is_canceled} onClick={() => runAction(`cancel-assessment-${selectedAssessment.id}`, () => cancelAssessment(selectedAssessment))} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
+									<button type="button" disabled={!canClinicalProfessional || selectedAssessment.is_canceled} onClick={() => runAction(`cancel-assessment-${selectedAssessment.id}`, () => cancelAssessment(selectedAssessment))} className="min-h-11 w-full rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
 										Cancelar avaliação
 									</button>
 									</div>
@@ -1659,10 +1659,10 @@ export default function DashboardPage({ userName }) {
 									<p className="text-xs font-bold uppercase tracking-wide text-sky-700">Privacidade e dados do cliente</p>
 									<p className="mt-1 text-xs text-slate-600">Estas ações pertencem ao cadastro do cliente e não alteram a avaliação selecionada.</p>
 									<div className="mt-2 flex flex-wrap gap-2">
-										<button type="button" onClick={() => exportClientPrivacyData(selectedClient)} className="rounded-xl border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50">
+										<button type="button" onClick={() => exportClientPrivacyData(selectedClient)} className="min-h-11 w-full rounded-xl border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50 sm:w-auto">
 											Exportar dados LGPD
 										</button>
-										<button type="button" disabled={selectedClient.is_anonymized} onClick={() => runAction(`anonymize-client-${selectedClient.id}`, () => anonymizeClient(selectedClient))} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50">
+										<button type="button" disabled={selectedClient.is_anonymized} onClick={() => runAction(`anonymize-client-${selectedClient.id}`, () => anonymizeClient(selectedClient))} className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
 											Anonimizar cliente
 										</button>
 									</div>

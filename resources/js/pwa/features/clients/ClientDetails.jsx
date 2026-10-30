@@ -75,7 +75,7 @@ export default function ClientDetails({ client, currentUser, scaleModel, onBack,
 				{access.reason ? <p className="mt-2 text-center text-xs font-semibold text-amber-700">{access.reason}</p> : null}
 			</div>
 
-			<div className="mt-4"><ClientWorkspaceTabs activeTab={activeTab} onChange={setActiveTab} /></div>
+			<div className="mt-4"><ClientWorkspaceTabs activeTab={activeTab} onChange={setActiveTab} sticky /></div>
 
 			<div id="client-panel-assessment" role="tabpanel" aria-labelledby="client-tab-assessment" className={activeTab === 'assessment' ? '' : 'hidden'}>
 			<div className="mt-4">

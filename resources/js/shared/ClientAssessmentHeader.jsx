@@ -7,7 +7,7 @@ function HeaderAction({ icon, children, onClick, disabled = false, primary = fal
 			type="button"
 			onClick={onClick}
 			disabled={disabled}
-			className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${primary ? 'border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+			className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto ${primary ? 'border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
 		>
 			<PwaIcon name={icon} size={18} />{children}
 		</button>
@@ -31,7 +31,7 @@ export default function ClientAssessmentHeader({
 					<p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">Medições, evolução, orientações associadas e relatórios corporais ficam reunidos exclusivamente neste módulo.</p>
 					<p className="mt-2 text-xs font-bold text-slate-500">{assessmentCount} avaliação(ões) registrada(s)</p>
 				</div>
-				<div className="grid gap-2 sm:grid-cols-3 lg:flex">
+				<div className="grid w-full gap-2 sm:grid-cols-3 lg:w-auto lg:flex">
 					<HeaderAction icon="plus" onClick={onStartAssessment} disabled={!canStartAssessment} primary>Nova avaliação</HeaderAction>
 					{onOpenEvolution ? <HeaderAction icon="trendUp" onClick={onOpenEvolution} disabled={!hasReport}>Ver evolução</HeaderAction> : null}
 					{onOpenReport ? <HeaderAction icon="fileText" onClick={onOpenReport} disabled={!hasReport}>Relatório corporal</HeaderAction> : null}
