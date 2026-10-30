@@ -6,6 +6,7 @@ import PwaIcon from '../../components/ui/PwaIcon';
 import ScreeningApprovalForm from './ScreeningApprovalForm';
 import ScreeningQrCode from './ScreeningQrCode';
 import ScreeningHistoryPanel from './ScreeningHistoryPanel';
+import ScreeningWorkspaceTabs from './ScreeningWorkspaceTabs';
 
 const durationOptions = [
 	{ value: 60, label: '1 hora' },
@@ -149,13 +150,13 @@ export default function ScreeningInvitationPanel({ client }) {
 
 	return (
 		<PwaCard className="mt-4 p-5" aria-labelledby="screening-invitation-title">
-			<div className="flex items-start gap-3"><span className="rounded-xl bg-teal-50 p-2 text-teal-700"><PwaIcon name="clipboard" /></span><div><h3 id="screening-invitation-title" className="font-extrabold text-ricosty-ink">Questionário de triagem</h3><p className="mt-1 text-sm text-slate-600">Crie um acesso temporário para preenchimento fora do sistema profissional.</p></div></div>
+			<div className="flex items-start gap-3"><span className="rounded-xl bg-teal-50 p-2 text-teal-700"><PwaIcon name="clipboard" /></span><div><h3 id="screening-invitation-title" className="font-extrabold text-ricosty-ink">Triagens e questionários</h3><p className="mt-1 text-sm text-slate-600">Crie novas aplicações ou consulte o histórico deste cliente.</p></div></div>
 
 			{error ? <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800" role="alert">{error}</p> : null}
 			{feedback ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800" role="status">{feedback}</p> : null}
-			<div className="mt-4 grid grid-cols-2 rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Triagens do cliente"><button type="button" role="tab" aria-selected={activeTab === 'new'} onClick={() => setActiveTab('new')} className={`pwa-focus min-h-11 rounded-lg text-sm font-bold ${activeTab === 'new' ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-600'}`}>Nova aplicação</button><button type="button" role="tab" aria-selected={activeTab === 'history'} onClick={() => setActiveTab('history')} className={`pwa-focus min-h-11 rounded-lg text-sm font-bold ${activeTab === 'history' ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-600'}`}>Triagens ({sessions.length})</button></div>
+			<ScreeningWorkspaceTabs activeTab={activeTab} historyCount={sessions.length} onChange={setActiveTab} />
 
-			{activeTab === 'new' ? <>
+			<div id="screening-panel-new" role="tabpanel" aria-labelledby="screening-tab-new" className={activeTab === 'new' ? '' : 'hidden'}>
 			<div className="mt-4 grid gap-3 sm:grid-cols-2">
 				<label className="text-sm font-bold text-slate-700 sm:col-span-2">Questionário<select value={questionnaireId} onChange={(event) => setQuestionnaireId(event.target.value)} className="pwa-focus mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3"><option value="">Selecione</option>{questionnaires.map((item) => <option key={item.id} value={item.id} disabled={!item.is_available}>{item.name} · {item.version}{questionnaireAvailabilityLabel(item)}</option>)}</select></label>
 				<label className="text-sm font-bold text-slate-700">Validade<select value={expiresInMinutes} onChange={(event) => setExpiresInMinutes(Number(event.target.value))} className="pwa-focus mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3">{durationOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
@@ -169,7 +170,10 @@ export default function ScreeningInvitationPanel({ client }) {
 			<PwaButton type="button" onClick={createInvitation} disabled={!questionnaireId || Boolean(busyAction) || (isMinor && (!guardianName.trim() || !guardianRelationship.trim()))} loading={busyAction === 'create'} icon="share" className="mt-4 w-full">Criar link temporário</PwaButton>
 
 			{invitation ? <div id="screening-generated-link" tabIndex={-1} className="pwa-focus mt-4 rounded-2xl border border-teal-200 bg-teal-50/70 p-4"><p className="text-xs font-bold uppercase text-teal-800">Novo link pronto para envio</p><p className="mt-1 text-sm font-semibold text-teal-950">O sistema não envia mensagens automaticamente. Escolha copiar ou compartilhar abaixo.</p><p className="mt-2 break-all rounded-lg bg-white p-2 text-xs text-slate-700">{invitation.url}</p><p className="mt-2 text-xs text-slate-600">Expira em {formatDate(invitation.expires_at)}. O QR Code abaixo é gerado localmente, sem enviar o token a terceiros.</p><ScreeningQrCode payload={invitation.qr_payload} questionnaireVersion={invitation.questionnaire_version} /><div className="mt-3 grid gap-2 sm:grid-cols-2"><PwaButton type="button" onClick={copyLink} icon="copy" variant="secondary">Copiar link</PwaButton><PwaButton type="button" onClick={shareLink} icon="share">Compartilhar</PwaButton></div></div> : null}
-			</> : <ScreeningHistoryPanel key={client.id} sessions={sessions} busyAction={busyAction} onNewApplication={() => setActiveTab('new')} onResend={resend} onRevoke={revoke} />}
+			</div>
+			<div id="screening-panel-history" role="tabpanel" aria-labelledby="screening-tab-history" className={activeTab === 'history' ? '' : 'hidden'}>
+				<ScreeningHistoryPanel key={client.id} sessions={sessions} busyAction={busyAction} onNewApplication={() => setActiveTab('new')} onResend={resend} onRevoke={revoke} />
+			</div>
 		</PwaCard>
 	);
 }

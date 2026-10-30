@@ -1639,7 +1639,9 @@ export default function DashboardPage({ userName }) {
 								))}
 							</div>
 							{selectedAssessment ? (
-								<div className="mt-4 flex flex-wrap gap-2">
+								<div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+									<p className="text-xs font-bold uppercase tracking-wide text-slate-500">Ações da avaliação selecionada</p>
+									<div className="mt-2 flex flex-wrap gap-2">
 									<button type="button" disabled={!canCreateClinicalRecords} onClick={() => duplicateAssessment(selectedAssessment)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50">
 										Duplicar como base
 									</button>
@@ -1649,16 +1651,21 @@ export default function DashboardPage({ userName }) {
 									<button type="button" disabled={!canClinicalProfessional || selectedAssessment.is_canceled} onClick={() => runAction(`cancel-assessment-${selectedAssessment.id}`, () => cancelAssessment(selectedAssessment))} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
 										Cancelar avaliação
 									</button>
-									{canAdmin ? (
-										<>
-											<button type="button" onClick={() => exportClientPrivacyData(selectedClient)} className="rounded-xl border border-sky-200 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50">
-												Exportar dados LGPD
-											</button>
-											<button type="button" disabled={selectedClient.is_anonymized} onClick={() => runAction(`anonymize-client-${selectedClient.id}`, () => anonymizeClient(selectedClient))} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50">
-												Anonimizar cliente
-											</button>
-										</>
-									) : null}
+									</div>
+								</div>
+							) : null}
+							{canAdmin ? (
+								<div className="mt-4 rounded-xl border border-sky-100 bg-sky-50/60 p-3">
+									<p className="text-xs font-bold uppercase tracking-wide text-sky-700">Privacidade e dados do cliente</p>
+									<p className="mt-1 text-xs text-slate-600">Estas ações pertencem ao cadastro do cliente e não alteram a avaliação selecionada.</p>
+									<div className="mt-2 flex flex-wrap gap-2">
+										<button type="button" onClick={() => exportClientPrivacyData(selectedClient)} className="rounded-xl border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50">
+											Exportar dados LGPD
+										</button>
+										<button type="button" disabled={selectedClient.is_anonymized} onClick={() => runAction(`anonymize-client-${selectedClient.id}`, () => anonymizeClient(selectedClient))} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50">
+											Anonimizar cliente
+										</button>
+									</div>
 								</div>
 							) : null}
 							<AssessmentDetails assessment={selectedAssessment} previousAssessment={previousSegmentalAssessment} />
