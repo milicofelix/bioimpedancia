@@ -154,8 +154,8 @@ class BodyscanSegmentalOcrCompleter
     private function prompt(array $firstReading): string
     {
         return <<<'PROMPT'
-Faça uma segunda leitura independente, focada exclusivamente nas seções "Análise de gordura segmentar" e "Equilíbrio muscular" do relatório Bodyscan Pro/RelaxFit.
-O relatório é vertical e os valores são pequenos. Amplie visualmente cada uma dessas duas seções antes de transcrever.
+Faça uma segunda leitura independente, focada exclusivamente nas seções "Análise de gordura segmentar" e "Equilíbrio muscular" do relatório Bodyscan Pro exibido pelo RelaxFit ou Fitdays.
+O relatório pode ser vertical ou técnico em página. Amplie visualmente cada uma dessas duas seções antes de transcrever.
 Em cada seção há cinco regiões: braço esquerdo, braço direito, tronco, perna esquerda e perna direita.
 Para cada região, leia na ordem apresentada: massa em kg, percentual relativo à referência e classificação textual.
 Não confunda percentual de referência com massa. Não transforme 3.7 kg em 37 e não remova o primeiro dígito de percentuais como 397.8% ou 97.4%.

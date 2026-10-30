@@ -8,6 +8,11 @@ import { segmentClassificationOptions, segmentLabels } from './bodyscanAssessmen
 import SegmentalBodyMap from '../../../components/bioimpedance/SegmentalBodyMap';
 
 const valueFields = ['mass_kg', 'reference_percentage', 'classification', 'reference_min_percentage', 'reference_max_percentage'];
+const layoutLabels = {
+	fitdays_technical_report: 'Fitdays · relatório técnico completo',
+	fitdays_vertical_report: 'Fitdays · relatório vertical',
+	relaxfit_vertical_report: 'RelaxFit · relatório vertical',
+};
 
 function firstError(errors, key) {
 	const value = errors?.[key];
@@ -80,6 +85,7 @@ export default function BodyscanReview({ previewUrl, form, extraction, client, c
 			{extraction?.side_consistency?.possible_swap ? <p role="alert" className="mt-3 rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm font-bold text-rose-800">Possível troca entre os lados L (esquerdo) e R (direito). Confira os marcadores diretamente na imagem.</p> : null}
 			{qualityWarnings.length ? <details className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm"><summary className="min-h-11 cursor-pointer font-bold">Qualidade da imagem · {qualityWarnings.length} {qualityWarnings.length === 1 ? 'observação' : 'observações'}</summary><p className="mb-2 text-xs text-amber-900">Estas mensagens tratam apenas de nitidez, resolução ou enquadramento.</p><ul className="list-disc space-y-1 pl-5">{qualityWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></details> : null}
 			{readingWarnings.length ? <details className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm"><summary className="min-h-11 cursor-pointer font-bold">Campos para conferir · {readingWarnings.length}</summary><p className="mb-2 text-xs text-amber-900">Confira somente os textos, números, unidades ou lados que não puderam ser lidos com segurança.</p><ul className="list-disc space-y-1 pl-5">{readingWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></details> : null}
+			<div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-950"><strong>Formato identificado:</strong> {layoutLabels[extraction?.report_layout] ?? 'Não identificado'}{extraction?.layout_profile_version ? ` · perfil ${extraction.layout_profile_version}` : ''}</div>
 			<div className="mt-4 grid grid-cols-2 gap-2 lg:hidden"><button type="button" onClick={() => setPanel('image')} className={`min-h-11 rounded-xl font-bold ${panel === 'image' ? 'bg-ricosty-700 text-white' : 'bg-slate-100'}`}>Imagem</button><button type="button" onClick={() => setPanel('values')} className={`min-h-11 rounded-xl font-bold ${panel === 'values' ? 'bg-ricosty-700 text-white' : 'bg-slate-100'}`}>Valores</button></div>
 			<div className="mt-4 lg:grid lg:grid-cols-[minmax(0,.7fr)_minmax(0,1.3fr)] lg:gap-5">
 				<div className={`${panel === 'image' ? 'block' : 'hidden'} lg:block`}><div className="sticky top-20 max-h-[75vh] overflow-y-auto rounded-xl border bg-slate-100 p-2"><img src={previewUrl} alt="Relatório Bodyscan Pro original para conferência" className="mx-auto h-auto w-full rounded-lg object-contain" /></div></div>

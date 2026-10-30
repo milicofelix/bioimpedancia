@@ -2,6 +2,7 @@
 
 namespace App\Services\Bioimpedance;
 
+use App\Domain\Bioimpedance\BodyscanReportLayout;
 use App\Domain\Bioimpedance\ScaleModel;
 use App\Models\AppAudit;
 use App\Models\Bioimpedance\BioimpedanceAiAnalysisOutput;
@@ -905,13 +906,17 @@ class BioimpedanceWorkflow
             'source_metadata.processed_at' => ['required', 'date'],
             'source_metadata.processor_model' => ['required', 'string', 'max:100'],
             'source_metadata.reference_version' => ['required', 'string', 'max:40'],
-            'source_metadata.source_application' => ['nullable', Rule::in(ScaleModel::BODYSCAN_APPLICATIONS)],
+            'source_metadata.source_application' => ['required', Rule::in(ScaleModel::BODYSCAN_APPLICATIONS)],
+            'source_metadata.report_layout' => ['required', Rule::in(BodyscanReportLayout::LAYOUTS)],
+            'source_metadata.layout_profile_version' => ['required', 'string', 'max:50'],
+            'source_metadata.layout_evidence' => ['required', 'array', 'min:3', 'max:20'],
+            'source_metadata.layout_evidence.*' => ['required', 'string', 'max:200'],
             'source_metadata.weight_unit' => ['required', Rule::in(['kg'])],
             'source_metadata.measured_at' => ['nullable', 'date'],
             'source_metadata.metrics' => ['required', 'array'],
             'source_metadata.segmental_measurements' => ['required', 'array', 'size:10'],
             'source_metadata.raw_values' => ['present', 'array'],
-            'source_metadata.detected_sections' => ['required', 'array', 'min:4'],
+            'source_metadata.detected_sections' => ['required', 'array', 'min:2'],
             'source_metadata.field_statuses' => ['present', 'array'],
             'source_metadata.missing_fields' => ['present', 'array'],
             'source_metadata.suspicious_values' => ['present', 'array'],
@@ -946,6 +951,21 @@ class BioimpedanceWorkflow
             || ! $validated['source_metadata']['side_consistency']['right_marker_visible']) {
             throw ValidationException::withMessages([
                 'source_metadata' => 'Os marcadores L e R precisam estar legíveis. Envie uma imagem completa e mais nítida antes de criar a avaliação.',
+            ]);
+        }
+
+        $sourceApplication = $validated['source_metadata']['source_application'] ?? null;
+        $reportLayout = $validated['source_metadata']['report_layout'];
+        if (! is_string($sourceApplication)
+            || ! BodyscanReportLayout::belongsToApplication($reportLayout, $sourceApplication)
+            || $validated['source_metadata']['layout_profile_version'] !== BodyscanReportLayout::profileVersion($reportLayout)) {
+            throw ValidationException::withMessages([
+                'source_metadata' => 'O aplicativo, o layout e a versão do perfil de leitura não correspondem. Processe novamente a imagem.',
+            ]);
+        }
+        if ($validated['measurement_application'] !== $sourceApplication) {
+            throw ValidationException::withMessages([
+                'measurement_application' => 'O aplicativo confirmado não corresponde à marca identificada no relatório. Processe novamente uma imagem compatível.',
             ]);
         }
 
@@ -1013,6 +1033,9 @@ class BioimpedanceWorkflow
             'processor_model' => $validated['source_metadata']['processor_model'],
             'reference_version' => $validated['source_metadata']['reference_version'],
             'extracted_application' => $validated['source_metadata']['source_application'] ?? null,
+            'report_layout' => $reportLayout,
+            'layout_profile_version' => $validated['source_metadata']['layout_profile_version'],
+            'layout_evidence' => $validated['source_metadata']['layout_evidence'],
             'weight_unit' => $validated['source_metadata']['weight_unit'],
             'confirmed_application' => $validated['measurement_application'],
             'athlete_mode_at_assessment' => (bool) $validated['athlete_mode_at_assessment'],

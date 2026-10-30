@@ -2,6 +2,7 @@
 
 namespace App\Services\Bioimpedance;
 
+use App\Domain\Bioimpedance\BodyscanReportLayout;
 use App\Domain\Bioimpedance\ScaleModel;
 use App\Models\Bioimpedance\BioimpedanceSegmentalMeasurement as Segment;
 use Illuminate\Http\UploadedFile;
@@ -56,11 +57,9 @@ class BodyscanProImageProcessor
         'ideal_body_weight_kg' => [2, 300],
     ];
 
-    private const REQUIRED_SECTIONS = [
-        'dados de membro',
+    private const REQUIRED_SEGMENTAL_SECTIONS = [
         'analise de gordura segmentar',
         'equilibrio muscular',
-        'indice corporal',
     ];
 
     public function __construct(
@@ -129,6 +128,9 @@ class BodyscanProImageProcessor
             'processor_model' => $processorModel,
             'reference_version' => ScaleModel::BODYSCAN_REFERENCE_VERSION,
             'source_application' => $result['source_application'],
+            'report_layout' => $result['report_layout'],
+            'layout_profile_version' => $result['layout_profile_version'],
+            'layout_evidence' => $result['layout_evidence'],
             'weight_unit' => $result['weight_unit'],
             'measured_at' => $result['measured_at'],
             'metrics' => $result['metrics'],
@@ -165,17 +167,33 @@ class BodyscanProImageProcessor
             ->map(fn (string $section) => $this->normalizedLabel($section))
             ->unique()
             ->values();
-        $matchedSections = collect(self::REQUIRED_SECTIONS)->filter(
+        $layoutEvidence = collect($payload['layout_evidence'] ?? [])
+            ->filter(fn ($evidence) => is_string($evidence) && trim($evidence) !== '')
+            ->map(fn (string $evidence) => mb_substr(trim($evidence), 0, 200))
+            ->unique()
+            ->values();
+        $sourceApplication = $this->normalizeSourceApplication($payload['source_application'] ?? null);
+        $reportLayout = BodyscanReportLayout::identify(
+            $sourceApplication,
+            $layoutEvidence->concat($detectedSections)->values()->all(),
+        );
+        $reportedLayout = $this->normalizeText($payload['report_layout'] ?? null);
+
+        if (! ($payload['recognized'] ?? false)
+            || $sourceApplication === null
+            || $reportLayout === null
+            || $reportedLayout !== $reportLayout
+            || ! BodyscanReportLayout::belongsToApplication($reportLayout, $sourceApplication)) {
+            throw new RuntimeException('A imagem não corresponde a um layout Bodyscan Pro compatível do RelaxFit ou Fitdays. Gere novamente um dos relatórios reconhecidos pelo sistema.');
+        }
+
+        $matchedSegmentalSections = collect(self::REQUIRED_SEGMENTAL_SECTIONS)->filter(
             fn (string $required) => $detectedSections->contains(
                 fn (string $detected) => str_contains($detected, $required) || str_contains($required, $detected),
             ),
         );
 
-        $requiredSegmentalSections = collect(['analise de gordura segmentar', 'equilibrio muscular']);
-
-        if (! ($payload['recognized'] ?? false)
-            || $matchedSections->count() < 3
-            || $requiredSegmentalSections->diff($matchedSections)->isNotEmpty()) {
+        if ($matchedSegmentalSections->count() !== count(self::REQUIRED_SEGMENTAL_SECTIONS)) {
             throw new RuntimeException('A imagem não possui as seções segmentares necessárias para um relatório Bodyscan Pro compatível.');
         }
 
@@ -192,8 +210,8 @@ class BodyscanProImageProcessor
             ->map(fn (string $issue) => trim($issue))
             ->filter(fn (string $issue) => $this->isVisualQualityIssue($issue))
             ->values();
-        $missingFields = collect(self::REQUIRED_SECTIONS)
-            ->reject(fn (string $required) => $matchedSections->contains($required))
+        $missingFields = collect(self::REQUIRED_SEGMENTAL_SECTIONS)
+            ->reject(fn (string $required) => $matchedSegmentalSections->contains($required))
             ->map(fn (string $section) => 'section:'.$section)
             ->values();
         $suspiciousValues = collect($payload['suspicious_values'] ?? [])
@@ -208,11 +226,8 @@ class BodyscanProImageProcessor
         $rawMetrics = is_array($payload['metrics'] ?? null) ? $payload['metrics'] : [];
         $metrics = [];
         $fieldStatuses = [];
-        $sourceApplication = $this->normalizeSourceApplication($payload['source_application'] ?? null);
-        $fieldStatuses['source_application'] = $sourceApplication === null ? 'missing' : 'recognized';
-        if ($sourceApplication === null) {
-            $missingFields->push('source_application');
-        }
+        $fieldStatuses['source_application'] = 'recognized';
+        $fieldStatuses['report_layout'] = 'recognized';
         foreach (self::METRIC_FIELDS as $field) {
             $rawValue = $rawMetrics[$field] ?? null;
             $metrics[$field] = array_key_exists($field, self::NUMERIC_RANGES)
@@ -286,6 +301,9 @@ class BodyscanProImageProcessor
             'report_type' => 'Bodyscan Pro',
             'reference_version' => ScaleModel::BODYSCAN_REFERENCE_VERSION,
             'source_application' => $sourceApplication,
+            'report_layout' => $reportLayout,
+            'layout_profile_version' => BodyscanReportLayout::profileVersion($reportLayout),
+            'layout_evidence' => $layoutEvidence->all(),
             'weight_unit' => $weightUnit,
             'measured_at' => $measuredAt,
             'metrics' => $metrics,
@@ -665,7 +683,8 @@ class BodyscanProImageProcessor
             'type', 'name', 'size_bytes', 'mime_type', 'stored', 'sha256', 'processed_at',
             'processor_model', 'reference_version', 'measured_at', 'metrics', 'segmental_measurements',
             'raw_values', 'detected_sections', 'field_statuses', 'missing_fields', 'suspicious_values',
-            'quality_issues', 'side_consistency', 'source_application', 'weight_unit',
+            'quality_issues', 'side_consistency', 'source_application', 'report_layout',
+            'layout_profile_version', 'layout_evidence', 'weight_unit',
         ])->mapWithKeys(fn (string $key) => [$key => $metadata[$key] ?? null])->all();
 
         return hash_hmac('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), (string) config('app.key'));
@@ -676,20 +695,25 @@ class BodyscanProImageProcessor
         return <<<'PROMPT'
 Analise exclusivamente a imagem anexada. Ela deve ser um relatório da balança Bodyscan Pro exibido pelo aplicativo RelaxFit ou Fitdays.
 Identifique source_application pela marca visível no relatório: relaxfit ou fitdays. Use null quando a origem não estiver legível; não deduza pela aparência.
+Identifique report_layout exclusivamente por textos realmente visíveis, sem usar posição, cores ou proporções da página:
+- fitdays_technical_report exige a marca Fitdays e os textos "Relatório de análise de composição corporal", "Impedância bioelétrica" e "Pontuação corporal";
+- fitdays_vertical_report exige a marca Fitdays, os cabeçalhos "Indicador", "Valor" e "Padrão", além dos textos "Limb Dados" e "Controle de peso";
+- relaxfit_vertical_report exige a marca RelaxFit, "Análise de gordura segmentar", "Equilíbrio muscular" e ao menos "Dados de membro" ou "Índice corporal".
+Em layout_evidence, copie separadamente e sem parafrasear cada marca, título ou cabeçalho usado para identificar o layout. Não inclua evidência que não esteja legível na imagem.
 Identifique weight_unit pela unidade impressa ao lado do peso: kg, lb ou stone. Use null se a unidade não estiver legível. Não converta valores entre unidades.
-Reconheça o modelo pelo conjunto de seções e não apenas pela aparência: "Dados de membro", "Análise de gordura segmentar", "Equilíbrio muscular" e "Índice corporal".
+Reconheça o modelo pelo conjunto de textos e seções do layout identificado, nunca apenas pela aparência.
 Extraia cada valor pelo rótulo textual e pelo marcador L/R correspondente. Nunca determine o lado apenas pela posição na tela.
 Para os segmentos, use somente estes identificadores: type fat ou muscle; region arm, trunk ou leg; side left, center ou right. O tronco deve usar side center.
 Devem existir cinco segmentos de gordura e cinco de músculo: braço esquerdo, braço direito, tronco, perna esquerda e perna direita.
 Em cada segmento extraia massa em kg, percentual relativo à referência, classificação, limites de referência impressos e o texto bruto visível.
 Classificação deve preservar o texto impresso, como Baixo, Padrão ou Alto. Não invente classificação ausente.
 Os percentuais segmentares são índices relativos à referência, não percentuais de gordura corporal.
-Extraia as métricas gerais do bloco "Índice corporal" pelos nomes dos rótulos.
+Extraia as métricas gerais pelos nomes dos rótulos: no RelaxFit use o bloco "Índice corporal"; no Fitdays vertical use a tabela "Indicador / Valor / Padrão"; no Fitdays técnico use "Análise da composição corporal" e "Outros indicadores".
 Preserve exatamente o valor decimal impresso. Não acrescente casas decimais nem alegue margem de erro ou precisão que não esteja escrita no relatório.
 Não calcule, estime, deduza ou complete valores ausentes. Use null quando algo não estiver legível.
 Converta a data e hora para YYYY-MM-DDTHH:MM:SS sem inventar fuso horário.
 Em detected_sections, copie os títulos realmente visíveis.
-Marque recognized=false para aplicativo diferente de RelaxFit/Fitdays, relatório sem análise segmentar ou imagem que não permita identificar o Bodyscan Pro.
+Marque recognized=false para aplicativo diferente de RelaxFit/Fitdays, relatório sem análise segmentar, evidências insuficientes para um dos três layouts ou imagem que não permita identificar o Bodyscan Pro.
 Marque is_complete=false quando houver corte, desfoque, valor ilegível, seção ausente ou lado não confirmável.
 Em side_consistency, confirme a visibilidade dos marcadores L e R e marque possible_swap=true diante de qualquer dúvida sobre os lados.
 Em legibility use clear, uncertain ou unreadable.
@@ -714,12 +738,14 @@ PROMPT;
         return [
             'type' => 'object',
             'additionalProperties' => false,
-            'required' => ['recognized', 'is_complete', 'quality_issues', 'source_application', 'weight_unit', 'measured_at', 'detected_sections', 'metrics', 'segmental_measurements', 'side_consistency', 'suspicious_values'],
+            'required' => ['recognized', 'is_complete', 'quality_issues', 'source_application', 'report_layout', 'layout_evidence', 'weight_unit', 'measured_at', 'detected_sections', 'metrics', 'segmental_measurements', 'side_consistency', 'suspicious_values'],
             'properties' => [
                 'recognized' => ['type' => 'boolean'],
                 'is_complete' => ['type' => 'boolean'],
                 'quality_issues' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'source_application' => ['type' => ['string', 'null'], 'enum' => ['relaxfit', 'fitdays', null]],
+                'report_layout' => ['type' => ['string', 'null'], 'enum' => [...BodyscanReportLayout::LAYOUTS, null]],
+                'layout_evidence' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'weight_unit' => ['type' => ['string', 'null'], 'enum' => ['kg', 'lb', 'stone', null]],
                 'measured_at' => $nullableString,
                 'detected_sections' => ['type' => 'array', 'items' => ['type' => 'string']],
