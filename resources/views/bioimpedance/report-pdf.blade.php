@@ -96,6 +96,7 @@
         .segmental-comparison th, .segmental-comparison td { padding: 6px; border: 1px solid #e5e7eb; text-align: left; }
         .segmental-comparison th { background: #fbf2f4; color: #475467; text-transform: uppercase; }
         .segmental-comparison tr { page-break-inside: avoid; }
+        .segmental-comparison caption { padding: 0 0 5px; color: #475467; font-size: 7px; text-align: left; }
         .segmental-legend { width: 100%; border-collapse: separate; border-spacing: 5px; margin-top: 6px; }
         .segmental-legend td { padding: 5px 7px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; font-size: 7px; text-align: center; }
     </style>
@@ -118,6 +119,27 @@
     $secondaryColor = $clinic['secondary_color'] ?? '#4a4a4a';
     $isBodyscan = ($assessment['device_model'] ?? null) === 'Bodyscan Pro';
     $isRelaxmedic = in_array(($assessment['device_model'] ?? null), ['Relaxmedic', 'Bodyscan Pro'], true);
+    $extendedMetrics = collect($assessment['extended_metrics'] ?? []);
+    $extendedMetricsByCode = $extendedMetrics->keyBy('metric_code');
+    $impedanceReadings = collect($assessment['impedance_readings'] ?? []);
+    $impedanceByKey = $impedanceReadings->keyBy(fn (array $reading) => ($reading['frequency_khz'] ?? '').'|'.($reading['region'] ?? '').'|'.($reading['side'] ?? ''));
+    $reportLayoutCode = data_get($assessment, 'source_metadata.report_layout')
+        ?? data_get($extendedMetrics->first(), 'source_layout')
+        ?? data_get($impedanceReadings->first(), 'source_layout');
+    $isFitdays = ($assessment['measurement_application'] ?? null) === 'fitdays';
+    $fitdaysControlCodes = ['recommended_target_weight', 'weight_control', 'fat_control', 'muscle_control'];
+    $fitdaysControlMetrics = $extendedMetrics->whereIn('metric_code', $fitdaysControlCodes)->values();
+    $fitdaysReferenceMetrics = $extendedMetrics
+        ->reject(fn (array $metric) => in_array($metric['metric_code'] ?? null, $fitdaysControlCodes, true))
+        ->filter(fn (array $metric) => ($metric['source_application'] ?? null) === 'fitdays'
+            && (($metric['application_classification'] ?? null) !== null
+                || ($metric['printed_minimum'] ?? null) !== null
+                || ($metric['printed_maximum'] ?? null) !== null
+                || ($metric['weight_proportion_percentage'] ?? null) !== null
+                || in_array($metric['metric_code'] ?? null, ['waist_hip_ratio', 'asmi', 'body_score', 'proprietary_obesity_index', 'body_balance_assessment'], true)))
+        ->values();
+    $hasFitdaysDataPage = $isFitdays && ($fitdaysReferenceMetrics->isNotEmpty() || $fitdaysControlMetrics->isNotEmpty());
+    $hasImpedancePage = $isFitdays && $impedanceReadings->isNotEmpty();
     $segmentalMeasurements = $assessment['segmental_measurements'] ?? [];
     $segmentalComparison = $comparison['segmental'] ?? null;
     $comparability = $comparison['comparability'] ?? null;
@@ -125,7 +147,12 @@
     $hasSegmentalPage = $isBodyscan && count($segmentalMeasurements) > 0;
     $hasDetailedComparison = count($comparison['metrics'] ?? []) > 0
         || (!($comparison['impedance']['is_baseline'] ?? true) && count($comparison['impedance']['readings'] ?? []) > 0);
-    $totalSections = 3 + ($hasDetailedComparison ? 1 : 0) + ($hasSegmentalPage ? 1 : 0) + ($hasSegmentalComparison ? 1 : 0);
+    $totalSections = 3
+        + ($hasFitdaysDataPage ? 1 : 0)
+        + ($hasImpedancePage ? 1 : 0)
+        + ($hasDetailedComparison ? 1 : 0)
+        + ($hasSegmentalPage ? 1 : 0)
+        + ($hasSegmentalComparison ? 1 : 0);
     $manufacturer = trim((string) ($reference['manufacturer'] ?? ($isRelaxmedic ? 'Relaxmedic' : 'Omron')));
     $deviceModel = trim((string) ($reference['model'] ?? $assessment['device_model'] ?? ''));
     $genericDeviceModels = ['relaxmedic', 'relaxmedic/relaxfit'];
@@ -154,6 +181,22 @@
         return $parts ? implode(' · ', $parts) : 'Origem não informada';
     };
     $measurementApplication = $measurementApplicationLabels[$assessment['measurement_application'] ?? ''] ?? null;
+    $reportLayout = $reportLayoutLabels[$reportLayoutCode] ?? $reportLayoutCode;
+    $athleteModeLabel = match ($assessment['athlete_mode_at_assessment'] ?? null) {
+        true => 'Ativado',
+        false => 'Desativado',
+        default => 'Não informado',
+    };
+    $extendedMetricDisplayValue = function (?array $metric, int $decimals = 2) use ($br): string {
+        if (! $metric) {
+            return '-';
+        }
+        if (($metric['numeric_value'] ?? null) !== null) {
+            return trim($br($metric['numeric_value'], $decimals).' '.($metric['unit'] ?? ''));
+        }
+
+        return (string) ($metric['text_value'] ?? $metric['raw_extracted_value'] ?? '-');
+    };
     $deviceSpecifications = $assessment['device_technical_specifications'] ?? [];
     $informationalReferences = $reference['informational_references'] ?? [];
     $displayClassification = fn ($indicator, $fallback = '-') => $indicator['classification'] ?? $fallback;
@@ -202,6 +245,16 @@
         'Nível de obesidade' => $assessment['obesity_level'] ?? null,
         'Tipo de corpo' => $assessment['body_type'] ?? null,
     ], fn ($value) => $value !== null && $value !== '');
+    $compositionDetailMetrics = $isFitdays
+        ? array_intersect_key($relaxmedicMetrics, array_flip([
+            'Massa corporal magra',
+            'Gordura subcutânea',
+            'Água corporal',
+            'Massa muscular',
+            'Massa óssea',
+            'Proteína',
+        ]))
+        : $relaxmedicMetrics;
     $metricNotes = [
         'Massa corporal magra' => 'Estimativa do equipamento; não comprova força ou função.',
         'Massa muscular' => 'Estimativa; não substitui avaliação funcional.',
@@ -244,19 +297,16 @@
             <td class="box"><div class="label">Metabolismo basal</div><div class="metric-small">{{ $assessment['resting_metabolism_kcal'] ? number_format($assessment['resting_metabolism_kcal'], 0, ',', '.') : '-' }} kcal/dia</div><div class="muted">Não corresponde ao gasto energético total nem à recomendação de consumo.</div></td>
             <td class="box">
                 <div class="label">Equipamento</div>
-                <div class="metric-small">{{ $manufacturer }}</div>
+                <div class="metric-small">{{ $manufacturer }}@if($assessment['device_model_code'] ?? null) · {{ $assessment['device_model_code'] }}@elseif($hasSpecificDeviceModel) · {{ $deviceModel }}@endif</div>
                 <div class="muted">
-                    @if($assessment['device_model_code'] ?? null)
-                        Modelo {{ $assessment['device_model_code'] }} ·
-                    @elseif($hasSpecificDeviceModel)
-                        Modelo {{ $deviceModel }} ·
-                    @endif
                     Referência {{ $assessment['reference_version'] ?? ($reference['classification_version'] ?? '1.0.0') }}
                     @if($assessment['device_manual_version'] ?? null)
                         · Manual {{ $assessment['device_manual_version'] }}
                     @endif
                     @if($measurementApplication)
-                        <br>Origem {{ $measurementApplication }} · Modo atleta {{ ($assessment['athlete_mode_at_assessment'] ?? false) ? 'ativado' : 'desativado' }}
+                        <br>Aplicativo: {{ $measurementApplication }}
+                        @if($reportLayout) · Layout: {{ $reportLayout }}@endif
+                        · Modo atleta: {{ $athleteModeLabel }}
                     @endif
                     @if($isBodyscan && $deviceSpecifications)
                         <br>{{ $deviceSpecifications['electrodes'] }} eletrodos · Dupla frequência: {{ implode(' kHz + ', $deviceSpecifications['frequencies_khz']) }} kHz · Operação: {{ $deviceSpecifications['minimum_temperature_c'] }} °C a {{ $deviceSpecifications['maximum_temperature_c'] }} °C
@@ -275,14 +325,18 @@
             <tr><td class="box" style="width: 50%;">@include('bioimpedance.partials.pdf-scale', ['title' => 'Gordura corporal', 'value' => $br($assessment['body_fat_percentage']).' %', 'indicator' => $bodyFat])</td><td class="box">@include('bioimpedance.partials.pdf-scale', ['title' => 'Músculo esquelético', 'value' => $br($assessment['skeletal_muscle_percentage']).' %', 'indicator' => $muscle])</td></tr>
             <tr><td class="box">@include('bioimpedance.partials.pdf-scale', ['title' => 'Gordura visceral', 'value' => $br($assessment['visceral_fat_level'], $isRelaxmedic ? 1 : 0).' nível', 'indicator' => $visceral])<div class="muted" style="margin-top: 5px;">Índice do dispositivo; não representa quantidade em kg.</div></td><td class="box"><div class="label">IMC calculado</div><div class="metric-value">{{ $br($assessment['calculated_bmi']) }}</div><span class="badge {{ $tone($bmi) }}">{{ $displayClassification($bmi) }}</span><div class="muted" style="margin-top: 5px;">Origem: cálculo do sistema com peso e altura. Deve ser interpretado com composição corporal, histórico e contexto individual.</div></td></tr>
         </table>
-        @if($isRelaxmedic && count($relaxmedicMetrics))
-            <div class="section-title" style="color: {{ $secondaryColor }};">Indicadores Relaxmedic</div>
+        @if($isRelaxmedic && count($compositionDetailMetrics))
+            <div class="section-title" style="color: {{ $secondaryColor }};">{{ $isFitdays ? 'Composição corporal importada' : 'Indicadores Relaxmedic' }}</div>
             <table class="grid">
-                @foreach(array_chunk($relaxmedicMetrics, 3, true) as $row)
+                @foreach(array_chunk($compositionDetailMetrics, 3, true) as $row)
                     <tr>@foreach($row as $label => $value)<td class="box" style="width: 33.33%;"><div class="label">{{ $label }}</div><div class="metric-small">{{ $value }}</div>@if(isset($metricNotes[$label]))<div class="muted" style="margin-top: 3px; font-size: 7px;">{{ $metricNotes[$label] }}</div>@else<div class="muted" style="margin-top: 3px; font-size: 7px;">Estimativa do equipamento.</div>@endif</td>@endforeach @for($i = count($row); $i < 3; $i++)<td></td>@endfor</tr>
                 @endforeach
             </table>
-            <div class="notice"><strong>Por que as classificações podem ser diferentes?</strong> O IMC é calculado pelo sistema usando peso e altura. “Nível de obesidade” e “Tipo de corpo” são classificações distintas importadas do RelaxFit; o tipo corporal é proprietário do aplicativo e não equivale à classificação do IMC.</div>
+            @if($isFitdays)
+                <div class="notice"><strong>Avaliação do aplicativo × interpretação profissional.</strong> Classificações como “alto”, “muito alto” ou “excelente” são preservadas como saídas do Fitdays. A interpretação profissional não é determinada automaticamente por esses rótulos e considera o contexto completo da avaliação.</div>
+            @else
+                <div class="notice"><strong>Por que as classificações podem ser diferentes?</strong> O IMC é calculado pelo sistema usando peso e altura. “Nível de obesidade” e “Tipo de corpo” são classificações distintas importadas do RelaxFit; o tipo corporal é proprietário do aplicativo e não equivale à classificação do IMC.</div>
+            @endif
         @endif
         @if($isBodyscan && count($informationalReferences))
             <div class="section-title" style="color: {{ $secondaryColor }};">Referências informativas do manual</div>
@@ -343,9 +397,17 @@
     </div>
 </section>
 
+@if($hasFitdaysDataPage)
+    @include('bioimpedance.partials.report-fitdays-data', ['pageNumber' => 3])
+@endif
+
+@if($hasImpedancePage)
+    @include('bioimpedance.partials.report-fitdays-impedance', ['pageNumber' => 3 + ($hasFitdaysDataPage ? 1 : 0)])
+@endif
+
 @if($hasDetailedComparison)
 <section class="report-section">
-    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Comparação compatível', 'pageNumber' => 3, 'totalSections' => $totalSections])
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Comparação compatível', 'pageNumber' => 3 + ($hasFitdaysDataPage ? 1 : 0) + ($hasImpedancePage ? 1 : 0), 'totalSections' => $totalSections])
     <div class="content">
         <div class="notice"><strong>{{ $comparability['label'] ?? 'Comparação descritiva' }}.</strong> Somente valores com tipo e unidade compatíveis são apresentados. As variações não representam automaticamente melhora ou piora clínica.</div>
         @if(count($comparison['metrics'] ?? []))
@@ -379,7 +441,7 @@
 
 @if($hasSegmentalPage)
 <section class="report-section segmental-page">
-    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Análise segmentar', 'pageNumber' => 3 + ($hasDetailedComparison ? 1 : 0), 'totalSections' => $totalSections])
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Análise segmentar', 'pageNumber' => 3 + ($hasFitdaysDataPage ? 1 : 0) + ($hasImpedancePage ? 1 : 0) + ($hasDetailedComparison ? 1 : 0), 'totalSections' => $totalSections])
     <div class="content">
         <div class="notice"><strong>Bodyscan Pro · referência {{ $assessment['reference_version'] ?? ($reference['classification_version'] ?? 'não informada') }}.</strong> L representa o lado esquerdo e R o lado direito. Massa, percentual de referência e classificação são apresentados ao redor do corpo e repetidos nas tabelas textuais.</div>
         <table class="segmental-grid"><tr>
@@ -399,7 +461,7 @@
 
 @if($isBodyscan && $hasSegmentalComparison)
 <section class="report-section">
-    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Evolução segmentar', 'pageNumber' => 3 + ($hasDetailedComparison ? 1 : 0) + ($hasSegmentalPage ? 1 : 0), 'totalSections' => $totalSections])
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Evolução segmentar', 'pageNumber' => 3 + ($hasFitdaysDataPage ? 1 : 0) + ($hasImpedancePage ? 1 : 0) + ($hasDetailedComparison ? 1 : 0) + ($hasSegmentalPage ? 1 : 0), 'totalSections' => $totalSections])
     <div class="content">
         <div class="notice"><strong>{{ $comparability['label'] ?? 'Comparação do mesmo equipamento' }}.</strong> Os valores mostram mudanças numéricas e não classificam melhora, piora ou problema clínico.@if($segmentalComparison['reference_warning'] ?? null)<br>{{ $segmentalComparison['reference_warning'] }}@endif</div>
         @foreach(['fat' => 'Gordura segmentar', 'muscle' => 'Equilíbrio muscular'] as $segmentType => $segmentTitle)
