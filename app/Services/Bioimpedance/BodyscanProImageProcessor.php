@@ -3,6 +3,7 @@
 namespace App\Services\Bioimpedance;
 
 use App\Domain\Bioimpedance\BodyscanReportLayout;
+use App\Domain\Bioimpedance\BodyscanOcrProfileRegistry;
 use App\Domain\Bioimpedance\ScaleModel;
 use App\Models\Bioimpedance\BioimpedanceSegmentalMeasurement as Segment;
 use Illuminate\Http\UploadedFile;
@@ -13,28 +14,7 @@ use RuntimeException;
 
 class BodyscanProImageProcessor
 {
-    private const METRIC_FIELDS = [
-        'weight_kg',
-        'scale_bmi',
-        'body_fat_percentage',
-        'muscle_rate_percentage',
-        'lean_body_mass_kg',
-        'subcutaneous_fat_percentage',
-        'visceral_fat_level',
-        'body_water_percentage',
-        'skeletal_muscle_percentage',
-        'muscle_mass_kg',
-        'bone_mass_kg',
-        'protein_percentage',
-        'resting_metabolism_kcal',
-        'body_age',
-        'fat_mass_kg',
-        'water_weight_kg',
-        'protein_mass_kg',
-        'ideal_body_weight_kg',
-        'obesity_level',
-        'body_type',
-    ];
+    private const METRIC_FIELDS = BodyscanOcrProfileRegistry::METRIC_FIELDS;
 
     private const NUMERIC_RANGES = [
         'weight_kg' => [ScaleModel::BODYSCAN_MIN_WEIGHT_KG, ScaleModel::BODYSCAN_MAX_WEIGHT_KG],
@@ -57,15 +37,11 @@ class BodyscanProImageProcessor
         'ideal_body_weight_kg' => [2, 300],
     ];
 
-    private const REQUIRED_SEGMENTAL_SECTIONS = [
-        'analise de gordura segmentar',
-        'equilibrio muscular',
-    ];
-
     public function __construct(
         private readonly BioimpedanceJpegInspector $jpegInspector,
         private readonly RelaxmedicValueNormalizer $valueNormalizer,
         private readonly BodyscanSegmentalOcrCompleter $segmentalCompleter,
+        private readonly BodyscanOcrProfileRegistry $ocrProfiles,
     ) {}
 
     public function process(UploadedFile $image): array
@@ -114,6 +90,7 @@ class BodyscanProImageProcessor
             $contents,
             $processorModel,
             is_array($payload['segmental_measurements'] ?? null) ? $payload['segmental_measurements'] : [],
+            is_string($payload['report_layout'] ?? null) ? $payload['report_layout'] : null,
         );
 
         $result = $this->normalize($payload, $image);
@@ -131,6 +108,7 @@ class BodyscanProImageProcessor
             'report_layout' => $result['report_layout'],
             'layout_profile_version' => $result['layout_profile_version'],
             'layout_evidence' => $result['layout_evidence'],
+            'available_metric_fields' => $result['available_metric_fields'],
             'weight_unit' => $result['weight_unit'],
             'measured_at' => $result['measured_at'],
             'metrics' => $result['metrics'],
@@ -187,14 +165,10 @@ class BodyscanProImageProcessor
             throw new RuntimeException('A imagem não corresponde a um layout Bodyscan Pro compatível do RelaxFit ou Fitdays. Gere novamente um dos relatórios reconhecidos pelo sistema.');
         }
 
-        $matchedSegmentalSections = collect(self::REQUIRED_SEGMENTAL_SECTIONS)->filter(
-            fn (string $required) => $detectedSections->contains(
-                fn (string $detected) => str_contains($detected, $required) || str_contains($required, $detected),
-            ),
-        );
-
-        if ($matchedSegmentalSections->count() !== count(self::REQUIRED_SEGMENTAL_SECTIONS)) {
-            throw new RuntimeException('A imagem não possui as seções segmentares necessárias para um relatório Bodyscan Pro compatível.');
+        $profile = $this->ocrProfiles->forLayout($reportLayout);
+        $missingRequiredSections = $profile->missingRequiredSections($detectedSections->all());
+        if ($missingRequiredSections !== []) {
+            throw new RuntimeException('A imagem não possui todas as seções obrigatórias do perfil '.$reportLayout.': '.implode(', ', $missingRequiredSections).'.');
         }
 
         $weightUnit = $this->normalizeWeightUnit($payload['weight_unit'] ?? null);
@@ -210,10 +184,7 @@ class BodyscanProImageProcessor
             ->map(fn (string $issue) => trim($issue))
             ->filter(fn (string $issue) => $this->isVisualQualityIssue($issue))
             ->values();
-        $missingFields = collect(self::REQUIRED_SEGMENTAL_SECTIONS)
-            ->reject(fn (string $required) => $matchedSegmentalSections->contains($required))
-            ->map(fn (string $section) => 'section:'.$section)
-            ->values();
+        $missingFields = collect();
         $suspiciousValues = collect($payload['suspicious_values'] ?? [])
             ->filter(fn ($item) => is_array($item) && filled($item['field'] ?? null) && filled($item['reason'] ?? null))
             ->filter(fn (array $item) => $this->isReadingUncertainty((string) $item['reason']))
@@ -224,11 +195,25 @@ class BodyscanProImageProcessor
             ]);
 
         $rawMetrics = is_array($payload['metrics'] ?? null) ? $payload['metrics'] : [];
+        $rawMetricLabels = is_array($payload['metric_source_labels'] ?? null) ? $payload['metric_source_labels'] : [];
+        $rawMetricTexts = is_array($payload['metric_raw_values'] ?? null) ? $payload['metric_raw_values'] : [];
         $metrics = [];
         $fieldStatuses = [];
         $fieldStatuses['source_application'] = 'recognized';
         $fieldStatuses['report_layout'] = 'recognized';
         foreach (self::METRIC_FIELDS as $field) {
+            if (! $profile->supportsMetric($field)) {
+                $metrics[$field] = null;
+                $fieldStatuses['metrics.'.$field] = 'unavailable_in_layout';
+                if (($rawMetrics[$field] ?? null) !== null) {
+                    $suspiciousValues->push([
+                        'field' => 'metrics.'.$field,
+                        'value' => $rawMetrics[$field],
+                        'reason' => 'O perfil identificado não oferece este campo; a leitura pode ter associado outro indicador ao rótulo incorreto.',
+                    ]);
+                }
+                continue;
+            }
             $rawValue = $rawMetrics[$field] ?? null;
             $metrics[$field] = array_key_exists($field, self::NUMERIC_RANGES)
                 ? $this->normalizeNumber($rawValue)
@@ -236,6 +221,15 @@ class BodyscanProImageProcessor
             $fieldStatuses['metrics.'.$field] = $metrics[$field] === null ? 'missing' : 'recognized';
             if ($metrics[$field] === null) {
                 $missingFields->push('metrics.'.$field);
+            } elseif (! $profile->recognizesMetricLabel($field, $rawMetricLabels[$field] ?? null)
+                || ! is_string($rawMetricTexts[$field] ?? null)
+                || trim($rawMetricTexts[$field]) === '') {
+                $fieldStatuses['metrics.'.$field] = 'suspicious';
+                $suspiciousValues->push([
+                    'field' => 'metrics.'.$field,
+                    'value' => $rawMetricLabels[$field] ?? null,
+                    'reason' => 'O rótulo ou o texto bruto da métrica não corresponde aos aliases do perfil identificado.',
+                ]);
             }
         }
 
@@ -304,6 +298,7 @@ class BodyscanProImageProcessor
             'report_layout' => $reportLayout,
             'layout_profile_version' => BodyscanReportLayout::profileVersion($reportLayout),
             'layout_evidence' => $layoutEvidence->all(),
+            'available_metric_fields' => $profile->availableMetricFields,
             'weight_unit' => $weightUnit,
             'measured_at' => $measuredAt,
             'metrics' => $metrics,
@@ -315,6 +310,8 @@ class BodyscanProImageProcessor
             'field_statuses' => $fieldStatuses,
             'raw_values' => [
                 'metrics' => $rawMetrics,
+                'metric_source_labels' => $rawMetricLabels,
+                'metric_text' => $rawMetricTexts,
                 'segmental_measurements' => $payload['segmental_measurements'] ?? [],
             ],
             'detected_sections' => $detectedSections->all(),
@@ -684,7 +681,7 @@ class BodyscanProImageProcessor
             'processor_model', 'reference_version', 'measured_at', 'metrics', 'segmental_measurements',
             'raw_values', 'detected_sections', 'field_statuses', 'missing_fields', 'suspicious_values',
             'quality_issues', 'side_consistency', 'source_application', 'report_layout',
-            'layout_profile_version', 'layout_evidence', 'weight_unit',
+            'layout_profile_version', 'layout_evidence', 'available_metric_fields', 'weight_unit',
         ])->mapWithKeys(fn (string $key) => [$key => $metadata[$key] ?? null])->all();
 
         return hash_hmac('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), (string) config('app.key'));
@@ -692,7 +689,7 @@ class BodyscanProImageProcessor
 
     private function prompt(): string
     {
-        return <<<'PROMPT'
+        $commonInstructions = <<<'PROMPT'
 Analise exclusivamente a imagem anexada. Ela deve ser um relatório da balança Bodyscan Pro exibido pelo aplicativo RelaxFit ou Fitdays.
 Identifique source_application pela marca visível no relatório: relaxfit ou fitdays. Use null quando a origem não estiver legível; não deduza pela aparência.
 Identifique report_layout exclusivamente por textos realmente visíveis, sem usar posição, cores ou proporções da página:
@@ -709,6 +706,8 @@ Em cada segmento extraia massa em kg, percentual relativo à referência, classi
 Classificação deve preservar o texto impresso, como Baixo, Padrão ou Alto. Não invente classificação ausente.
 Os percentuais segmentares são índices relativos à referência, não percentuais de gordura corporal.
 Extraia as métricas gerais pelos nomes dos rótulos: no RelaxFit use o bloco "Índice corporal"; no Fitdays vertical use a tabela "Indicador / Valor / Padrão"; no Fitdays técnico use "Análise da composição corporal" e "Outros indicadores".
+Use exclusivamente os aliases do perfil identificado. Para cada métrica, retorne em metric_source_labels o rótulo exato encontrado e em metric_raw_values o texto integral da linha ou célula que sustenta o valor.
+Para campos que o perfil não oferece, retorne null em metrics, metric_source_labels e metric_raw_values. Não marque esses campos como ilegíveis ou ausentes.
 Preserve exatamente o valor decimal impresso. Não acrescente casas decimais nem alegue margem de erro ou precisão que não esteja escrita no relatório.
 Não calcule, estime, deduza ou complete valores ausentes. Use null quando algo não estiver legível.
 Converta a data e hora para YYYY-MM-DDTHH:MM:SS sem inventar fuso horário.
@@ -724,6 +723,8 @@ Não interprete vermelho, amarelo, verde ou azul. Não conclua risco, normalidad
 Não inclua em quality_issues ou suspicious_values valores legíveis apenas por estarem coloridos ou classificados pelo dispositivo.
 Liste em português somente problemas de leitura, sem realizar interpretação clínica.
 PROMPT;
+
+        return $commonInstructions."\n\nPERFIS OCR SUPORTADOS\n".$this->ocrProfiles->promptBlocks();
     }
 
     private function responseSchema(): array
@@ -738,7 +739,7 @@ PROMPT;
         return [
             'type' => 'object',
             'additionalProperties' => false,
-            'required' => ['recognized', 'is_complete', 'quality_issues', 'source_application', 'report_layout', 'layout_evidence', 'weight_unit', 'measured_at', 'detected_sections', 'metrics', 'segmental_measurements', 'side_consistency', 'suspicious_values'],
+            'required' => ['recognized', 'is_complete', 'quality_issues', 'source_application', 'report_layout', 'layout_evidence', 'weight_unit', 'measured_at', 'detected_sections', 'metrics', 'metric_source_labels', 'metric_raw_values', 'segmental_measurements', 'side_consistency', 'suspicious_values'],
             'properties' => [
                 'recognized' => ['type' => 'boolean'],
                 'is_complete' => ['type' => 'boolean'],
@@ -754,6 +755,18 @@ PROMPT;
                     'additionalProperties' => false,
                     'required' => self::METRIC_FIELDS,
                     'properties' => $metricProperties,
+                ],
+                'metric_source_labels' => [
+                    'type' => 'object',
+                    'additionalProperties' => false,
+                    'required' => self::METRIC_FIELDS,
+                    'properties' => array_fill_keys(self::METRIC_FIELDS, $nullableString),
+                ],
+                'metric_raw_values' => [
+                    'type' => 'object',
+                    'additionalProperties' => false,
+                    'required' => self::METRIC_FIELDS,
+                    'properties' => array_fill_keys(self::METRIC_FIELDS, $nullableString),
                 ],
                 'segmental_measurements' => [
                     'type' => 'array',

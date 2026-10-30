@@ -2,6 +2,7 @@
 
 namespace App\Services\Bioimpedance;
 
+use App\Domain\Bioimpedance\BodyscanOcrProfileRegistry;
 use App\Models\Bioimpedance\BioimpedanceSegmentalMeasurement as Segment;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
@@ -9,7 +10,9 @@ use Illuminate\Support\Facades\Http;
 
 class BodyscanSegmentalOcrCompleter
 {
-    public function complete(string $imageContents, string $model, array $segments): array
+    public function __construct(private readonly BodyscanOcrProfileRegistry $ocrProfiles) {}
+
+    public function complete(string $imageContents, string $model, array $segments, ?string $reportLayout = null): array
     {
         try {
             $response = Http::withToken((string) config('services.openai.api_key'))
@@ -24,7 +27,7 @@ class BodyscanSegmentalOcrCompleter
                     'input' => [[
                         'role' => 'user',
                         'content' => [
-                            ['type' => 'input_text', 'text' => $this->prompt($segments)],
+                            ['type' => 'input_text', 'text' => $this->prompt($segments, $reportLayout)],
                             ['type' => 'input_image', 'image_url' => 'data:image/jpeg;base64,'.base64_encode($imageContents), 'detail' => 'high'],
                         ],
                     ]],
@@ -151,8 +154,17 @@ class BodyscanSegmentalOcrCompleter
         return ($segment['type'] ?? '').'|'.($segment['region'] ?? '').'|'.($segment['side'] ?? '');
     }
 
-    private function prompt(array $firstReading): string
+    private function prompt(array $firstReading, ?string $reportLayout): string
     {
+        $profileContext = '';
+        if (is_string($reportLayout) && $reportLayout !== '') {
+            try {
+                $profileContext = "\n\nPerfil identificado na primeira leitura:\n".$this->ocrProfiles->forLayout($reportLayout)->segmentalPromptBlock();
+            } catch (\InvalidArgumentException) {
+                $profileContext = '';
+            }
+        }
+
         return <<<'PROMPT'
 Faça uma segunda leitura independente, focada exclusivamente nas seções "Análise de gordura segmentar" e "Equilíbrio muscular" do relatório Bodyscan Pro exibido pelo RelaxFit ou Fitdays.
 O relatório pode ser vertical ou técnico em página. Amplie visualmente cada uma dessas duas seções antes de transcrever.
@@ -167,6 +179,7 @@ Use null para qualquer valor que continuar ilegível. Não calcule massas, perce
 Marque legibility como clear somente quando massa, percentual e classificação estiverem efetivamente legíveis.
 Retorne exatamente dez segmentos, sem métricas gerais.
 PROMPT
+        .$profileContext
         ."\n\nPrimeira leitura, fornecida apenas para indicar os pontos que precisam ser relidos; não a trate como fonte confiável:\n"
         .json_encode($firstReading, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }

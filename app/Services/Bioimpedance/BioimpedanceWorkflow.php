@@ -3,6 +3,7 @@
 namespace App\Services\Bioimpedance;
 
 use App\Domain\Bioimpedance\BodyscanReportLayout;
+use App\Domain\Bioimpedance\BodyscanOcrProfileRegistry;
 use App\Domain\Bioimpedance\ScaleModel;
 use App\Models\AppAudit;
 use App\Models\Bioimpedance\BioimpedanceAiAnalysisOutput;
@@ -43,6 +44,7 @@ class BioimpedanceWorkflow
         private readonly BioimpedanceWorkspacePresenter $workspacePresenter,
         private readonly BioimpedanceAdminDashboard $adminDashboard,
         private readonly ScreeningPrivacyService $screeningPrivacyService,
+        private readonly BodyscanOcrProfileRegistry $bodyscanOcrProfiles,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -911,11 +913,17 @@ class BioimpedanceWorkflow
             'source_metadata.layout_profile_version' => ['required', 'string', 'max:50'],
             'source_metadata.layout_evidence' => ['required', 'array', 'min:3', 'max:20'],
             'source_metadata.layout_evidence.*' => ['required', 'string', 'max:200'],
+            'source_metadata.available_metric_fields' => ['required', 'array', 'min:1'],
+            'source_metadata.available_metric_fields.*' => ['required', 'distinct', Rule::in(BodyscanOcrProfileRegistry::METRIC_FIELDS)],
             'source_metadata.weight_unit' => ['required', Rule::in(['kg'])],
             'source_metadata.measured_at' => ['nullable', 'date'],
             'source_metadata.metrics' => ['required', 'array'],
             'source_metadata.segmental_measurements' => ['required', 'array', 'size:10'],
             'source_metadata.raw_values' => ['present', 'array'],
+            'source_metadata.raw_values.metrics' => ['required', 'array'],
+            'source_metadata.raw_values.metric_source_labels' => ['required', 'array'],
+            'source_metadata.raw_values.metric_text' => ['required', 'array'],
+            'source_metadata.raw_values.segmental_measurements' => ['required', 'array'],
             'source_metadata.detected_sections' => ['required', 'array', 'min:2'],
             'source_metadata.field_statuses' => ['present', 'array'],
             'source_metadata.missing_fields' => ['present', 'array'],
@@ -966,6 +974,12 @@ class BioimpedanceWorkflow
         if ($validated['measurement_application'] !== $sourceApplication) {
             throw ValidationException::withMessages([
                 'measurement_application' => 'O aplicativo confirmado não corresponde à marca identificada no relatório. Processe novamente uma imagem compatível.',
+            ]);
+        }
+        $expectedMetricFields = $this->bodyscanOcrProfiles->forLayout($reportLayout)->availableMetricFields;
+        if (array_values($validated['source_metadata']['available_metric_fields']) !== $expectedMetricFields) {
+            throw ValidationException::withMessages([
+                'source_metadata' => 'Os campos disponíveis não correspondem ao perfil OCR identificado. Processe novamente a imagem.',
             ]);
         }
 
@@ -1036,6 +1050,7 @@ class BioimpedanceWorkflow
             'report_layout' => $reportLayout,
             'layout_profile_version' => $validated['source_metadata']['layout_profile_version'],
             'layout_evidence' => $validated['source_metadata']['layout_evidence'],
+            'available_metric_fields' => $validated['source_metadata']['available_metric_fields'],
             'weight_unit' => $validated['source_metadata']['weight_unit'],
             'confirmed_application' => $validated['measurement_application'],
             'athlete_mode_at_assessment' => (bool) $validated['athlete_mode_at_assessment'],
@@ -1047,6 +1062,7 @@ class BioimpedanceWorkflow
             'ocr_suspicious_values' => $validated['source_metadata']['suspicious_values'],
             'ocr_quality_issues' => $validated['source_metadata']['quality_issues'],
             'ocr_detected_sections' => $validated['source_metadata']['detected_sections'],
+            'ocr_raw_values' => $validated['source_metadata']['raw_values'],
             'side_consistency' => $validated['source_metadata']['side_consistency'],
             'segmental_review_corrections' => $segmentalReviewCorrections,
             'review_confirmed_at' => now()->toIso8601String(),
