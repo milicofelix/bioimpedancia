@@ -27,6 +27,7 @@ import ScreeningInvitationPanel from '../pwa/features/clients/ScreeningInvitatio
 import ClientModuleSummary from '../shared/ClientModuleSummary';
 import ClientWorkspaceTabs from '../shared/ClientWorkspaceTabs';
 import ClientAssessmentHeader from '../shared/ClientAssessmentHeader';
+import { clinicModules } from '../shared/clinicModules';
 
 const emptyClient = {
 	full_name: '',
@@ -86,6 +87,9 @@ const defaultClinic = {
 	footer_text: 'Vita Scan Análise clínica Biológica - Avaliação corporal e acompanhamento estético',
 	technical_notice: 'Os resultados de bioimpedância são estimativas e podem variar conforme hidratação, alimentação, ciclo hormonal, medicamentos e condições de medição. Este documento não substitui avaliação médica ou nutricional.',
 	scale_model: 'relaxmedic_bodyscan_pro',
+	assessment_module_enabled: true,
+	screening_module_enabled: true,
+	reports_module_enabled: true,
 };
 
 const emptyUserForm = {
@@ -696,6 +700,19 @@ export default function DashboardPage({ userName }) {
 	const canCreateClinicalRecords = ['admin', 'professional', 'reception'].includes(currentUser?.role);
 	const canClinicalProfessional = ['admin', 'professional'].includes(currentUser?.role);
 	const canCreateCurrentAssessment = isImageAssessment ? canClinicalProfessional : canCreateClinicalRecords;
+	const enabledModules = clinicModules(clinic);
+
+	useEffect(() => {
+		if (clientWorkspaceTab === 'assessment' && !enabledModules.assessment) {
+			setClientWorkspaceTab(enabledModules.reports ? 'reports' : enabledModules.screening ? 'screenings' : 'assessment');
+		}
+		if (clientWorkspaceTab === 'screenings' && !enabledModules.screening) {
+			setClientWorkspaceTab(enabledModules.assessment ? 'assessment' : enabledModules.reports ? 'reports' : 'screenings');
+		}
+		if (clientWorkspaceTab === 'reports' && !enabledModules.reports) {
+			setClientWorkspaceTab(enabledModules.assessment ? 'assessment' : enabledModules.screening ? 'screenings' : 'reports');
+		}
+	}, [clientWorkspaceTab, enabledModules.assessment, enabledModules.screening, enabledModules.reports]);
 
 	async function handleLogout() {
 		await logout();
@@ -792,7 +809,7 @@ export default function DashboardPage({ userName }) {
 			.sort((left, right) => new Date(right.evaluated_at) - new Date(left.evaluated_at))[0];
 		if (!latestAssessment) return;
 
-		setClientWorkspaceTab('assessment');
+		setClientWorkspaceTab('reports');
 		selectAssessment(latestAssessment.id);
 		window.setTimeout(() => document.getElementById('relatorio')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
 	}
@@ -1164,6 +1181,7 @@ export default function DashboardPage({ userName }) {
 			}
 			setAssessmentDraftSavedAt(null);
 			startNewAssessment();
+			if (enabledModules.reports) setClientWorkspaceTab('reports');
 			window.setTimeout(() => document.getElementById('relatorio')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
 		} catch (error) {
 			setErrors(error.response?.data?.errors ?? {});
@@ -1301,10 +1319,10 @@ export default function DashboardPage({ userName }) {
 			</header>
 
 			<nav className="no-print sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur lg:hidden">
-				<div className="grid grid-cols-3 gap-2">
+				<div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${1 + Number(enabledModules.assessment) + Number(enabledModules.reports)}, minmax(0, 1fr))` }}>
 					<a href="#clientes" className="rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-bold text-slate-700">Clientes</a>
-					<a href="#avaliacao" className="rounded-xl border border-emerald-200 px-3 py-2 text-center text-xs font-bold text-emerald-700">Avaliação</a>
-					<a href="#relatorio" className="rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-bold text-slate-700">Relatório</a>
+					{enabledModules.assessment ? <a href="#avaliacao" onClick={() => setClientWorkspaceTab('assessment')} className="rounded-xl border border-emerald-200 px-3 py-2 text-center text-xs font-bold text-emerald-700">Avaliação</a> : null}
+					{enabledModules.reports ? <a href="#relatorio" onClick={() => setClientWorkspaceTab('reports')} className="rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-bold text-slate-700">Relatório</a> : null}
 				</div>
 			</nav>
 
@@ -1435,6 +1453,22 @@ export default function DashboardPage({ userName }) {
 							</div>
 						</div>
 						<form onSubmit={(event) => runAction('save-clinic', () => submitClinic(event))} className="mt-4 space-y-3">
+							<fieldset className="rounded-xl border border-teal-200 bg-teal-50/60 p-3">
+								<legend className="px-1 text-xs font-bold uppercase tracking-wide text-teal-800">Módulos disponíveis</legend>
+								<p className="mb-3 text-xs leading-5 text-slate-600">A seleção controla o painel e a área operacional/PWA. A configuração permanece disponível somente aqui para administradores.</p>
+								<div className="space-y-2">
+									{[
+										['assessment_module_enabled', 'Avaliação corporal'],
+										['screening_module_enabled', 'Triagens'],
+										['reports_module_enabled', 'Relatórios corporais'],
+									].map(([field, label]) => (
+										<label key={field} className="flex min-h-11 items-center gap-3 rounded-lg bg-white px-3 text-sm font-semibold text-slate-800 ring-1 ring-slate-200">
+											<input type="checkbox" checked={Boolean(clinicForm[field])} onChange={(event) => updateClinic(field, event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500" />
+											<span>{label}</span>
+										</label>
+									))}
+								</div>
+							</fieldset>
 							<Field label="Modelo da balança">
 								<select value={clinicForm.scale_model} onChange={(event) => updateClinic('scale_model', event.target.value)} className={inputClass()}>
 									<option value="relaxmedic_bodyscan_pro">Bodyscan Pro (padrão)</option>
@@ -1498,7 +1532,7 @@ export default function DashboardPage({ userName }) {
 							</Field>
 							{Object.keys(clinicErrors).length ? (
 								<div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-									Confira os dados da clínica antes de salvar.
+									{clinicErrors.modules?.[0] ?? 'Confira os dados da clínica antes de salvar.'}
 								</div>
 							) : null}
 							<button type="submit" disabled={savingClinic} aria-busy={savingClinic} className="w-full rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
@@ -1601,17 +1635,18 @@ export default function DashboardPage({ userName }) {
 								client={selectedClient}
 								canStartAssessment={canCreateCurrentAssessment}
 								canAccessScreenings={canClinicalProfessional}
+								enabledModules={enabledModules}
 								onStartAssessment={startNewAssessment}
 								onOpenScreenings={openClientScreenings}
 								onOpenReports={openLatestClientReport}
 							/>
 						</div>
-						<ClientWorkspaceTabs activeTab={clientWorkspaceTab} onChange={setClientWorkspaceTab} />
-						<div id="client-panel-assessment" role="tabpanel" aria-labelledby="client-tab-assessment" className={clientWorkspaceTab === 'assessment' ? 'contents' : 'hidden'}>
+						<ClientWorkspaceTabs activeTab={clientWorkspaceTab} onChange={setClientWorkspaceTab} enabledModules={enabledModules} includeReports />
+						<div id="client-panel-assessment" role="tabpanel" aria-labelledby="client-tab-assessment" className={enabledModules.assessment && clientWorkspaceTab === 'assessment' ? 'contents' : 'hidden'}>
 						<ClientAssessmentHeader
 							assessmentCount={selectedClient.assessments?.length ?? 0}
 							canStartAssessment={canCreateCurrentAssessment}
-							hasReport={Boolean(selectedClient.assessments?.some((assessment) => !assessment.is_canceled))}
+							hasReport={enabledModules.reports && Boolean(selectedClient.assessments?.some((assessment) => !assessment.is_canceled))}
 							onStartAssessment={startNewAssessment}
 							onOpenEvolution={openClientEvolution}
 							onOpenReport={openLatestClientReport}
@@ -1783,7 +1818,7 @@ export default function DashboardPage({ userName }) {
 							) : null}
 						</div>
 						</div>
-						<div id="client-panel-screenings" role="tabpanel" aria-labelledby="client-tab-screenings" className={clientWorkspaceTab === 'screenings' ? '' : 'hidden'}>
+						<div id="client-panel-screenings" role="tabpanel" aria-labelledby="client-tab-screenings" className={enabledModules.screening && clientWorkspaceTab === 'screenings' ? '' : 'hidden'}>
 							{['admin', 'professional'].includes(currentUser?.role) ? (
 								<ScreeningInvitationPanel client={selectedClient} canCreateInvitation={selectedClient.is_active && !selectedClient.is_anonymized} creationUnavailableReason={selectedClient.is_anonymized ? 'Cliente anonimizado não pode receber novas triagens. Os dados remanescentes seguem as regras de retenção e auditoria.' : 'Cliente inativo não pode receber novas triagens. O histórico permanece disponível para consulta.'} />
 							) : (
@@ -1796,9 +1831,9 @@ export default function DashboardPage({ userName }) {
 						</>
 					) : null}
 
-					{clientWorkspaceTab === 'assessment' ? <div id="client-assessment-evolution" className="scroll-mt-20"><EvolutionPanel client={selectedClient} selectedAssessment={selectedAssessment} /></div> : null}
+					{enabledModules.assessment && clientWorkspaceTab === 'assessment' ? <div id="client-assessment-evolution" className="scroll-mt-20"><EvolutionPanel client={selectedClient} selectedAssessment={selectedAssessment} /></div> : null}
 
-						<div id="avaliacao" ref={assessmentSectionRef} className={`no-print scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${clientWorkspaceTab === 'assessment' ? '' : 'hidden'}`}>
+						<div id="avaliacao" ref={assessmentSectionRef} className={`no-print scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${enabledModules.assessment && clientWorkspaceTab === 'assessment' ? '' : 'hidden'}`}>
 							<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 								<div>
 									<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">{assessmentMode === 'edit' ? 'Corrigir avaliação' : 'Registrar nova avaliação'}</p>
@@ -1968,7 +2003,7 @@ export default function DashboardPage({ userName }) {
 						)}
 					</div>
 
-					<div id="relatorio" className={`scroll-mt-20 ${clientWorkspaceTab === 'assessment' ? '' : 'hidden'}`}>
+					<div id="relatorio" role="tabpanel" aria-labelledby="client-tab-reports" className={`scroll-mt-20 ${enabledModules.reports && clientWorkspaceTab === 'reports' ? '' : 'hidden'}`}>
 						<Report clinic={clinic} client={selectedClient} assessment={selectedAssessment} professional={userName} />
 					</div>
 				</section>

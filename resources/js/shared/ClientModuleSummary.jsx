@@ -1,6 +1,7 @@
 import React from 'react';
 import PwaIcon from '../pwa/components/ui/PwaIcon';
 import { formatDate } from './formatters';
+import { defaultClinicModules } from './clinicModules';
 
 const moduleStyles = {
 	assessment: {
@@ -52,23 +53,32 @@ export default function ClientModuleSummary({
 	onStartAssessment,
 	onOpenScreenings,
 	onOpenReports,
+	enabledModules = defaultClinicModules,
 }) {
 	const assessments = [...(client?.assessments ?? [])]
 		.filter((assessment) => !assessment.is_canceled)
 		.sort((left, right) => new Date(right.evaluated_at) - new Date(left.evaluated_at));
 	const latestAssessment = assessments[0] ?? null;
 	const clientUnavailable = !client?.is_active || client?.is_anonymized;
+	const hasEnabledModules = enabledModules.assessment || enabledModules.screening || enabledModules.reports;
+	const enabledCount = [enabledModules.assessment, enabledModules.screening, enabledModules.reports].filter(Boolean).length;
+	const enabledLabels = [
+		enabledModules.assessment ? 'avaliações corporais' : null,
+		enabledModules.screening ? 'triagens' : null,
+		enabledModules.reports ? 'relatórios corporais' : null,
+	].filter(Boolean);
 
 	return (
 		<section aria-labelledby="client-modules-title" className="no-print rounded-2xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm sm:p-5">
 			<div>
 				<p className="text-xs font-bold uppercase tracking-[0.14em] text-teal-700">Atendimentos do cliente</p>
 				<h2 id="client-modules-title" className="mt-1 text-xl font-extrabold text-slate-950">Escolha o módulo para continuar</h2>
-				<p className="mt-1 text-sm leading-6 text-slate-600">Avaliações corporais, triagens e documentos permanecem organizados em fluxos independentes.</p>
+				<p className="mt-1 text-sm leading-6 text-slate-600">{hasEnabledModules ? `Módulos ativos: ${enabledLabels.join(', ')}.` : 'Os módulos de atendimento podem ser definidos nas configurações da clínica.'}</p>
 			</div>
 
-			<p className="mt-3 text-xs font-semibold text-slate-500 md:hidden">Deslize para ver todos os módulos.</p>
-			<div role="list" aria-label="Módulos disponíveis para o cliente" className="-mx-1 mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-1 pb-2 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0 md:pb-0">
+			{hasEnabledModules ? <p className="mt-3 text-xs font-semibold text-slate-500 md:hidden">Deslize para ver os módulos ativos.</p> : null}
+			<div role="list" aria-label="Módulos disponíveis para o cliente" className={`-mx-1 mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-1 pb-2 md:mx-0 md:grid md:overflow-visible md:px-0 md:pb-0 ${enabledCount === 1 ? 'md:grid-cols-1' : enabledCount === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
+				{enabledModules.assessment ? (
 				<ModuleCard
 					type="assessment"
 					title="Avaliação corporal"
@@ -79,6 +89,8 @@ export default function ClientModuleSummary({
 					disabled={!canStartAssessment}
 					disabledReason={clientUnavailable ? 'Disponível somente para clientes ativos e identificados.' : 'Seu perfil ou o equipamento atual não permite iniciar esta avaliação.'}
 				/>
+				) : null}
+				{enabledModules.screening ? (
 				<ModuleCard
 					type="screening"
 					title="Triagens"
@@ -89,6 +101,8 @@ export default function ClientModuleSummary({
 					disabled={!canAccessScreenings || clientUnavailable}
 					disabledReason={clientUnavailable ? 'Disponível somente para clientes ativos e identificados.' : 'Somente administradores e profissionais podem acessar triagens.'}
 				/>
+				) : null}
+				{enabledModules.reports ? (
 				<ModuleCard
 					type="reports"
 					title="Relatórios corporais"
@@ -99,7 +113,9 @@ export default function ClientModuleSummary({
 					disabled={!latestAssessment}
 					disabledReason="O primeiro relatório ficará disponível após uma avaliação corporal."
 				/>
+				) : null}
 			</div>
+			{!hasEnabledModules ? <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">Nenhum módulo de atendimento está ativo. Um administrador pode habilitá-los nas configurações do painel web.</p> : null}
 		</section>
 	);
 }

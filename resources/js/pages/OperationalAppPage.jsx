@@ -13,6 +13,7 @@ import { clearOperationalCaches } from '../security/browserSession';
 import PwaButton from '../pwa/components/ui/PwaButton';
 import PwaIcon from '../pwa/components/ui/PwaIcon';
 import useActionLock from '../hooks/useActionLock';
+import { clinicModules } from '../shared/clinicModules';
 
 export default function OperationalAppPage() {
 	const runAction = useActionLock();
@@ -22,6 +23,7 @@ export default function OperationalAppPage() {
 	const [selectedClient, setSelectedClient] = useState(null);
 	const [selectedAssessment, setSelectedAssessment] = useState(null);
 	const { section, navigate } = useOperationalSection();
+	const enabledModules = clinicModules(workspace?.clinic);
 
 	useEffect(() => {
 		registerOperationalServiceWorker();
@@ -45,6 +47,12 @@ export default function OperationalAppPage() {
 			stopObservingViewport();
 		};
 	}, []);
+
+	useEffect(() => {
+		if (!workspace) return;
+		if (['avaliacao', 'assistente'].includes(section) && !enabledModules.assessment) navigate('clientes');
+		if (section === 'relatorio' && !enabledModules.reports) navigate('clientes');
+	}, [workspace, section, enabledModules.assessment, enabledModules.reports]);
 
 	async function handleLogout() {
 		return runAction('logout', async () => {
@@ -125,12 +133,13 @@ export default function OperationalAppPage() {
 	const scaleModel = workspace.clinic?.scale_model;
 
 	return (
-		<OperationalShell activeSection={section} currentUser={workspace.current_user} onLogout={handleLogout} onNavigate={navigate}>
+		<OperationalShell activeSection={section} currentUser={workspace.current_user} enabledModules={enabledModules} onLogout={handleLogout} onNavigate={navigate}>
 			{section === 'clientes' ? (
 				<ClientsFeature
 					clients={workspace.clients ?? []}
 					currentUser={workspace.current_user}
 					scaleModel={scaleModel}
+					enabledModules={enabledModules}
 					onClientCreated={handleClientCreated}
 					onNewAssessment={startAssessment}
 					onOpenAssistant={openAssistant}
@@ -153,6 +162,7 @@ export default function OperationalAppPage() {
 					onBackToClients={() => navigate('clientes')}
 					onApproved={updateAssessmentState}
 					onOpenReport={() => navigate('relatorio')}
+					canOpenReport={enabledModules.reports}
 				/>
 			) : section === 'relatorio' ? (
 				<AssessmentReportFeature

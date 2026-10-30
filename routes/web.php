@@ -24,21 +24,23 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
-Route::get('/r/{token}', [AssessmentShareController::class, 'publicReport'])->name('bioimpedance.public-report');
+Route::get('/r/{token}', [AssessmentShareController::class, 'publicReport'])
+    ->middleware('clinic.module:reports')
+    ->name('bioimpedance.public-report');
 Route::get('/triagem/{token}', [PublicScreeningController::class, 'show'])
-    ->middleware('throttle:30,1')
+    ->middleware(['throttle:30,1', 'clinic.module:screening'])
     ->where('token', '[A-Za-z0-9]{64}')
     ->name('screening.public.show');
 Route::post('/triagem/{token}/identidade', [PublicScreeningController::class, 'verify'])
-    ->middleware('throttle:10,1')
+    ->middleware(['throttle:10,1', 'clinic.module:screening'])
     ->where('token', '[A-Za-z0-9]{64}')
     ->name('screening.public.verify');
 Route::post('/triagem/{token}/finalizar', [PublicScreeningController::class, 'complete'])
-    ->middleware('throttle:6,1')
+    ->middleware(['throttle:6,1', 'clinic.module:screening'])
     ->where('token', '[A-Za-z0-9]{64}')
     ->name('screening.public.complete');
 Route::get('/triagem/{token}/resultado.pdf', PublicScreeningResultPdfController::class)
-    ->middleware('throttle:10,1')
+    ->middleware(['throttle:10,1', 'clinic.module:screening'])
     ->where('token', '[A-Za-z0-9]{64}')
     ->name('screening.public.result-pdf');
 
@@ -65,33 +67,39 @@ Route::middleware('auth')->group(function () {
     Route::patch('/bioimpedance/clients/{client}/inactivate', [ClientController::class, 'inactivate'])->name('bioimpedance.clients.inactivate');
     Route::get('/bioimpedance/clients/{client}/privacy-export', [ClientController::class, 'exportPrivacyData'])->name('bioimpedance.clients.privacy-export');
     Route::patch('/bioimpedance/clients/{client}/anonymize', [ClientController::class, 'anonymize'])->name('bioimpedance.clients.anonymize');
-    Route::get('/screening/clients/{client}/invitations', [ScreeningInvitationController::class, 'index'])->name('screening.invitations.index');
-    Route::post('/screening/invitations', [ScreeningInvitationController::class, 'store'])->name('screening.invitations.store');
-    Route::post('/screening/invitations/{session}/resend', [ScreeningInvitationController::class, 'resend'])->name('screening.invitations.resend');
-    Route::patch('/screening/invitations/{session}/revoke', [ScreeningInvitationController::class, 'revoke'])->name('screening.invitations.revoke');
-    Route::get('/screening/sessions/{session}', [ScreeningProfessionalReviewController::class, 'show'])->name('screening.sessions.show');
-    Route::patch('/screening/sessions/{session}/professional-review', [ScreeningProfessionalReviewController::class, 'update'])->name('screening.sessions.professional-review.update');
-    Route::get('/screening/sessions/{session}/client-pdf', ScreeningResultPdfController::class)->name('screening.sessions.client-pdf');
-    Route::patch('/screening/questionnaires/{questionnaire}/approve', ScreeningQuestionnaireApprovalController::class)->name('screening.questionnaires.approve');
-    Route::post('/bioimpedance/assessments', [AssessmentController::class, 'store'])->name('bioimpedance.assessments.store');
+    Route::middleware('clinic.module:screening')->group(function () {
+        Route::get('/screening/clients/{client}/invitations', [ScreeningInvitationController::class, 'index'])->name('screening.invitations.index');
+        Route::post('/screening/invitations', [ScreeningInvitationController::class, 'store'])->name('screening.invitations.store');
+        Route::post('/screening/invitations/{session}/resend', [ScreeningInvitationController::class, 'resend'])->name('screening.invitations.resend');
+        Route::patch('/screening/invitations/{session}/revoke', [ScreeningInvitationController::class, 'revoke'])->name('screening.invitations.revoke');
+        Route::get('/screening/sessions/{session}', [ScreeningProfessionalReviewController::class, 'show'])->name('screening.sessions.show');
+        Route::patch('/screening/sessions/{session}/professional-review', [ScreeningProfessionalReviewController::class, 'update'])->name('screening.sessions.professional-review.update');
+        Route::get('/screening/sessions/{session}/client-pdf', ScreeningResultPdfController::class)->name('screening.sessions.client-pdf');
+        Route::patch('/screening/questionnaires/{questionnaire}/approve', ScreeningQuestionnaireApprovalController::class)->name('screening.questionnaires.approve');
+    });
+    Route::post('/bioimpedance/assessments', [AssessmentController::class, 'store'])
+        ->middleware('clinic.module:assessment')
+        ->name('bioimpedance.assessments.store');
     Route::post('/bioimpedance/relaxmedic/process-image', [AssessmentImportController::class, 'processRelaxmedicImage'])
-        ->middleware('throttle:5,1')
+        ->middleware(['throttle:5,1', 'clinic.module:assessment'])
         ->name('bioimpedance.relaxmedic.process-image');
     Route::post('/bioimpedance/bodyscan-pro/process-image', [AssessmentImportController::class, 'processBodyscanProImage'])
-        ->middleware('throttle:5,1')
+        ->middleware(['throttle:5,1', 'clinic.module:assessment'])
         ->name('bioimpedance.bodyscan-pro.process-image');
-    Route::get('/bioimpedance/assessments/{assessment}/pdf', [AssessmentReportController::class, 'download'])->name('bioimpedance.assessments.pdf');
+    Route::get('/bioimpedance/assessments/{assessment}/pdf', [AssessmentReportController::class, 'download'])
+        ->middleware('clinic.module:reports')
+        ->name('bioimpedance.assessments.pdf');
     Route::get('/bioimpedance/assessments/{assessment}/observation-suggestion', [AiAnalysisController::class, 'suggestObservation'])
-        ->middleware('throttle:5,1')
+        ->middleware(['throttle:5,1', 'clinic.module:assessment'])
         ->name('bioimpedance.assessments.observation-suggestion');
-    Route::patch('/bioimpedance/assessments/{assessment}/observation', [AiAnalysisController::class, 'approveObservation'])->name('bioimpedance.assessments.observation.approve');
+    Route::patch('/bioimpedance/assessments/{assessment}/observation', [AiAnalysisController::class, 'approveObservation'])->middleware('clinic.module:assessment')->name('bioimpedance.assessments.observation.approve');
     Route::get('/bioimpedance/assessments/{assessment}/care-guidance-suggestion', [AiAnalysisController::class, 'suggestCareGuidance'])
-        ->middleware('throttle:5,1')
+        ->middleware(['throttle:5,1', 'clinic.module:assessment'])
         ->name('bioimpedance.assessments.care-guidance.suggestion');
-    Route::patch('/bioimpedance/assessments/{assessment}/care-guidance', [AiAnalysisController::class, 'approveCareGuidance'])->name('bioimpedance.assessments.care-guidance.approve');
-    Route::post('/bioimpedance/assessments/{assessment}/shares', [AssessmentShareController::class, 'store'])->name('bioimpedance.assessments.shares.store');
-    Route::patch('/bioimpedance/report-shares/{share}/revoke', [AssessmentShareController::class, 'revoke'])->name('bioimpedance.report-shares.revoke');
-    Route::put('/bioimpedance/assessments/{assessment}', [AssessmentController::class, 'update'])->name('bioimpedance.assessments.update');
-    Route::patch('/bioimpedance/assessments/{assessment}/cancel', [AssessmentController::class, 'cancel'])->name('bioimpedance.assessments.cancel');
+    Route::patch('/bioimpedance/assessments/{assessment}/care-guidance', [AiAnalysisController::class, 'approveCareGuidance'])->middleware('clinic.module:assessment')->name('bioimpedance.assessments.care-guidance.approve');
+    Route::post('/bioimpedance/assessments/{assessment}/shares', [AssessmentShareController::class, 'store'])->middleware('clinic.module:reports')->name('bioimpedance.assessments.shares.store');
+    Route::patch('/bioimpedance/report-shares/{share}/revoke', [AssessmentShareController::class, 'revoke'])->middleware('clinic.module:reports')->name('bioimpedance.report-shares.revoke');
+    Route::put('/bioimpedance/assessments/{assessment}', [AssessmentController::class, 'update'])->middleware('clinic.module:assessment')->name('bioimpedance.assessments.update');
+    Route::patch('/bioimpedance/assessments/{assessment}/cancel', [AssessmentController::class, 'cancel'])->middleware('clinic.module:assessment')->name('bioimpedance.assessments.cancel');
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 });

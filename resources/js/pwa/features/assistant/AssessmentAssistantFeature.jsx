@@ -12,7 +12,7 @@ import PwaJourneyHeader from '../../components/ui/PwaJourneyHeader';
 import useActionLock from '../../../hooks/useActionLock';
 import CareGuidanceAssistant from './CareGuidanceAssistant';
 
-export default function AssessmentAssistantFeature({ client, assessment, currentUser, onBackToClients, onApproved, onOpenReport }) {
+export default function AssessmentAssistantFeature({ client, assessment, currentUser, onBackToClients, onApproved, onOpenReport, canOpenReport = true }) {
 	const runAction = useActionLock();
 	const [assistant, setAssistant] = useState(null);
 	const [draft, setDraft] = useState('');
@@ -130,7 +130,7 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 					<h2 className="mt-3 text-lg font-bold text-slate-950">Observação adicionada</h2>
 					<p className="mt-2 text-sm leading-6 text-slate-600">A aprovação humana foi registrada na avaliação e na auditoria. O texto já poderá ser usado no relatório.</p>
 					<div className={`mx-auto mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ${approvedAsEdited ? 'bg-violet-100 text-violet-700' : 'bg-emerald-100 text-emerald-700'}`}><span aria-hidden="true">{approvedAsEdited ? '✎' : '✓'}</span>{approvedAsEdited ? 'Versão editada aprovada' : 'Sugestão original aprovada'}</div>
-					<div className="mt-4 grid gap-3 sm:grid-cols-2"><PwaButton type="button" onClick={() => setApproved(false)} variant="secondary" icon="refresh">Gerar outra sugestão</PwaButton><PwaButton type="button" onClick={onOpenReport} icon="fileText">Abrir relatório</PwaButton></div>
+					<div className={`mt-4 grid gap-3 ${canOpenReport ? 'sm:grid-cols-2' : ''}`}><PwaButton type="button" onClick={() => setApproved(false)} variant="secondary" icon="refresh">Gerar outra sugestão</PwaButton>{canOpenReport ? <PwaButton type="button" onClick={onOpenReport} icon="fileText">Abrir relatório</PwaButton> : null}</div>
 				</PwaCard>
 			) : generating ? (
 				<AssistantProgress currentStep={processingStep} />

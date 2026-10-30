@@ -1,12 +1,15 @@
 import React from 'react';
 import PwaIcon from '../pwa/components/ui/PwaIcon';
+import { defaultClinicModules } from './clinicModules';
 
-const tabs = [
-	{ id: 'assessment', label: 'Avaliação corporal', icon: 'clipboard' },
-	{ id: 'screenings', label: 'Triagens', icon: 'check' },
-];
+export default function ClientWorkspaceTabs({ activeTab, onChange, sticky = false, enabledModules = defaultClinicModules, includeReports = false }) {
+	const tabs = [
+		...(enabledModules?.assessment ? [{ id: 'assessment', label: 'Avaliação corporal', icon: 'clipboard' }] : []),
+		...(enabledModules?.screening ? [{ id: 'screenings', label: 'Triagens', icon: 'check' }] : []),
+		...(includeReports && enabledModules?.reports ? [{ id: 'reports', label: 'Relatórios corporais', icon: 'fileText' }] : []),
+	];
 
-export default function ClientWorkspaceTabs({ activeTab, onChange, sticky = false }) {
+	if (!tabs.length) return null;
 	function handleKeyDown(event, currentIndex) {
 		if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
 		event.preventDefault();
@@ -24,7 +27,7 @@ export default function ClientWorkspaceTabs({ activeTab, onChange, sticky = fals
 
 	return (
 		<nav aria-label="Módulos do cliente" className={`no-print rounded-2xl border border-slate-200 bg-white/95 p-1.5 shadow-sm backdrop-blur ${sticky ? 'sticky top-[calc(env(safe-area-inset-top)+4.75rem)] z-10' : ''}`}>
-			<div role="tablist" aria-label="Área de atendimento do cliente" className="grid grid-cols-2 gap-1">
+			<div role="tablist" aria-label="Área de atendimento do cliente" className={`grid gap-1 ${tabs.length === 3 ? 'grid-cols-3' : tabs.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
 				{tabs.map((tab, index) => {
 					const active = activeTab === tab.id;
 					return (

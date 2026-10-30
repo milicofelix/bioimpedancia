@@ -241,7 +241,20 @@ class BioimpedanceWorkflow
             'footer_text' => ['nullable', 'string', 'max:500'],
             'technical_notice' => ['nullable', 'string', 'max:1000'],
             'scale_model' => ['required', Rule::in(BioimpedanceClinicSetting::SCALE_MODELS)],
+            'assessment_module_enabled' => ['required', 'boolean'],
+            'screening_module_enabled' => ['required', 'boolean'],
+            'reports_module_enabled' => ['required', 'boolean'],
         ]);
+
+        if (! collect([
+            $validated['assessment_module_enabled'],
+            $validated['screening_module_enabled'],
+            $validated['reports_module_enabled'],
+        ])->contains(true)) {
+            throw ValidationException::withMessages([
+                'modules' => 'Mantenha pelo menos um módulo ativo para a clínica.',
+            ]);
+        }
 
         $settings = BioimpedanceClinicSetting::current();
         $oldValues = $settings->payload();

@@ -16,14 +16,15 @@ function initials(name) {
 	return String(name ?? '?').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 }
 
-export default function ClientDetails({ client, currentUser, scaleModel, onBack, onNewAssessment, onOpenAssistant, onOpenReport }) {
+export default function ClientDetails({ client, currentUser, scaleModel, enabledModules, onBack, onNewAssessment, onOpenAssistant, onOpenReport }) {
 	const access = assessmentAccess(client, currentUser, scaleModel);
 	const assessments = [...(client.assessments ?? [])].sort((left, right) => new Date(right.evaluated_at) - new Date(left.evaluated_at));
 	const latestActiveAssessment = assessments.find((assessment) => !assessment.is_canceled) ?? null;
 	const canAccessScreenings = ['admin', 'professional'].includes(currentUser?.role);
-	const [activeTab, setActiveTab] = useState('assessment');
+	const firstActiveTab = enabledModules.assessment ? 'assessment' : enabledModules.screening ? 'screenings' : 'assessment';
+	const [activeTab, setActiveTab] = useState(firstActiveTab);
 
-	useEffect(() => setActiveTab('assessment'), [client.id]);
+	useEffect(() => setActiveTab(firstActiveTab), [client.id, firstActiveTab]);
 
 	function openScreenings() {
 		setActiveTab('screenings');
@@ -71,18 +72,19 @@ export default function ClientDetails({ client, currentUser, scaleModel, onBack,
 					onStartAssessment={() => onNewAssessment(client)}
 					onOpenScreenings={openScreenings}
 					onOpenReports={() => latestActiveAssessment && onOpenReport(client, latestActiveAssessment)}
+					enabledModules={enabledModules}
 				/>
 				{access.reason ? <p className="mt-2 text-center text-xs font-semibold text-amber-700">{access.reason}</p> : null}
 			</div>
 
-			<div className="mt-4"><ClientWorkspaceTabs activeTab={activeTab} onChange={setActiveTab} sticky /></div>
+			<div className="mt-4"><ClientWorkspaceTabs activeTab={activeTab} onChange={setActiveTab} enabledModules={enabledModules} sticky /></div>
 
-			<div id="client-panel-assessment" role="tabpanel" aria-labelledby="client-tab-assessment" className={activeTab === 'assessment' ? '' : 'hidden'}>
+			<div id="client-panel-assessment" role="tabpanel" aria-labelledby="client-tab-assessment" className={enabledModules.assessment && activeTab === 'assessment' ? '' : 'hidden'}>
 			<div className="mt-4">
 				<ClientAssessmentHeader
 					assessmentCount={assessments.length}
 					canStartAssessment={access.allowed}
-					hasReport={Boolean(latestActiveAssessment)}
+					hasReport={enabledModules.reports && Boolean(latestActiveAssessment)}
 					onStartAssessment={() => onNewAssessment(client)}
 					onOpenReport={() => latestActiveAssessment && onOpenReport(client, latestActiveAssessment)}
 				/>
@@ -105,7 +107,7 @@ export default function ClientDetails({ client, currentUser, scaleModel, onBack,
 								<div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-lg bg-white/80 px-3 py-2"><span className="block text-[11px] font-bold uppercase text-slate-600">Peso</span><strong className="text-sm text-slate-800">{numberBr(assessment.weight_kg, 1)} kg</strong></div><div className="rounded-lg bg-white/80 px-3 py-2"><span className="block text-[11px] font-bold uppercase text-slate-600">IMC</span><strong className="text-sm text-slate-800">{numberBr(assessment.calculated_bmi ?? assessment.scale_bmi, 1)}</strong></div></div>
 								<div className="mt-3 flex flex-wrap gap-2">
 									<p className="w-full text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Ações da avaliação</p>
-									<PwaButton type="button" onClick={() => onOpenReport(client, assessment)} variant="secondary" icon="fileText" className="px-3 text-xs">Relatório corporal</PwaButton>
+									{enabledModules.reports ? <PwaButton type="button" onClick={() => onOpenReport(client, assessment)} variant="secondary" icon="fileText" className="px-3 text-xs">Relatório corporal</PwaButton> : null}
 									{canUseClinicalFeatures(currentUser) ? <PwaButton type="button" onClick={() => onOpenAssistant(client, assessment)} variant="ghost" icon="sparkles" className="px-3 text-xs">Assistente</PwaButton> : null}
 								</div>
 							</div>
@@ -116,7 +118,7 @@ export default function ClientDetails({ client, currentUser, scaleModel, onBack,
 			</PwaCard>
 			</div>
 
-			<div id="client-panel-screenings" role="tabpanel" aria-labelledby="client-tab-screenings" className={activeTab === 'screenings' ? '' : 'hidden'}>
+			<div id="client-panel-screenings" role="tabpanel" aria-labelledby="client-tab-screenings" className={enabledModules.screening && activeTab === 'screenings' ? '' : 'hidden'}>
 				{canAccessScreenings ? <ScreeningInvitationPanel client={client} canCreateInvitation={client.is_active && !client.is_anonymized} creationUnavailableReason={client.is_anonymized ? 'Cliente anonimizado não pode receber novas triagens. Os dados remanescentes seguem as regras de retenção e auditoria.' : 'Cliente inativo não pode receber novas triagens. O histórico permanece disponível para consulta.'} /> : (
 					<PwaCard className="mt-4 border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
 						<strong>Triagens indisponíveis para este perfil.</strong>
