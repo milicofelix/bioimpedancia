@@ -3,6 +3,7 @@
 namespace App\Services\Bioimpedance;
 
 use App\Domain\Bioimpedance\BodyscanReportLayout;
+use App\Domain\Bioimpedance\BodyscanExtendedMetricCatalog;
 use App\Domain\Bioimpedance\BodyscanOcrProfileRegistry;
 use App\Domain\Bioimpedance\ScaleModel;
 use App\Models\AppAudit;
@@ -312,24 +313,20 @@ class BioimpedanceWorkflow
 
         $sourceMetadata = null;
         $segmentalMeasurements = [];
+        $extendedMetrics = [];
         $measurementProfile = [];
 
         if ($scaleModel === BioimpedanceClinicSetting::SCALE_MODEL_BODYSCAN_PRO) {
             $this->authorizeClinicalProfessional($request);
-            [$sourceMetadata, $segmentalMeasurements, $measurementProfile] = $this->validateBodyscanReview($request, $bodyscanProcessor);
-            $request->validate(collect([
-                'weight_kg', 'scale_bmi', 'body_fat_percentage', 'muscle_rate_percentage',
-                'lean_body_mass_kg', 'subcutaneous_fat_percentage', 'visceral_fat_level',
-                'body_water_percentage', 'skeletal_muscle_percentage', 'muscle_mass_kg',
-                'bone_mass_kg', 'protein_percentage', 'resting_metabolism_kcal', 'body_age',
-                'fat_mass_kg', 'water_weight_kg', 'protein_mass_kg', 'ideal_body_weight_kg',
-                'obesity_level', 'body_type',
-            ])->mapWithKeys(fn (string $field) => [$field => ['required']])->all(), [], [
+            [$sourceMetadata, $segmentalMeasurements, $measurementProfile, $extendedMetrics] = $this->validateBodyscanReview($request, $bodyscanProcessor);
+            $request->validate(collect($sourceMetadata['available_metric_fields'])
+                ->mapWithKeys(fn (string $field) => [$field => ['required']])->all(), [], [
                 'weight_kg' => 'peso',
                 'scale_bmi' => 'IMC',
             ]);
 
-            if (! $this->relaxmedicValueNormalizer->recognizesObesityLevel($request->input('obesity_level'))) {
+            if (in_array('obesity_level', $sourceMetadata['available_metric_fields'], true)
+                && ! $this->relaxmedicValueNormalizer->recognizesObesityLevel($request->input('obesity_level'))) {
                 throw ValidationException::withMessages([
                     'obesity_level' => 'Selecione um nível de obesidade reconhecido depois de conferir a imagem.',
                 ]);
@@ -434,7 +431,7 @@ class BioimpedanceWorkflow
                 ]);
             }
 
-            $assessment = DB::transaction(function () use ($validated, $snapshot, $request, $analysis, $sourceMetadata, $segmentalMeasurements): BioimpedanceAssessment {
+            $assessment = DB::transaction(function () use ($validated, $snapshot, $request, $analysis, $sourceMetadata, $segmentalMeasurements, $extendedMetrics): BioimpedanceAssessment {
                 $assessment = BioimpedanceAssessment::query()->create([
                     ...$validated,
                     ...$snapshot,
@@ -447,8 +444,13 @@ class BioimpedanceWorkflow
 
                 if ($segmentalMeasurements !== []) {
                     $assessment->segmentalMeasurements()->createMany($segmentalMeasurements);
-                    $assessment->load('segmentalMeasurements');
                 }
+
+                if ($extendedMetrics !== []) {
+                    $assessment->extendedMetrics()->createMany($extendedMetrics);
+                }
+
+                $assessment->load(['segmentalMeasurements', 'extendedMetrics']);
 
                 $this->auditAssessment(
                     $assessment,
@@ -569,14 +571,14 @@ class BioimpedanceWorkflow
 
     public function downloadAssessmentPdf(BioimpedanceAssessment $assessment, LegacyBioimpedanceAnalysisRefresher $legacyAnalysisRefresher): Response
     {
-        $assessment->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements']);
+        $assessment->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements', 'extendedMetrics']);
         $legacyAnalysisRefresher->refreshIfLegacy($assessment);
-        $assessment->refresh()->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements']);
+        $assessment->refresh()->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements', 'extendedMetrics']);
         $assessment->update([
             'report_issued_at' => now(),
             'report_issue_count' => $assessment->report_issue_count + 1,
         ]);
-        $assessment->refresh()->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements']);
+        $assessment->refresh()->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements', 'extendedMetrics']);
         config(['dompdf.public_path' => public_path()]);
         $this->audit(request(), 'bioimpedance_assessment.report_downloaded', $assessment, 'Relatório PDF acessado', null, [
             'assessment_id' => $assessment->id,
@@ -825,7 +827,7 @@ class BioimpedanceWorkflow
     {
         $share = BioimpedanceReportShare::query()
             ->where('token_hash', hash('sha256', $token))
-            ->with(['assessment.client', 'assessment.professional', 'assessment.correctedBy', 'assessment.canceledBy', 'assessment.segmentalMeasurements'])
+            ->with(['assessment.client', 'assessment.professional', 'assessment.correctedBy', 'assessment.canceledBy', 'assessment.segmentalMeasurements', 'assessment.extendedMetrics'])
             ->firstOrFail();
 
         abort_if($share->revoked_at || $share->expires_at->isPast(), 410, 'Link expirado ou revogado.');
@@ -918,6 +920,20 @@ class BioimpedanceWorkflow
             'source_metadata.weight_unit' => ['required', Rule::in(['kg'])],
             'source_metadata.measured_at' => ['nullable', 'date'],
             'source_metadata.metrics' => ['required', 'array'],
+            'source_metadata.extended_metrics' => ['present', 'array', 'max:30'],
+            'source_metadata.extended_metrics.*.metric_code' => ['required', 'distinct', Rule::in(BodyscanExtendedMetricCatalog::CODES)],
+            'source_metadata.extended_metrics.*.original_label' => ['required', 'string', 'max:160'],
+            'source_metadata.extended_metrics.*.numeric_value' => ['nullable', 'numeric'],
+            'source_metadata.extended_metrics.*.text_value' => ['nullable', 'string', 'max:2000'],
+            'source_metadata.extended_metrics.*.unit' => ['nullable', 'string', 'max:30'],
+            'source_metadata.extended_metrics.*.application_classification' => ['nullable', 'string', 'max:120'],
+            'source_metadata.extended_metrics.*.printed_minimum' => ['nullable', 'numeric'],
+            'source_metadata.extended_metrics.*.printed_maximum' => ['nullable', 'numeric'],
+            'source_metadata.extended_metrics.*.weight_proportion_percentage' => ['nullable', 'numeric'],
+            'source_metadata.extended_metrics.*.source_application' => ['required', Rule::in(ScaleModel::BODYSCAN_APPLICATIONS)],
+            'source_metadata.extended_metrics.*.source_layout' => ['required', Rule::in(BodyscanReportLayout::LAYOUTS)],
+            'source_metadata.extended_metrics.*.raw_extracted_value' => ['required', 'string', 'max:2000'],
+            'source_metadata.extended_metrics.*.reference_version' => ['required', 'string', 'max:60'],
             'source_metadata.segmental_measurements' => ['required', 'array', 'size:10'],
             'source_metadata.raw_values' => ['present', 'array'],
             'source_metadata.raw_values.metrics' => ['required', 'array'],
@@ -981,6 +997,30 @@ class BioimpedanceWorkflow
             throw ValidationException::withMessages([
                 'source_metadata' => 'Os campos disponíveis não correspondem ao perfil OCR identificado. Processe novamente a imagem.',
             ]);
+        }
+
+        $allowedExtendedCodes = BodyscanExtendedMetricCatalog::availableForLayout($reportLayout);
+        $submittedExtendedCodes = collect($validated['source_metadata']['extended_metrics'])->pluck('metric_code');
+        $missingRequiredExtendedCodes = collect(BodyscanExtendedMetricCatalog::requiredForLayout($reportLayout))
+            ->reject(fn (string $code) => $submittedExtendedCodes->contains($code))
+            ->values();
+        if ($missingRequiredExtendedCodes->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'source_metadata' => 'O relatório não teve todos os indicadores estendidos obrigatórios lidos. Processe novamente uma imagem completa e nítida.',
+            ]);
+        }
+        foreach ($validated['source_metadata']['extended_metrics'] as $index => $metric) {
+            $isTextual = BodyscanExtendedMetricCatalog::isTextual($metric['metric_code']);
+            if (! in_array($metric['metric_code'], $allowedExtendedCodes, true)
+                || $metric['source_application'] !== $sourceApplication
+                || $metric['source_layout'] !== $reportLayout
+                || $metric['reference_version'] !== BodyscanExtendedMetricCatalog::REFERENCE_VERSION
+                || ($isTextual ? blank($metric['text_value'] ?? null) : ! is_numeric($metric['numeric_value'] ?? null))
+                || (isset($metric['printed_minimum'], $metric['printed_maximum']) && (float) $metric['printed_minimum'] > (float) $metric['printed_maximum'])) {
+                throw ValidationException::withMessages([
+                    "source_metadata.extended_metrics.{$index}" => 'A métrica estendida não corresponde ao aplicativo e ao layout identificados. Processe novamente a imagem.',
+                ]);
+            }
         }
 
         $expectedKeys = collect(BioimpedanceSegmentalMeasurement::TYPES)
@@ -1051,6 +1091,7 @@ class BioimpedanceWorkflow
             'layout_profile_version' => $validated['source_metadata']['layout_profile_version'],
             'layout_evidence' => $validated['source_metadata']['layout_evidence'],
             'available_metric_fields' => $validated['source_metadata']['available_metric_fields'],
+            'extended_metric_codes' => collect($validated['source_metadata']['extended_metrics'])->pluck('metric_code')->values()->all(),
             'weight_unit' => $validated['source_metadata']['weight_unit'],
             'confirmed_application' => $validated['measurement_application'],
             'athlete_mode_at_assessment' => (bool) $validated['athlete_mode_at_assessment'],
@@ -1073,7 +1114,7 @@ class BioimpedanceWorkflow
             'device_model_code' => ScaleModel::BODYSCAN_PRO_MODEL_CODE,
             'device_manual_version' => ScaleModel::BODYSCAN_PRO_MANUAL_VERSION,
             'measurement_protocol' => $validated['measurement_protocol'],
-        ]];
+        ], $validated['source_metadata']['extended_metrics']];
     }
 
     private function validateAssessment(Request $request, bool $requireClient = true, ?string $deviceModel = null): array
@@ -1311,6 +1352,16 @@ class BioimpedanceWorkflow
                 ->map(fn (BioimpedanceSegmentalMeasurement $measurement) => $measurement->only([
                     'type', 'region', 'side', 'mass_kg', 'reference_percentage', 'classification',
                     'reference_min_percentage', 'reference_max_percentage', 'reference_version',
+                ]))->values()->all();
+        }
+
+        if ($assessment->relationLoaded('extendedMetrics')) {
+            $values['extended_metrics'] = $assessment->extendedMetrics
+                ->map(fn ($metric) => $metric->only([
+                    'metric_code', 'original_label', 'numeric_value', 'text_value', 'unit',
+                    'application_classification', 'printed_minimum', 'printed_maximum',
+                    'weight_proportion_percentage', 'source_application', 'source_layout',
+                    'raw_extracted_value', 'reference_version',
                 ]))->values()->all();
         }
 

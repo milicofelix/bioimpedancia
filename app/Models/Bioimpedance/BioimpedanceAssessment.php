@@ -138,6 +138,11 @@ class BioimpedanceAssessment extends Model
         return $this->hasMany(BioimpedanceSegmentalMeasurement::class, 'bioimpedance_assessment_id');
     }
 
+    public function extendedMetrics(): HasMany
+    {
+        return $this->hasMany(BioimpedanceExtendedMetric::class, 'bioimpedance_assessment_id');
+    }
+
     public function shares(): HasMany
     {
         return $this->hasMany(BioimpedanceReportShare::class);

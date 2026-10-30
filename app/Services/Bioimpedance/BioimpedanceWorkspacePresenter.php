@@ -86,7 +86,7 @@ class BioimpedanceWorkspacePresenter
     public function loadClientAssessments(BioimpedanceClient $client): BioimpedanceClient
     {
         return $client->load(['assessments' => fn ($query) => $query
-            ->with(['shares', 'careGuidanceApprovedBy', 'aiAnalysisRequests.output', 'segmentalMeasurements'])
+            ->with(['shares', 'careGuidanceApprovedBy', 'aiAnalysisRequests.output', 'segmentalMeasurements', 'extendedMetrics'])
             ->latest('evaluated_at')]);
     }
 
@@ -94,7 +94,7 @@ class BioimpedanceWorkspacePresenter
     {
         $clients = BioimpedanceClient::query()
             ->with(['assessments' => fn ($query) => $query
-                ->with(['shares', 'careGuidanceApprovedBy', 'aiAnalysisRequests.output', 'segmentalMeasurements'])
+                ->with(['shares', 'careGuidanceApprovedBy', 'aiAnalysisRequests.output', 'segmentalMeasurements', 'extendedMetrics'])
                 ->latest('evaluated_at')])
             ->orderBy('full_name')
             ->get()
@@ -182,6 +182,24 @@ class BioimpedanceWorkspacePresenter
                     'reference_version' => $measurement->reference_version,
                     'raw_value' => $measurement->raw_value,
                 ])->all(),
+            'extended_metrics' => $assessment->relationLoaded('extendedMetrics')
+                ? $assessment->extendedMetrics->map(fn ($metric) => [
+                    'metric_code' => $metric->metric_code,
+                    'original_label' => $metric->original_label,
+                    'numeric_value' => $metric->numeric_value === null ? null : (float) $metric->numeric_value,
+                    'text_value' => $metric->text_value,
+                    'unit' => $metric->unit,
+                    'application_classification' => $metric->application_classification,
+                    'printed_minimum' => $metric->printed_minimum === null ? null : (float) $metric->printed_minimum,
+                    'printed_maximum' => $metric->printed_maximum === null ? null : (float) $metric->printed_maximum,
+                    'weight_proportion_percentage' => $metric->weight_proportion_percentage === null ? null : (float) $metric->weight_proportion_percentage,
+                    'source_application' => $metric->source_application,
+                    'source_layout' => $metric->source_layout,
+                    'raw_extracted_value' => $metric->raw_extracted_value,
+                    'reference_version' => $metric->reference_version,
+                    'interpretation_scope' => 'proprietary_informational',
+                ])->values()->all()
+                : [],
             'weight_kg' => (float) $assessment->weight_kg,
             'scale_bmi' => $assessment->scale_bmi === null ? null : (float) $assessment->scale_bmi,
             'calculated_bmi' => (float) $assessment->calculated_bmi,

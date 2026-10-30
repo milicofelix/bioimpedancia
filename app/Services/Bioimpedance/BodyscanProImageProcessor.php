@@ -3,6 +3,7 @@
 namespace App\Services\Bioimpedance;
 
 use App\Domain\Bioimpedance\BodyscanReportLayout;
+use App\Domain\Bioimpedance\BodyscanExtendedMetricCatalog;
 use App\Domain\Bioimpedance\BodyscanOcrProfileRegistry;
 use App\Domain\Bioimpedance\ScaleModel;
 use App\Models\Bioimpedance\BioimpedanceSegmentalMeasurement as Segment;
@@ -42,6 +43,7 @@ class BodyscanProImageProcessor
         private readonly RelaxmedicValueNormalizer $valueNormalizer,
         private readonly BodyscanSegmentalOcrCompleter $segmentalCompleter,
         private readonly BodyscanOcrProfileRegistry $ocrProfiles,
+        private readonly BodyscanExtendedMetricNormalizer $extendedMetricNormalizer,
     ) {}
 
     public function process(UploadedFile $image): array
@@ -61,7 +63,7 @@ class BodyscanProImageProcessor
             ->post(rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/').'/responses', [
                 'model' => $processorModel,
                 'store' => false,
-                'max_output_tokens' => 6500,
+                'max_output_tokens' => 9000,
                 'input' => [[
                     'role' => 'user',
                     'content' => [
@@ -112,6 +114,7 @@ class BodyscanProImageProcessor
             'weight_unit' => $result['weight_unit'],
             'measured_at' => $result['measured_at'],
             'metrics' => $result['metrics'],
+            'extended_metrics' => $result['extended_metrics'],
             'segmental_measurements' => $result['segmental_measurements'],
             'raw_values' => $result['raw_values'],
             'detected_sections' => $result['detected_sections'],
@@ -261,6 +264,21 @@ class BodyscanProImageProcessor
             }
         }
 
+        $extendedMetrics = $this->extendedMetricNormalizer->normalize(
+            is_array($payload['extended_metrics'] ?? null) ? $payload['extended_metrics'] : [],
+            $sourceApplication,
+            $reportLayout,
+        );
+        $extractedExtendedCodes = collect($extendedMetrics)->pluck('metric_code');
+        foreach (BodyscanExtendedMetricCatalog::requiredForLayout($reportLayout) as $requiredCode) {
+            if (! $extractedExtendedCodes->contains($requiredCode)) {
+                $missingFields->push('extended_metrics.'.$requiredCode);
+                $fieldStatuses['extended_metrics.'.$requiredCode] = 'missing';
+            } else {
+                $fieldStatuses['extended_metrics.'.$requiredCode] = 'recognized';
+            }
+        }
+
         $segmentalMeasurements = $this->normalizeSegments(
             is_array($payload['segmental_measurements'] ?? null) ? $payload['segmental_measurements'] : [],
             $missingFields,
@@ -302,6 +320,7 @@ class BodyscanProImageProcessor
             'weight_unit' => $weightUnit,
             'measured_at' => $measuredAt,
             'metrics' => $metrics,
+            'extended_metrics' => $extendedMetrics,
             'segmental_measurements' => $segmentalMeasurements,
             'side_consistency' => $sideConsistency,
             'missing_fields' => $missingFields->unique()->values()->all(),
@@ -312,6 +331,7 @@ class BodyscanProImageProcessor
                 'metrics' => $rawMetrics,
                 'metric_source_labels' => $rawMetricLabels,
                 'metric_text' => $rawMetricTexts,
+                'extended_metrics' => $payload['extended_metrics'] ?? [],
                 'segmental_measurements' => $payload['segmental_measurements'] ?? [],
             ],
             'detected_sections' => $detectedSections->all(),
@@ -678,7 +698,7 @@ class BodyscanProImageProcessor
     {
         $payload = collect([
             'type', 'name', 'size_bytes', 'mime_type', 'stored', 'sha256', 'processed_at',
-            'processor_model', 'reference_version', 'measured_at', 'metrics', 'segmental_measurements',
+            'processor_model', 'reference_version', 'measured_at', 'metrics', 'extended_metrics', 'segmental_measurements',
             'raw_values', 'detected_sections', 'field_statuses', 'missing_fields', 'suspicious_values',
             'quality_issues', 'side_consistency', 'source_application', 'report_layout',
             'layout_profile_version', 'layout_evidence', 'available_metric_fields', 'weight_unit',
@@ -708,6 +728,13 @@ Os percentuais segmentares são índices relativos à referência, não percentu
 Extraia as métricas gerais pelos nomes dos rótulos: no RelaxFit use o bloco "Índice corporal"; no Fitdays vertical use a tabela "Indicador / Valor / Padrão"; no Fitdays técnico use "Análise da composição corporal" e "Outros indicadores".
 Use exclusivamente os aliases do perfil identificado. Para cada métrica, retorne em metric_source_labels o rótulo exato encontrado e em metric_raw_values o texto integral da linha ou célula que sustenta o valor.
 Para campos que o perfil não oferece, retorne null em metrics, metric_source_labels e metric_raw_values. Não marque esses campos como ilegíveis ou ausentes.
+Extraia em extended_metrics somente indicadores realmente impressos e permitidos no layout identificado. Preserve rótulo, valor bruto, unidade, classificação do aplicativo, limites impressos e proporção do peso. Não derive limites nem classificações.
+No Fitdays técnico podem existir WHR, Pontuação corporal, Peso-alvo recomendado, controles de peso/gordura/músculo, Obesidade (peso atual/Peso alvo), ASMI e Avaliação do equilíbrio corporal.
+No Fitdays vertical extraia WHR, Peso-alvo recomendado, controles de peso/gordura/músculo e o contexto das métricas gerais permitidas quando impressos.
+Use os códigos: waist_hip_ratio, body_score, recommended_target_weight, weight_control, fat_control, muscle_control, proprietary_obesity_index, asmi e body_balance_assessment.
+Para preservar classificações e faixas do aplicativo nas métricas gerais, também podem ser usados: weight, bmi, body_fat_percentage, fat_mass, bone_mass, protein_mass, body_water, muscle_mass, muscle_rate, skeletal_muscle, subcutaneous_fat e visceral_fat. Extraia somente os que estiverem impressos, mesmo que o valor também esteja em metrics.
+Para body_balance_assessment, use text_value para reunir fielmente os itens impressos; nos demais, use numeric_value. Não inclua a lista "Consumo comum de exercícios" nem calorias de atividades.
+Classificações como Alto, Muito alto e Excelente são textos proprietários do aplicativo: apenas copie, sem interpretação clínica. Pontuação corporal não é diagnóstico e peso-alvo é referência proprietária do Fitdays.
 Preserve exatamente o valor decimal impresso. Não acrescente casas decimais nem alegue margem de erro ou precisão que não esteja escrita no relatório.
 Não calcule, estime, deduza ou complete valores ausentes. Use null quando algo não estiver legível.
 Converta a data e hora para YYYY-MM-DDTHH:MM:SS sem inventar fuso horário.
@@ -739,7 +766,7 @@ PROMPT;
         return [
             'type' => 'object',
             'additionalProperties' => false,
-            'required' => ['recognized', 'is_complete', 'quality_issues', 'source_application', 'report_layout', 'layout_evidence', 'weight_unit', 'measured_at', 'detected_sections', 'metrics', 'metric_source_labels', 'metric_raw_values', 'segmental_measurements', 'side_consistency', 'suspicious_values'],
+            'required' => ['recognized', 'is_complete', 'quality_issues', 'source_application', 'report_layout', 'layout_evidence', 'weight_unit', 'measured_at', 'detected_sections', 'metrics', 'metric_source_labels', 'metric_raw_values', 'extended_metrics', 'segmental_measurements', 'side_consistency', 'suspicious_values'],
             'properties' => [
                 'recognized' => ['type' => 'boolean'],
                 'is_complete' => ['type' => 'boolean'],
@@ -767,6 +794,26 @@ PROMPT;
                     'additionalProperties' => false,
                     'required' => self::METRIC_FIELDS,
                     'properties' => array_fill_keys(self::METRIC_FIELDS, $nullableString),
+                ],
+                'extended_metrics' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'additionalProperties' => false,
+                        'required' => ['code', 'original_label', 'numeric_value', 'text_value', 'unit', 'classification', 'printed_minimum', 'printed_maximum', 'weight_proportion_percentage', 'raw_value'],
+                        'properties' => [
+                            'code' => ['type' => 'string', 'enum' => BodyscanExtendedMetricCatalog::CODES],
+                            'original_label' => ['type' => 'string'],
+                            'numeric_value' => $nullableNumber,
+                            'text_value' => $nullableString,
+                            'unit' => $nullableString,
+                            'classification' => $nullableString,
+                            'printed_minimum' => $nullableNumber,
+                            'printed_maximum' => $nullableNumber,
+                            'weight_proportion_percentage' => $nullableNumber,
+                            'raw_value' => ['type' => 'string'],
+                        ],
+                    ],
                 ],
                 'segmental_measurements' => [
                     'type' => 'array',

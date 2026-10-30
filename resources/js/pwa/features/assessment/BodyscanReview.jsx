@@ -13,6 +13,35 @@ const layoutLabels = {
 	fitdays_vertical_report: 'Fitdays · relatório vertical',
 	relaxfit_vertical_report: 'RelaxFit · relatório vertical',
 };
+const extendedMetricLabels = {
+	waist_hip_ratio: 'WHR',
+	body_score: 'Pontuação corporal',
+	recommended_target_weight: 'Peso-alvo recomendado',
+	weight_control: 'Controle de peso',
+	fat_control: 'Controle de gordura',
+	muscle_control: 'Controle muscular',
+	proprietary_obesity_index: 'Índice proprietário de obesidade',
+	asmi: 'ASMI',
+	body_balance_assessment: 'Avaliação do equilíbrio corporal',
+};
+
+function ExtendedMetrics({ metrics }) {
+	if (!metrics?.length) return null;
+
+	return (
+		<section className="rounded-2xl border border-sky-200 bg-sky-50/40 p-4">
+			<h3 className="font-bold text-slate-950">Indicadores estendidos do aplicativo</h3>
+			<p className="mt-1 text-xs leading-5 text-slate-600">Referências e classificações proprietárias do Fitdays. Não representam classificação clínica, diagnóstico ou prescrição.</p>
+			<div className="mt-3 grid gap-2 sm:grid-cols-2">
+				{metrics.map((metric) => {
+					const value = metric.text_value ?? [metric.numeric_value, metric.unit].filter((part) => part !== null && part !== undefined && part !== '').join(' ');
+					return <div key={metric.metric_code} className="rounded-xl border border-sky-100 bg-white p-3 text-xs"><strong className="block text-slate-900">{extendedMetricLabels[metric.metric_code] ?? metric.original_label}</strong><span className="mt-1 block text-base font-bold text-slate-800">{value}</span>{metric.application_classification ? <span className="mt-1 block text-slate-600">Classificação do aplicativo: {metric.application_classification}</span> : null}{metric.weight_proportion_percentage !== null && metric.weight_proportion_percentage !== undefined ? <span className="block text-slate-600">Proporção do peso: {metric.weight_proportion_percentage}%</span> : null}<span className="mt-1 block text-slate-500">Leitura bruta: {metric.raw_extracted_value}</span></div>;
+				})}
+			</div>
+			<p className="mt-3 text-xs font-semibold text-sky-900">Peso-alvo e controles são referências proprietárias. A pontuação corporal não deve ser utilizada para diagnóstico.</p>
+		</section>
+	);
+}
 
 function firstError(errors, key) {
 	const value = errors?.[key];
@@ -106,13 +135,14 @@ export default function BodyscanReview({ previewUrl, form, extraction, client, c
 						<p className="mt-3 text-xs font-semibold text-slate-600">Equipamento RM-BD0015A · Manual de referência V1.1222</p>
 					</section>
 					<section className="rounded-2xl border border-slate-200 bg-white p-4"><h3 className="font-bold text-slate-950">Métricas gerais</h3><label className="mt-3 block text-sm font-semibold">Data e hora<input type="datetime-local" required max={localDatetimeNow()} value={form.general.evaluated_at} onChange={(event) => onGeneralUpdate('evaluated_at', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label><div className="mt-3 grid gap-2 sm:grid-cols-2">{Object.entries(relaxmedicMetricLabels).map(([field, label]) => { const available = availableMetricFields.has(field); const flagged = available && ['missing', 'unrecognized', 'suspicious'].includes(statuses[`metrics.${field}`]); const rawText = extraction?.raw_values?.metric_text?.[field]; return <label key={field} className={`rounded-xl border p-3 text-xs font-semibold ${!available ? 'border-slate-200 bg-slate-100 text-slate-500' : flagged ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}`}>{label}{!available ? <span className="ml-2 text-[10px] font-bold text-slate-500">NÃO DISPONÍVEL NESTE FORMATO</span> : flagged ? <span className="ml-2 text-[10px] font-bold text-amber-800">CONFERIR</span> : null}{field === 'obesity_level' ? <select required={available} disabled={!available} value={form.general[field]} onChange={(event) => onGeneralUpdate(field, event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 font-normal disabled:cursor-not-allowed disabled:bg-slate-100"><option value="">{available ? 'Selecione após conferir' : 'Ausente neste layout'}</option>{(extraction?.allowed_values?.obesity_level ?? []).map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input required={available} disabled={!available} type="text" inputMode={relaxmedicTextFields.includes(field) ? 'text' : relaxmedicIntegerFields.includes(field) ? 'numeric' : 'decimal'} value={form.general[field]} onChange={(event) => onGeneralUpdate(field, event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 font-normal disabled:cursor-not-allowed disabled:bg-slate-100" />}{available && rawText ? <span className="mt-1 block font-normal text-slate-500">Leitura bruta: {rawText}</span> : null}{firstError(errors, field) ? <span className="mt-1 block text-rose-700">{firstError(errors, field)}</span> : null}</label>; })}</div></section>
+					<ExtendedMetrics metrics={extraction?.extended_metrics ?? []} />
 					<div className="grid gap-4 xl:grid-cols-2"><SegmentalBodyMap measurements={form.segments} type="fat" /><SegmentalBodyMap measurements={form.segments} type="muscle" /></div>
 					<SegmentSection title="Gordura segmentar" type="fat" segments={grouped.fat} statuses={statuses} errors={errors} onUpdate={onSegmentUpdate} />
 					<SegmentSection title="Equilíbrio muscular" type="muscle" segments={grouped.muscle} statuses={statuses} errors={errors} onUpdate={onSegmentUpdate} />
 					<label className="block text-sm font-semibold">Observações<input maxLength={2000} value={form.general.notes} onChange={(event) => onGeneralUpdate('notes', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label>
 				</div>
 			</div>
-			<label className="mt-5 flex items-start gap-3 rounded-2xl border border-ricosty-200 bg-ricosty-50 p-4 text-sm font-semibold"><input type="checkbox" checked={confirmed} disabled={incomplete} onChange={(event) => onConfirm(event.target.checked)} className="mt-0.5 h-5 w-5" /><span>Comparei a imagem original e confirmo o perfil usado na medição, as métricas gerais, os cinco segmentos de gordura e os cinco segmentos musculares.</span></label>
+			<label className="mt-5 flex items-start gap-3 rounded-2xl border border-ricosty-200 bg-ricosty-50 p-4 text-sm font-semibold"><input type="checkbox" checked={confirmed} disabled={incomplete} onChange={(event) => onConfirm(event.target.checked)} className="mt-0.5 h-5 w-5" /><span>Comparei a imagem original e confirmo o perfil usado na medição, as métricas gerais e estendidas, os cinco segmentos de gordura e os cinco segmentos musculares.</span></label>
 			{firstError(errors, 'source_metadata') || firstError(errors, 'bodyscan_review_confirmed') || firstError(errors, 'segmental_measurements') ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-700">{firstError(errors, 'source_metadata') ?? firstError(errors, 'bodyscan_review_confirmed') ?? firstError(errors, 'segmental_measurements')}</p> : null}
 			<PwaButton type="submit" disabled={incomplete || !confirmed || saving || !online} loading={saving} icon="check" className="mt-4 w-full">{saving ? 'Criando avaliação...' : 'Confirmar e criar avaliação'}</PwaButton>
 		</form>
