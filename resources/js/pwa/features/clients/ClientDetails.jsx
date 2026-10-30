@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { formatDate, formatIssueDate, numberBr } from '../../../shared/formatters';
 import { cpfMask } from '../../../shared/inputMasks';
 import { assessmentAccess, canUseClinicalFeatures } from './clientAccess';
@@ -7,6 +7,7 @@ import PwaCard from '../../components/ui/PwaCard';
 import PwaIcon from '../../components/ui/PwaIcon';
 import ScreeningInvitationPanel from './ScreeningInvitationPanel';
 import ClientModuleSummary from '../../../shared/ClientModuleSummary';
+import ClientWorkspaceTabs from '../../../shared/ClientWorkspaceTabs';
 
 const sexLabels = { female: 'Feminino', male: 'Masculino' };
 
@@ -19,9 +20,13 @@ export default function ClientDetails({ client, currentUser, scaleModel, onBack,
 	const assessments = [...(client.assessments ?? [])].sort((left, right) => new Date(right.evaluated_at) - new Date(left.evaluated_at));
 	const latestActiveAssessment = assessments.find((assessment) => !assessment.is_canceled) ?? null;
 	const canAccessScreenings = ['admin', 'professional'].includes(currentUser?.role);
+	const [activeTab, setActiveTab] = useState('assessment');
 
-	function scrollToSection(sectionId) {
-		document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	useEffect(() => setActiveTab('assessment'), [client.id]);
+
+	function openScreenings() {
+		setActiveTab('screenings');
+		window.setTimeout(() => document.getElementById('client-panel-screenings')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
 	}
 
 	return (
@@ -63,21 +68,15 @@ export default function ClientDetails({ client, currentUser, scaleModel, onBack,
 					canStartAssessment={access.allowed}
 					canAccessScreenings={canAccessScreenings}
 					onStartAssessment={() => onNewAssessment(client)}
-					onOpenScreenings={() => scrollToSection('client-screenings')}
+					onOpenScreenings={openScreenings}
 					onOpenReports={() => latestActiveAssessment && onOpenReport(client, latestActiveAssessment)}
 				/>
 				{access.reason ? <p className="mt-2 text-center text-xs font-semibold text-amber-700">{access.reason}</p> : null}
 			</div>
 
-			{client.is_active && !client.is_anonymized ? (
-				canAccessScreenings ? <div id="client-screenings" className="scroll-mt-24"><ScreeningInvitationPanel client={client} /></div> : (
-					<PwaCard className="mt-4 border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-						<strong>Questionário de triagem indisponível para este perfil.</strong>
-						<p className="mt-1">Somente contas de administrador ou profissional podem criar e acompanhar aplicações.</p>
-					</PwaCard>
-				)
-			) : null}
+			<div className="mt-4"><ClientWorkspaceTabs activeTab={activeTab} onChange={setActiveTab} /></div>
 
+			<div id="client-panel-assessment" role="tabpanel" aria-labelledby="client-tab-assessment" className={activeTab === 'assessment' ? '' : 'hidden'}>
 			<PwaCard className="mt-4 p-5">
 				<div className="flex items-center justify-between gap-3">
 					<h3 className="flex items-center gap-2 font-extrabold text-ricosty-ink"><PwaIcon name="history" className="text-ricosty-600" />Histórico resumido</h3>
@@ -104,6 +103,16 @@ export default function ClientDetails({ client, currentUser, scaleModel, onBack,
 					{!assessments.length ? <li className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500">Nenhuma avaliação registrada.</li> : null}
 				</ol>
 			</PwaCard>
+			</div>
+
+			<div id="client-panel-screenings" role="tabpanel" aria-labelledby="client-tab-screenings" className={activeTab === 'screenings' ? '' : 'hidden'}>
+				{client.is_active && !client.is_anonymized && canAccessScreenings ? <ScreeningInvitationPanel client={client} /> : (
+					<PwaCard className="mt-4 border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+						<strong>Triagens indisponíveis para este cliente ou perfil.</strong>
+						<p className="mt-1">É necessário usar uma conta de administrador ou profissional e selecionar um cliente ativo e identificado.</p>
+					</PwaCard>
+				)}
+			</div>
 		</section>
 	);
 }

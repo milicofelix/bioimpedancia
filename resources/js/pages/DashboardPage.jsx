@@ -25,6 +25,7 @@ import BodyscanProtocolChecklist from '../pwa/features/assessment/BodyscanProtoc
 import VitaScanBrand from '../components/brand/VitaScanBrand';
 import ScreeningInvitationPanel from '../pwa/features/clients/ScreeningInvitationPanel';
 import ClientModuleSummary from '../shared/ClientModuleSummary';
+import ClientWorkspaceTabs from '../shared/ClientWorkspaceTabs';
 
 const emptyClient = {
 	full_name: '',
@@ -492,6 +493,7 @@ export default function DashboardPage({ userName }) {
 	const relaxmedicImageInputRef = useRef(null);
 	const imagePreviewUrlRef = useRef('');
 	const [clients, setClients] = useState([]);
+	const [clientWorkspaceTab, setClientWorkspaceTab] = useState('assessment');
 	const [clinic, setClinic] = useState(defaultClinic);
 	const [clinicForm, setClinicForm] = useState(defaultClinic);
 	const [currentUser, setCurrentUser] = useState(null);
@@ -740,6 +742,7 @@ export default function DashboardPage({ userName }) {
 	}
 
 	function selectClient(client) {
+		setClientWorkspaceTab('assessment');
 		setSelectedClientId(client.id);
 		setSelectedAssessmentId(client.assessments?.[0]?.id ?? null);
 		setShareResult(null);
@@ -768,6 +771,7 @@ export default function DashboardPage({ userName }) {
 	}
 
 	function startNewAssessment() {
+		setClientWorkspaceTab('assessment');
 		setAssessmentMode('create');
 		setEditingAssessmentId(null);
 		setShareResult(null);
@@ -787,8 +791,14 @@ export default function DashboardPage({ userName }) {
 			.sort((left, right) => new Date(right.evaluated_at) - new Date(left.evaluated_at))[0];
 		if (!latestAssessment) return;
 
+		setClientWorkspaceTab('assessment');
 		selectAssessment(latestAssessment.id);
 		window.setTimeout(() => document.getElementById('relatorio')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+	}
+
+	function openClientScreenings() {
+		setClientWorkspaceTab('screenings');
+		window.setTimeout(() => document.getElementById('client-panel-screenings')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
 	}
 
 	function clearRelaxmedicImage() {
@@ -1580,10 +1590,12 @@ export default function DashboardPage({ userName }) {
 								canStartAssessment={canCreateCurrentAssessment}
 								canAccessScreenings={canClinicalProfessional}
 								onStartAssessment={startNewAssessment}
-								onOpenScreenings={() => document.getElementById('client-screenings')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+								onOpenScreenings={openClientScreenings}
 								onOpenReports={openLatestClientReport}
 							/>
 						</div>
+						<ClientWorkspaceTabs activeTab={clientWorkspaceTab} onChange={setClientWorkspaceTab} />
+						<div id="client-panel-assessment" role="tabpanel" aria-labelledby="client-tab-assessment" className={clientWorkspaceTab === 'assessment' ? 'contents' : 'hidden'}>
 						<div className="no-print rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
 							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 								<div>
@@ -1743,24 +1755,23 @@ export default function DashboardPage({ userName }) {
 								</div>
 							) : null}
 						</div>
-						{selectedClient.is_active && !selectedClient.is_anonymized ? (
-							<div id="client-screenings" className="scroll-mt-20">
-								{['admin', 'professional'].includes(currentUser?.role) ? (
-									<ScreeningInvitationPanel client={selectedClient} />
-								) : (
-									<div className="no-print rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-										<strong>Questionário de triagem indisponível para este perfil.</strong>
-										<p className="mt-1">Somente contas de administrador ou profissional podem criar e acompanhar aplicações.</p>
-									</div>
-								)}
-							</div>
-						) : null}
+						</div>
+						<div id="client-panel-screenings" role="tabpanel" aria-labelledby="client-tab-screenings" className={clientWorkspaceTab === 'screenings' ? '' : 'hidden'}>
+							{selectedClient.is_active && !selectedClient.is_anonymized && ['admin', 'professional'].includes(currentUser?.role) ? (
+								<ScreeningInvitationPanel client={selectedClient} />
+							) : (
+								<div className="no-print rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+									<strong>Triagens indisponíveis para este cliente ou perfil.</strong>
+									<p className="mt-1">É necessário usar uma conta de administrador ou profissional e selecionar um cliente ativo e identificado.</p>
+								</div>
+							)}
+						</div>
 						</>
 					) : null}
 
-					<EvolutionPanel client={selectedClient} selectedAssessment={selectedAssessment} />
+					{clientWorkspaceTab === 'assessment' ? <EvolutionPanel client={selectedClient} selectedAssessment={selectedAssessment} /> : null}
 
-						<div id="avaliacao" ref={assessmentSectionRef} className="no-print scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+						<div id="avaliacao" ref={assessmentSectionRef} className={`no-print scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${clientWorkspaceTab === 'assessment' ? '' : 'hidden'}`}>
 							<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 								<div>
 									<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">{assessmentMode === 'edit' ? 'Corrigir avaliação' : 'Registrar nova avaliação'}</p>
@@ -1929,7 +1940,7 @@ export default function DashboardPage({ userName }) {
 						)}
 					</div>
 
-					<div id="relatorio" className="scroll-mt-20">
+					<div id="relatorio" className={`scroll-mt-20 ${clientWorkspaceTab === 'assessment' ? '' : 'hidden'}`}>
 						<Report clinic={clinic} client={selectedClient} assessment={selectedAssessment} professional={userName} />
 					</div>
 				</section>
