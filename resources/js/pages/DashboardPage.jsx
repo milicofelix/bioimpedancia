@@ -1778,12 +1778,12 @@ export default function DashboardPage({ userName }) {
 						</div>
 						</div>
 						<div id="client-panel-screenings" role="tabpanel" aria-labelledby="client-tab-screenings" className={clientWorkspaceTab === 'screenings' ? '' : 'hidden'}>
-							{selectedClient.is_active && !selectedClient.is_anonymized && ['admin', 'professional'].includes(currentUser?.role) ? (
-								<ScreeningInvitationPanel client={selectedClient} />
+							{['admin', 'professional'].includes(currentUser?.role) ? (
+								<ScreeningInvitationPanel client={selectedClient} canCreateInvitation={selectedClient.is_active && !selectedClient.is_anonymized} creationUnavailableReason={selectedClient.is_anonymized ? 'Cliente anonimizado não pode receber novas triagens. Os dados remanescentes seguem as regras de retenção e auditoria.' : 'Cliente inativo não pode receber novas triagens. O histórico permanece disponível para consulta.'} />
 							) : (
 								<div className="no-print rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-									<strong>Triagens indisponíveis para este cliente ou perfil.</strong>
-									<p className="mt-1">É necessário usar uma conta de administrador ou profissional e selecionar um cliente ativo e identificado.</p>
+									<strong>Triagens indisponíveis para este perfil.</strong>
+									<p className="mt-1">É necessário usar uma conta de administrador ou profissional para consultar e administrar triagens.</p>
 								</div>
 							)}
 						</div>

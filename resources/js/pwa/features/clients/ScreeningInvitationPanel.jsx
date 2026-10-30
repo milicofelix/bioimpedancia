@@ -25,7 +25,7 @@ function questionnaireAvailabilityLabel(questionnaire) {
 	return questionnaire.status === 'retired' ? ' (descontinuado)' : ' (aguardando aprovação)';
 }
 
-export default function ScreeningInvitationPanel({ client }) {
+export default function ScreeningInvitationPanel({ client, canCreateInvitation = true, creationUnavailableReason = '' }) {
 	const [loading, setLoading] = useState(true);
 	const [busyAction, setBusyAction] = useState(null);
 	const [questionnaires, setQuestionnaires] = useState([]);
@@ -47,7 +47,7 @@ export default function ScreeningInvitationPanel({ client }) {
 	useEffect(() => {
 		let active = true;
 		setLoading(true);
-		setActiveTab('new');
+		setActiveTab(canCreateInvitation ? 'new' : 'history');
 		setGuardianName('');
 		setGuardianRelationship('');
 		window.axios.get(`/screening/clients/${client.id}/invitations`).then(({ data }) => {
@@ -62,7 +62,7 @@ export default function ScreeningInvitationPanel({ client }) {
 		});
 
 		return () => { active = false; };
-	}, [client.id]);
+	}, [canCreateInvitation, client.id]);
 
 	useEffect(() => {
 		if (!invitation?.url || activeTab !== 'new') return;
@@ -75,7 +75,7 @@ export default function ScreeningInvitationPanel({ client }) {
 	}, [activeTab, invitation]);
 
 	async function createInvitation() {
-		if (!questionnaireId || busyAction) return;
+		if (!canCreateInvitation || !questionnaireId || busyAction) return;
 		setBusyAction('create'); setError(''); setFeedback(''); setInvitation(null);
 		try {
 			const { data } = await window.axios.post('/screening/invitations', {
@@ -94,7 +94,7 @@ export default function ScreeningInvitationPanel({ client }) {
 	}
 
 	async function resend(session) {
-		if (busyAction) return;
+		if (!canCreateInvitation || busyAction) return;
 		const confirmation = session.revoked_at
 			? 'Criar um novo acesso para esta triagem? Um novo link temporário será gerado para compartilhar com o cliente.'
 			: 'Gerar um novo link para esta triagem? O link anterior deixará de funcionar imediatamente e será necessário compartilhar o novo link com o cliente.';
@@ -157,22 +157,23 @@ export default function ScreeningInvitationPanel({ client }) {
 			<ScreeningWorkspaceTabs activeTab={activeTab} historyCount={sessions.length} onChange={setActiveTab} />
 
 			<div id="screening-panel-new" role="tabpanel" aria-labelledby="screening-tab-new" className={activeTab === 'new' ? '' : 'hidden'}>
+			{!canCreateInvitation ? <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold leading-5 text-amber-900" role="status">{creationUnavailableReason || 'Novas aplicações estão indisponíveis para este cliente. O histórico permanece disponível para consulta.'}</p> : null}
 			<div className="mt-4 grid gap-3 sm:grid-cols-2">
-				<label className="text-sm font-bold text-slate-700 sm:col-span-2">Questionário<select value={questionnaireId} onChange={(event) => setQuestionnaireId(event.target.value)} className="pwa-focus mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3"><option value="">Selecione</option>{questionnaires.map((item) => <option key={item.id} value={item.id} disabled={!item.is_available}>{item.name} · {item.version}{questionnaireAvailabilityLabel(item)}</option>)}</select></label>
-				<label className="text-sm font-bold text-slate-700">Validade<select value={expiresInMinutes} onChange={(event) => setExpiresInMinutes(Number(event.target.value))} className="pwa-focus mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3">{durationOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-				<label className="text-sm font-bold text-slate-700">Modo<select value={accessMode} onChange={(event) => setAccessMode(event.target.value)} className="pwa-focus mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3"><option value="remote">Enviar ao cliente</option><option value="reception">Tablet da recepção</option></select></label>
+				<label className="text-sm font-bold text-slate-700 sm:col-span-2">Questionário<select value={questionnaireId} disabled={!canCreateInvitation} onChange={(event) => setQuestionnaireId(event.target.value)} className="pwa-focus mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 disabled:cursor-not-allowed disabled:bg-slate-100"><option value="">Selecione</option>{questionnaires.map((item) => <option key={item.id} value={item.id} disabled={!item.is_available}>{item.name} · {item.version}{questionnaireAvailabilityLabel(item)}</option>)}</select></label>
+				<label className="text-sm font-bold text-slate-700">Validade<select value={expiresInMinutes} disabled={!canCreateInvitation} onChange={(event) => setExpiresInMinutes(Number(event.target.value))} className="pwa-focus mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 disabled:cursor-not-allowed disabled:bg-slate-100">{durationOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+				<label className="text-sm font-bold text-slate-700">Modo<select value={accessMode} disabled={!canCreateInvitation} onChange={(event) => setAccessMode(event.target.value)} className="pwa-focus mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 disabled:cursor-not-allowed disabled:bg-slate-100"><option value="remote">Enviar ao cliente</option><option value="reception">Tablet da recepção</option></select></label>
 			</div>
 			{isMinor ? <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4"><p className="text-sm font-extrabold text-amber-950">Fluxo para menor de idade</p><p className="mt-1 text-xs leading-5 text-amber-900">Informe o responsável legal. Ele deverá confirmar o próprio nome e fornecer consentimento específico ao abrir o convite.</p><div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="text-sm font-bold text-slate-700">Responsável legal<input type="text" value={guardianName} onChange={(event) => setGuardianName(event.target.value)} maxLength={160} className="pwa-focus mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3" /></label><label className="text-sm font-bold text-slate-700">Vínculo com o menor<input type="text" value={guardianRelationship} onChange={(event) => setGuardianRelationship(event.target.value)} maxLength={100} placeholder="Ex.: mãe, pai ou tutor" className="pwa-focus mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3" /></label></div></div> : null}
 
 			{!availableQuestionnaires.length ? <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900">Nenhuma versão está ativa. As versões editoriais permanecem bloqueadas até registrar a aprovação de um profissional habilitado.</p> : null}
 			{pendingQuestionnaires.length ? <p className="mt-3 rounded-xl bg-sky-50 p-3 text-xs font-semibold leading-5 text-sky-900">Há {pendingQuestionnaires.length} instrumento(s) aguardando revisão profissional. Cada instrumento possui conteúdo e resultado independentes.</p> : null}
 			{pendingQuestionnaires.map((questionnaire) => <ScreeningApprovalForm key={questionnaire.id} questionnaire={questionnaire} onApproved={questionnaireApproved} />)}
-			<PwaButton type="button" onClick={createInvitation} disabled={!questionnaireId || Boolean(busyAction) || (isMinor && (!guardianName.trim() || !guardianRelationship.trim()))} loading={busyAction === 'create'} icon="share" className="mt-4 w-full">Criar link temporário</PwaButton>
+			<PwaButton type="button" onClick={createInvitation} disabled={!canCreateInvitation || !questionnaireId || Boolean(busyAction) || (isMinor && (!guardianName.trim() || !guardianRelationship.trim()))} loading={busyAction === 'create'} icon="share" className="mt-4 w-full">Criar link temporário</PwaButton>
 
 			{invitation ? <div id="screening-generated-link" tabIndex={-1} className="pwa-focus mt-4 rounded-2xl border border-teal-200 bg-teal-50/70 p-4"><p className="text-xs font-bold uppercase text-teal-800">Novo link pronto para envio</p><p className="mt-1 text-sm font-semibold text-teal-950">O sistema não envia mensagens automaticamente. Escolha copiar ou compartilhar abaixo.</p><p className="mt-2 break-all rounded-lg bg-white p-2 text-xs text-slate-700">{invitation.url}</p><p className="mt-2 text-xs text-slate-600">Expira em {formatDate(invitation.expires_at)}. O QR Code abaixo é gerado localmente, sem enviar o token a terceiros.</p><ScreeningQrCode payload={invitation.qr_payload} questionnaireVersion={invitation.questionnaire_version} /><div className="mt-3 grid gap-2 sm:grid-cols-2"><PwaButton type="button" onClick={copyLink} icon="copy" variant="secondary">Copiar link</PwaButton><PwaButton type="button" onClick={shareLink} icon="share">Compartilhar</PwaButton></div></div> : null}
 			</div>
 			<div id="screening-panel-history" role="tabpanel" aria-labelledby="screening-tab-history" className={activeTab === 'history' ? '' : 'hidden'}>
-				<ScreeningHistoryPanel key={client.id} sessions={sessions} busyAction={busyAction} onNewApplication={() => setActiveTab('new')} onResend={resend} onRevoke={revoke} />
+				<ScreeningHistoryPanel key={client.id} sessions={sessions} busyAction={busyAction} canCreateInvitation={canCreateInvitation} onNewApplication={() => setActiveTab('new')} onResend={resend} onRevoke={revoke} />
 			</div>
 		</PwaCard>
 	);
