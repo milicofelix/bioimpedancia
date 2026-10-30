@@ -6,6 +6,7 @@ import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaIcon from '../../components/ui/PwaIcon';
 import ScreeningInvitationPanel from './ScreeningInvitationPanel';
+import ClientModuleSummary from '../../../shared/ClientModuleSummary';
 
 const sexLabels = { female: 'Feminino', male: 'Masculino' };
 
@@ -16,6 +17,12 @@ function initials(name) {
 export default function ClientDetails({ client, currentUser, scaleModel, onBack, onNewAssessment, onOpenAssistant, onOpenReport }) {
 	const access = assessmentAccess(client, currentUser, scaleModel);
 	const assessments = [...(client.assessments ?? [])].sort((left, right) => new Date(right.evaluated_at) - new Date(left.evaluated_at));
+	const latestActiveAssessment = assessments.find((assessment) => !assessment.is_canceled) ?? null;
+	const canAccessScreenings = ['admin', 'professional'].includes(currentUser?.role);
+
+	function scrollToSection(sectionId) {
+		document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	}
 
 	return (
 		<section aria-labelledby="client-details-title">
@@ -48,15 +55,22 @@ export default function ClientDetails({ client, currentUser, scaleModel, onBack,
 					<p><strong>Próxima avaliação:</strong> {formatIssueDate(client.next_assessment_at)}</p>
 				</div>
 
-				<div className="mt-5 rounded-2xl bg-gradient-to-br from-ricosty-50 to-ricosty-cream p-3 ring-1 ring-ricosty-100">
-					<div className="mb-3 flex items-center gap-2 px-1 text-xs text-ricosty-800"><PwaIcon name="clipboard" size={16} /><span><strong>Pronto para atender?</strong> Inicie o fluxo Relaxmedic.</span></div>
-					<PwaButton type="button" disabled={!access.allowed} onClick={() => onNewAssessment(client)} icon="plus" className="w-full text-base">Nova avaliação</PwaButton>
-				</div>
-				{access.reason ? <p className="mt-2 text-center text-xs font-semibold text-amber-700">{access.reason}</p> : null}
 			</PwaCard>
 
+			<div className="mt-4">
+				<ClientModuleSummary
+					client={client}
+					canStartAssessment={access.allowed}
+					canAccessScreenings={canAccessScreenings}
+					onStartAssessment={() => onNewAssessment(client)}
+					onOpenScreenings={() => scrollToSection('client-screenings')}
+					onOpenReports={() => latestActiveAssessment && onOpenReport(client, latestActiveAssessment)}
+				/>
+				{access.reason ? <p className="mt-2 text-center text-xs font-semibold text-amber-700">{access.reason}</p> : null}
+			</div>
+
 			{client.is_active && !client.is_anonymized ? (
-				['admin', 'professional'].includes(currentUser?.role) ? <ScreeningInvitationPanel client={client} /> : (
+				canAccessScreenings ? <div id="client-screenings" className="scroll-mt-24"><ScreeningInvitationPanel client={client} /></div> : (
 					<PwaCard className="mt-4 border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
 						<strong>Questionário de triagem indisponível para este perfil.</strong>
 						<p className="mt-1">Somente contas de administrador ou profissional podem criar e acompanhar aplicações.</p>

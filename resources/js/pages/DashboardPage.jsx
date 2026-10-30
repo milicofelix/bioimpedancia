@@ -24,6 +24,7 @@ import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocol
 import BodyscanProtocolChecklist from '../pwa/features/assessment/BodyscanProtocolChecklist';
 import VitaScanBrand from '../components/brand/VitaScanBrand';
 import ScreeningInvitationPanel from '../pwa/features/clients/ScreeningInvitationPanel';
+import ClientModuleSummary from '../shared/ClientModuleSummary';
 
 const emptyClient = {
 	full_name: '',
@@ -487,6 +488,7 @@ function clinicFormFromClinic(clinic) {
 export default function DashboardPage({ userName }) {
 	const runAction = useActionLock();
 	const assessmentSectionRef = useRef(null);
+	const clientModulesRef = useRef(null);
 	const relaxmedicImageInputRef = useRef(null);
 	const imagePreviewUrlRef = useRef('');
 	const [clients, setClients] = useState([]);
@@ -748,7 +750,7 @@ export default function DashboardPage({ userName }) {
 		setAssessmentForm({ ...emptyAssessment, evaluated_at: localDatetimeNow() });
 		setAssessmentChangeReason('');
 		clearRelaxmedicImage();
-		window.setTimeout(() => assessmentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+		window.setTimeout(() => clientModulesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
 	}
 
 	function selectClientById(clientId) {
@@ -776,6 +778,17 @@ export default function DashboardPage({ userName }) {
 		setAssessmentDraftSavedAt(null);
 		setErrors({});
 		clearRelaxmedicImage();
+		window.setTimeout(() => assessmentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+	}
+
+	function openLatestClientReport() {
+		const latestAssessment = [...(selectedClient?.assessments ?? [])]
+			.filter((assessment) => !assessment.is_canceled)
+			.sort((left, right) => new Date(right.evaluated_at) - new Date(left.evaluated_at))[0];
+		if (!latestAssessment) return;
+
+		selectAssessment(latestAssessment.id);
+		window.setTimeout(() => document.getElementById('relatorio')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
 	}
 
 	function clearRelaxmedicImage() {
@@ -1561,6 +1574,16 @@ export default function DashboardPage({ userName }) {
 
 					{selectedClient ? (
 						<>
+						<div ref={clientModulesRef} className="scroll-mt-20">
+							<ClientModuleSummary
+								client={selectedClient}
+								canStartAssessment={canCreateCurrentAssessment}
+								canAccessScreenings={canClinicalProfessional}
+								onStartAssessment={startNewAssessment}
+								onOpenScreenings={() => document.getElementById('client-screenings')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+								onOpenReports={openLatestClientReport}
+							/>
+						</div>
 						<div className="no-print rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
 							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 								<div>
@@ -1721,14 +1744,16 @@ export default function DashboardPage({ userName }) {
 							) : null}
 						</div>
 						{selectedClient.is_active && !selectedClient.is_anonymized ? (
-							['admin', 'professional'].includes(currentUser?.role) ? (
-								<ScreeningInvitationPanel client={selectedClient} />
-							) : (
-								<div className="no-print rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-									<strong>Questionário de triagem indisponível para este perfil.</strong>
-									<p className="mt-1">Somente contas de administrador ou profissional podem criar e acompanhar aplicações.</p>
-								</div>
-							)
+							<div id="client-screenings" className="scroll-mt-20">
+								{['admin', 'professional'].includes(currentUser?.role) ? (
+									<ScreeningInvitationPanel client={selectedClient} />
+								) : (
+									<div className="no-print rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+										<strong>Questionário de triagem indisponível para este perfil.</strong>
+										<p className="mt-1">Somente contas de administrador ou profissional podem criar e acompanhar aplicações.</p>
+									</div>
+								)}
+							</div>
 						) : null}
 						</>
 					) : null}
