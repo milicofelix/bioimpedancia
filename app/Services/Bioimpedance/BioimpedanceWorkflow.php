@@ -410,6 +410,29 @@ class BioimpedanceWorkflow
 
         $this->validateEvaluationDateAgainstBirthDate($client, $validated['evaluated_at']);
 
+        if ($sourceMetadata && ($sourceMetadata['report_layout'] ?? null) === BodyscanReportLayout::FITDAYS_TECHNICAL) {
+            $printedProfile = $sourceMetadata['printed_measurement_profile'];
+            $registeredAge = (int) $client->birth_date->diffInYears(Carbon::parse($validated['evaluated_at']));
+            $registeredHeight = (float) $client->height_cm;
+            $sourceMetadata['printed_profile_comparison'] = [
+                'biological_sex' => [
+                    'printed' => $printedProfile['biological_sex'],
+                    'registered' => $client->biological_sex,
+                    'matches' => $printedProfile['biological_sex'] === $client->biological_sex,
+                ],
+                'age_years' => [
+                    'printed' => (int) $printedProfile['age_years'],
+                    'registered' => $registeredAge,
+                    'matches' => (int) $printedProfile['age_years'] === $registeredAge,
+                ],
+                'height_cm' => [
+                    'printed' => (float) $printedProfile['height_cm'],
+                    'registered' => $registeredHeight,
+                    'matches' => abs((float) $printedProfile['height_cm'] - $registeredHeight) < 0.1,
+                ],
+            ];
+        }
+
         $snapshot = $this->assessmentSnapshot($client, $validated['evaluated_at'], $measurementProfile);
         $analysis = $analyzer->analyze($client->toArray(), [...$validated, ...$snapshot]);
 
@@ -925,6 +948,11 @@ class BioimpedanceWorkflow
             'source_metadata.available_metric_fields.*' => ['required', 'distinct', Rule::in(BodyscanOcrProfileRegistry::METRIC_FIELDS)],
             'source_metadata.weight_unit' => ['required', Rule::in(['kg'])],
             'source_metadata.measured_at' => ['nullable', 'date'],
+            'source_metadata.printed_measurement_profile' => ['required', 'array'],
+            'source_metadata.printed_measurement_profile.biological_sex' => ['nullable', Rule::in(['male', 'female'])],
+            'source_metadata.printed_measurement_profile.age_years' => ['nullable', 'numeric', 'between:1,120'],
+            'source_metadata.printed_measurement_profile.height_cm' => ['nullable', 'numeric', 'between:50,250'],
+            'source_metadata.printed_measurement_profile.raw_value' => ['nullable', 'string', 'max:160'],
             'source_metadata.metrics' => ['required', 'array'],
             'source_metadata.extended_metrics' => ['present', 'array', 'max:30'],
             'source_metadata.extended_metrics.*.metric_code' => ['required', 'distinct', Rule::in(BodyscanExtendedMetricCatalog::CODES)],
@@ -955,6 +983,7 @@ class BioimpedanceWorkflow
             'source_metadata.raw_values.metrics' => ['required', 'array'],
             'source_metadata.raw_values.metric_source_labels' => ['required', 'array'],
             'source_metadata.raw_values.metric_text' => ['required', 'array'],
+            'source_metadata.raw_values.printed_measurement_profile' => ['present', 'array'],
             'source_metadata.raw_values.impedance_readings' => ['present', 'array'],
             'source_metadata.raw_values.segmental_measurements' => ['required', 'array'],
             'source_metadata.detected_sections' => ['required', 'array', 'min:2'],
@@ -1013,6 +1042,15 @@ class BioimpedanceWorkflow
         if ($validated['measurement_application'] !== $sourceApplication) {
             throw ValidationException::withMessages([
                 'measurement_application' => 'O aplicativo confirmado não corresponde à marca identificada no relatório. Processe novamente uma imagem compatível.',
+            ]);
+        }
+        $printedProfile = $validated['source_metadata']['printed_measurement_profile'];
+        if ($reportLayout === BodyscanReportLayout::FITDAYS_TECHNICAL
+            && (blank($printedProfile['biological_sex'] ?? null)
+                || ! is_numeric($printedProfile['age_years'] ?? null)
+                || ! is_numeric($printedProfile['height_cm'] ?? null))) {
+            throw ValidationException::withMessages([
+                'source_metadata' => 'Sexo, idade e altura impressos precisam estar legíveis no relatório técnico.',
             ]);
         }
         $expectedMetricFields = $this->bodyscanOcrProfiles->forLayout($reportLayout)->availableMetricFields;
@@ -1178,6 +1216,7 @@ class BioimpedanceWorkflow
             'available_metric_fields' => $validated['source_metadata']['available_metric_fields'],
             'extended_metric_codes' => collect($validated['source_metadata']['extended_metrics'])->pluck('metric_code')->values()->all(),
             'impedance_reading_count' => count($impedanceReadings),
+            'printed_measurement_profile' => $validated['source_metadata']['printed_measurement_profile'],
             'weight_unit' => $validated['source_metadata']['weight_unit'],
             'confirmed_application' => $validated['measurement_application'],
             'athlete_mode_at_assessment' => (bool) $validated['athlete_mode_at_assessment'],

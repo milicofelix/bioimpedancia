@@ -114,6 +114,7 @@ class BodyscanProImageProcessor
             'available_metric_fields' => $result['available_metric_fields'],
             'weight_unit' => $result['weight_unit'],
             'measured_at' => $result['measured_at'],
+            'printed_measurement_profile' => $result['printed_measurement_profile'],
             'metrics' => $result['metrics'],
             'extended_metrics' => $result['extended_metrics'],
             'impedance_readings' => $result['impedance_readings'],
@@ -206,6 +207,35 @@ class BodyscanProImageProcessor
         $fieldStatuses = [];
         $fieldStatuses['source_application'] = 'recognized';
         $fieldStatuses['report_layout'] = 'recognized';
+
+        $rawPrintedProfile = is_array($payload['printed_measurement_profile'] ?? null)
+            ? $payload['printed_measurement_profile']
+            : [];
+        $printedProfile = [
+            'biological_sex' => $this->normalizeBiologicalSex($rawPrintedProfile['biological_sex'] ?? null),
+            'age_years' => $this->normalizeNumber($rawPrintedProfile['age_years'] ?? null),
+            'height_cm' => $this->normalizeNumber($rawPrintedProfile['height_cm'] ?? null),
+            'raw_value' => $this->normalizeText($rawPrintedProfile['raw_value'] ?? null),
+        ];
+        if ($reportLayout === BodyscanReportLayout::FITDAYS_TECHNICAL) {
+            foreach (['biological_sex', 'age_years', 'height_cm'] as $field) {
+                $statusKey = 'printed_measurement_profile.'.$field;
+                $fieldStatuses[$statusKey] = $printedProfile[$field] === null ? 'missing' : 'recognized';
+                if ($printedProfile[$field] === null) {
+                    $missingFields->push($statusKey);
+                }
+            }
+            foreach (['age_years' => [1, 120], 'height_cm' => [50, 250]] as $field => [$minimum, $maximum]) {
+                if ($printedProfile[$field] !== null && ($printedProfile[$field] < $minimum || $printedProfile[$field] > $maximum)) {
+                    $fieldStatuses['printed_measurement_profile.'.$field] = 'suspicious';
+                    $suspiciousValues->push([
+                        'field' => 'printed_measurement_profile.'.$field,
+                        'value' => $printedProfile[$field],
+                        'reason' => 'Dado do perfil impresso fora da faixa de integridade esperada.',
+                    ]);
+                }
+            }
+        }
         foreach (self::METRIC_FIELDS as $field) {
             if (! $profile->supportsMetric($field)) {
                 $metrics[$field] = null;
@@ -330,6 +360,7 @@ class BodyscanProImageProcessor
             'available_metric_fields' => $profile->availableMetricFields,
             'weight_unit' => $weightUnit,
             'measured_at' => $measuredAt,
+            'printed_measurement_profile' => $printedProfile,
             'metrics' => $metrics,
             'extended_metrics' => $extendedMetrics,
             'impedance_readings' => $impedanceReadings,
@@ -343,6 +374,7 @@ class BodyscanProImageProcessor
                 'metrics' => $rawMetrics,
                 'metric_source_labels' => $rawMetricLabels,
                 'metric_text' => $rawMetricTexts,
+                'printed_measurement_profile' => $rawPrintedProfile,
                 'extended_metrics' => $payload['extended_metrics'] ?? [],
                 'impedance_readings' => $payload['impedance_readings'] ?? [],
                 'segmental_measurements' => $payload['segmental_measurements'] ?? [],
@@ -769,6 +801,17 @@ class BodyscanProImageProcessor
         };
     }
 
+    private function normalizeBiologicalSex(mixed $value): ?string
+    {
+        $normalized = $this->normalizedLabel((string) $value);
+
+        return match (true) {
+            in_array($normalized, ['male', 'masculino', 'm'], true) => 'male',
+            in_array($normalized, ['female', 'feminino', 'f'], true) => 'female',
+            default => null,
+        };
+    }
+
     private function normalizeWeightUnit(mixed $value): ?string
     {
         $normalized = $this->normalizedLabel((string) $value);
@@ -806,7 +849,7 @@ class BodyscanProImageProcessor
     {
         $payload = collect([
             'type', 'name', 'size_bytes', 'mime_type', 'stored', 'sha256', 'processed_at',
-            'processor_model', 'reference_version', 'measured_at', 'metrics', 'extended_metrics', 'impedance_readings', 'segmental_measurements',
+            'processor_model', 'reference_version', 'measured_at', 'printed_measurement_profile', 'metrics', 'extended_metrics', 'impedance_readings', 'segmental_measurements',
             'raw_values', 'detected_sections', 'field_statuses', 'missing_fields', 'suspicious_values',
             'quality_issues', 'side_consistency', 'source_application', 'report_layout',
             'layout_profile_version', 'layout_evidence', 'available_metric_fields', 'weight_unit',
@@ -826,6 +869,7 @@ Identifique report_layout exclusivamente por textos realmente visíveis, sem usa
 - relaxfit_vertical_report exige a marca RelaxFit, "Análise de gordura segmentar", "Equilíbrio muscular" e ao menos "Dados de membro" ou "Índice corporal".
 Em layout_evidence, copie separadamente e sem parafrasear cada marca, título ou cabeçalho usado para identificar o layout. Não inclua evidência que não esteja legível na imagem.
 Identifique weight_unit pela unidade impressa ao lado do peso: kg, lb ou stone. Use null se a unidade não estiver legível. Não converta valores entre unidades.
+No fitdays_technical_report, extraia de seu cabeçalho sexo, idade e altura em printed_measurement_profile. Normalize biological_sex como male ou female, preserve idade em anos, altura em cm e copie a linha completa em raw_value. Nos layouts verticais, use null nos quatro campos quando esses dados não estiverem impressos; não deduza pelo cadastro, nome ou aparência.
 Reconheça o modelo pelo conjunto de textos e seções do layout identificado, nunca apenas pela aparência.
 Extraia cada valor pelo rótulo textual e pelo marcador L/R correspondente. Nunca determine o lado apenas pela posição na tela.
 Para os segmentos, use somente estes identificadores: type fat ou muscle; region arm, trunk ou leg; side left, center ou right. O tronco deve usar side center.
@@ -877,7 +921,7 @@ PROMPT;
         return [
             'type' => 'object',
             'additionalProperties' => false,
-            'required' => ['recognized', 'is_complete', 'quality_issues', 'source_application', 'report_layout', 'layout_evidence', 'weight_unit', 'measured_at', 'detected_sections', 'metrics', 'metric_source_labels', 'metric_raw_values', 'extended_metrics', 'impedance_readings', 'segmental_measurements', 'side_consistency', 'suspicious_values'],
+            'required' => ['recognized', 'is_complete', 'quality_issues', 'source_application', 'report_layout', 'layout_evidence', 'weight_unit', 'measured_at', 'printed_measurement_profile', 'detected_sections', 'metrics', 'metric_source_labels', 'metric_raw_values', 'extended_metrics', 'impedance_readings', 'segmental_measurements', 'side_consistency', 'suspicious_values'],
             'properties' => [
                 'recognized' => ['type' => 'boolean'],
                 'is_complete' => ['type' => 'boolean'],
@@ -887,6 +931,17 @@ PROMPT;
                 'layout_evidence' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'weight_unit' => ['type' => ['string', 'null'], 'enum' => ['kg', 'lb', 'stone', null]],
                 'measured_at' => $nullableString,
+                'printed_measurement_profile' => [
+                    'type' => 'object',
+                    'additionalProperties' => false,
+                    'required' => ['biological_sex', 'age_years', 'height_cm', 'raw_value'],
+                    'properties' => [
+                        'biological_sex' => ['type' => ['string', 'null'], 'enum' => ['male', 'female', null]],
+                        'age_years' => $nullableNumber,
+                        'height_cm' => $nullableNumber,
+                        'raw_value' => $nullableString,
+                    ],
+                ],
                 'detected_sections' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'metrics' => [
                     'type' => 'object',

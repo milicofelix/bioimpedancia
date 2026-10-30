@@ -19,7 +19,7 @@ final class BodyscanReportLayout
     ];
 
     private const PROFILE_VERSIONS = [
-        self::FITDAYS_TECHNICAL => 'fitdays-technical-1.2.0',
+        self::FITDAYS_TECHNICAL => 'fitdays-technical-1.3.0',
         self::FITDAYS_VERTICAL => 'fitdays-vertical-1.1.0',
         self::RELAXFIT_VERTICAL => 'relaxfit-vertical-1.0.0',
     ];

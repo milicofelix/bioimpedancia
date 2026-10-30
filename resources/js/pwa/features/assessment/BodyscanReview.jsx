@@ -25,20 +25,22 @@ const extendedMetricLabels = {
 	body_balance_assessment: 'Avaliação do equilíbrio corporal',
 };
 
-function ExtendedMetrics({ metrics }) {
+const weightControlCodes = new Set(['recommended_target_weight', 'weight_control', 'fat_control', 'muscle_control']);
+
+function ExtendedMetrics({ metrics, title = 'Métricas estendidas', controlSection = false }) {
 	if (!metrics?.length) return null;
 
 	return (
 		<section className="rounded-2xl border border-sky-200 bg-sky-50/40 p-4">
-			<h3 className="font-bold text-slate-950">Indicadores estendidos do aplicativo</h3>
-			<p className="mt-1 text-xs leading-5 text-slate-600">Referências e classificações proprietárias do Fitdays. Não representam classificação clínica, diagnóstico ou prescrição.</p>
+			<h3 className="font-bold text-slate-950">{title}</h3>
+			<p className="mt-1 text-xs leading-5 text-slate-600">{controlSection ? 'Metas e controles proprietários apresentados pelo aplicativo. Não constituem prescrição clínica.' : 'Referências, faixas e classificações proprietárias do Fitdays. Não representam classificação clínica ou diagnóstico.'}</p>
 			<div className="mt-3 grid gap-2 sm:grid-cols-2">
 				{metrics.map((metric) => {
 					const value = metric.text_value ?? [metric.numeric_value, metric.unit].filter((part) => part !== null && part !== undefined && part !== '').join(' ');
-					return <div key={metric.metric_code} className="rounded-xl border border-sky-100 bg-white p-3 text-xs"><strong className="block text-slate-900">{extendedMetricLabels[metric.metric_code] ?? metric.original_label}</strong><span className="mt-1 block text-base font-bold text-slate-800">{value}</span>{metric.application_classification ? <span className="mt-1 block text-slate-600">Classificação do aplicativo: {metric.application_classification}</span> : null}{metric.weight_proportion_percentage !== null && metric.weight_proportion_percentage !== undefined ? <span className="block text-slate-600">Proporção do peso: {metric.weight_proportion_percentage}%</span> : null}<span className="mt-1 block text-slate-500">Leitura bruta: {metric.raw_extracted_value}</span></div>;
+					return <div key={metric.metric_code} className="rounded-xl border border-sky-100 bg-white p-3 text-xs"><strong className="block text-slate-900">{extendedMetricLabels[metric.metric_code] ?? metric.original_label}</strong><span className="mt-1 block text-base font-bold text-slate-800">{value}</span>{metric.application_classification ? <span className="mt-1 block text-slate-600">Classificação do aplicativo: {metric.application_classification}</span> : null}{metric.printed_minimum !== null && metric.printed_minimum !== undefined && metric.printed_maximum !== null && metric.printed_maximum !== undefined ? <span className="block text-slate-600">Faixa impressa: {metric.printed_minimum}–{metric.printed_maximum} {metric.unit ?? ''}</span> : null}{metric.weight_proportion_percentage !== null && metric.weight_proportion_percentage !== undefined ? <span className="block text-slate-600">Proporção do peso: {metric.weight_proportion_percentage}%</span> : null}<span className="mt-1 block text-slate-500">Leitura bruta: {metric.raw_extracted_value}</span></div>;
 				})}
 			</div>
-			<p className="mt-3 text-xs font-semibold text-sky-900">Peso-alvo e controles são referências proprietárias. A pontuação corporal não deve ser utilizada para diagnóstico.</p>
+			<p className="mt-3 text-xs font-semibold text-sky-900">{controlSection ? 'O peso-alvo é uma referência proprietária do aplicativo.' : 'A pontuação corporal não deve ser utilizada para diagnóstico.'}</p>
 		</section>
 	);
 }
@@ -137,6 +139,19 @@ export default function BodyscanReview({ previewUrl, form, extraction, client, c
 	const readingWarnings = [...new Set((extraction?.suspicious_values ?? []).map((item) => item.reason).filter(Boolean))];
 	const measurementAge = ageAtMeasurement(client?.birth_date, form.general.evaluated_at);
 	const availableMetricFields = new Set(extraction?.available_metric_fields ?? Object.keys(relaxmedicMetricLabels));
+	const compositionFields = Object.entries(relaxmedicMetricLabels).filter(([field]) => availableMetricFields.has(field));
+	const extendedMetrics = (extraction?.extended_metrics ?? []).filter((metric) => !weightControlCodes.has(metric.metric_code));
+	const weightControlMetrics = (extraction?.extended_metrics ?? []).filter((metric) => weightControlCodes.has(metric.metric_code));
+	const isTechnicalLayout = extraction?.report_layout === 'fitdays_technical_report';
+	const printedProfile = extraction?.printed_measurement_profile ?? {};
+	const registeredSex = client?.biological_sex ?? null;
+	const registeredHeight = client?.height_cm === null || client?.height_cm === undefined ? null : Number(client.height_cm);
+	const profileComparison = {
+		biological_sex: !isTechnicalLayout || !printedProfile.biological_sex || printedProfile.biological_sex === registeredSex,
+		age_years: !isTechnicalLayout || printedProfile.age_years === null || printedProfile.age_years === undefined || Number(printedProfile.age_years) === measurementAge,
+		height_cm: !isTechnicalLayout || printedProfile.height_cm === null || printedProfile.height_cm === undefined || (registeredHeight !== null && Math.abs(Number(printedProfile.height_cm) - registeredHeight) < 0.1),
+	};
+	const hasProfileDivergence = isTechnicalLayout && Object.values(profileComparison).some((matches) => !matches);
 
 	return (
 		<form onSubmit={onSubmit} aria-busy={saving} className="pwa-card p-4 sm:p-5">
@@ -145,30 +160,33 @@ export default function BodyscanReview({ previewUrl, form, extraction, client, c
 			{qualityWarnings.length ? <details className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm"><summary className="min-h-11 cursor-pointer font-bold">Qualidade da imagem · {qualityWarnings.length} {qualityWarnings.length === 1 ? 'observação' : 'observações'}</summary><p className="mb-2 text-xs text-amber-900">Estas mensagens tratam apenas de nitidez, resolução ou enquadramento.</p><ul className="list-disc space-y-1 pl-5">{qualityWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></details> : null}
 			{readingWarnings.length ? <details className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm"><summary className="min-h-11 cursor-pointer font-bold">Campos para conferir · {readingWarnings.length}</summary><p className="mb-2 text-xs text-amber-900">Confira somente os textos, números, unidades ou lados que não puderam ser lidos com segurança.</p><ul className="list-disc space-y-1 pl-5">{readingWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></details> : null}
 			<div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-950"><strong>Formato identificado:</strong> {layoutLabels[extraction?.report_layout] ?? 'Não identificado'}{extraction?.layout_profile_version ? ` · perfil ${extraction.layout_profile_version}` : ''}</div>
+			{hasProfileDivergence ? <p role="alert" className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">O perfil impresso diverge do cadastro. Confira sexo, idade e altura antes de confirmar a avaliação.</p> : null}
 			<div className="mt-4 grid grid-cols-2 gap-2 lg:hidden"><button type="button" onClick={() => setPanel('image')} className={`min-h-11 rounded-xl font-bold ${panel === 'image' ? 'bg-ricosty-700 text-white' : 'bg-slate-100'}`}>Imagem</button><button type="button" onClick={() => setPanel('values')} className={`min-h-11 rounded-xl font-bold ${panel === 'values' ? 'bg-ricosty-700 text-white' : 'bg-slate-100'}`}>Valores</button></div>
 			<div className="mt-4 lg:grid lg:grid-cols-[minmax(0,.7fr)_minmax(0,1.3fr)] lg:gap-5">
 				<div className={`${panel === 'image' ? 'block' : 'hidden'} lg:block`}><div className="sticky top-20 max-h-[75vh] overflow-y-auto rounded-xl border bg-slate-100 p-2"><img src={previewUrl} alt="Relatório Bodyscan Pro original para conferência" className="mx-auto h-auto w-full rounded-lg object-contain" /></div></div>
 				<div className={`${panel === 'values' ? 'block' : 'hidden'} space-y-4 lg:block`}>
 					<section className="rounded-2xl border border-ricosty-200 bg-ricosty-50/40 p-4">
 						<h3 className="font-bold text-slate-950">Perfil usado na medição</h3>
-						<p className="mt-1 text-xs leading-5 text-slate-600">Confirme os mesmos dados configurados no aplicativo da balança. Sexo, idade e altura vêm do cadastro do cliente e serão preservados na avaliação.</p>
+						<p className="mt-1 text-xs leading-5 text-slate-600">Confirme o perfil configurado no aplicativo. No relatório técnico, os dados impressos são comparados ao cadastro sem substituição automática.</p>
 						<div className="mt-3 grid gap-2 sm:grid-cols-3">
-							<ProfileValue label="Sexo" value={client?.biological_sex === 'female' ? 'Feminino' : client?.biological_sex === 'male' ? 'Masculino' : 'Não informado'} />
-							<ProfileValue label="Idade na medição" value={measurementAge !== null ? `${measurementAge} anos` : 'Calculada ao salvar'} />
-							<ProfileValue label="Altura" value={client?.height_cm ? `${String(client.height_cm).replace('.', ',')} cm` : 'Não informada'} />
+							<ProfileValue label="Sexo no cadastro" value={client?.biological_sex === 'female' ? 'Feminino' : client?.biological_sex === 'male' ? 'Masculino' : 'Não informado'} printedValue={isTechnicalLayout ? (printedProfile.biological_sex === 'female' ? 'Feminino' : printedProfile.biological_sex === 'male' ? 'Masculino' : 'Ilegível') : null} matches={profileComparison.biological_sex} />
+							<ProfileValue label="Idade na medição" value={measurementAge !== null ? `${measurementAge} anos` : 'Calculada ao salvar'} printedValue={isTechnicalLayout ? `${printedProfile.age_years ?? 'Ilegível'} anos` : null} matches={profileComparison.age_years} />
+							<ProfileValue label="Altura no cadastro" value={client?.height_cm ? `${String(client.height_cm).replace('.', ',')} cm` : 'Não informada'} printedValue={isTechnicalLayout ? `${printedProfile.height_cm ?? 'Ilegível'} cm` : null} matches={profileComparison.height_cm} />
 						</div>
+						{isTechnicalLayout && printedProfile.raw_value ? <p className="mt-2 text-xs text-slate-500">Cabeçalho lido: {printedProfile.raw_value}</p> : null}
 						<div className="mt-3 grid gap-3 sm:grid-cols-2">
 							<label className="text-sm font-semibold text-slate-800">Aplicativo de origem<select required value={form.profile?.measurement_application ?? ''} onChange={(event) => onProfileUpdate('measurement_application', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3"><option value="">Selecione após conferir</option><option value="relaxfit">RelaxFit</option><option value="fitdays">Fitdays</option></select>{firstError(errors, 'measurement_application') ? <span className="mt-1 block text-xs text-rose-700">{firstError(errors, 'measurement_application')}</span> : null}</label>
 							<label className="text-sm font-semibold text-slate-800">Modo atleta<select required value={form.profile?.athlete_mode_at_assessment ?? ''} onChange={(event) => onProfileUpdate('athlete_mode_at_assessment', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3"><option value="">Selecione após conferir</option><option value="0">Desativado</option><option value="1">Ativado</option></select>{firstError(errors, 'athlete_mode_at_assessment') ? <span className="mt-1 block text-xs text-rose-700">{firstError(errors, 'athlete_mode_at_assessment')}</span> : null}</label>
 						</div>
 						<p className="mt-3 text-xs font-semibold text-slate-600">Equipamento RM-BD0015A · Manual de referência V1.1222</p>
 					</section>
-					<section className="rounded-2xl border border-slate-200 bg-white p-4"><h3 className="font-bold text-slate-950">Métricas gerais</h3><label className="mt-3 block text-sm font-semibold">Data e hora<input type="datetime-local" required max={localDatetimeNow()} value={form.general.evaluated_at} onChange={(event) => onGeneralUpdate('evaluated_at', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label><div className="mt-3 grid gap-2 sm:grid-cols-2">{Object.entries(relaxmedicMetricLabels).map(([field, label]) => { const available = availableMetricFields.has(field); const flagged = available && ['missing', 'unrecognized', 'suspicious'].includes(statuses[`metrics.${field}`]); const rawText = extraction?.raw_values?.metric_text?.[field]; return <label key={field} className={`rounded-xl border p-3 text-xs font-semibold ${!available ? 'border-slate-200 bg-slate-100 text-slate-500' : flagged ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}`}>{label}{!available ? <span className="ml-2 text-[10px] font-bold text-slate-500">NÃO DISPONÍVEL NESTE FORMATO</span> : flagged ? <span className="ml-2 text-[10px] font-bold text-amber-800">CONFERIR</span> : null}{field === 'obesity_level' ? <select required={available} disabled={!available} value={form.general[field]} onChange={(event) => onGeneralUpdate(field, event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 font-normal disabled:cursor-not-allowed disabled:bg-slate-100"><option value="">{available ? 'Selecione após conferir' : 'Ausente neste layout'}</option>{(extraction?.allowed_values?.obesity_level ?? []).map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input required={available} disabled={!available} type="text" inputMode={relaxmedicTextFields.includes(field) ? 'text' : relaxmedicIntegerFields.includes(field) ? 'numeric' : 'decimal'} value={form.general[field]} onChange={(event) => onGeneralUpdate(field, event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 font-normal disabled:cursor-not-allowed disabled:bg-slate-100" />}{available && rawText ? <span className="mt-1 block font-normal text-slate-500">Leitura bruta: {rawText}</span> : null}{firstError(errors, field) ? <span className="mt-1 block text-rose-700">{firstError(errors, field)}</span> : null}</label>; })}</div></section>
-					<ExtendedMetrics metrics={extraction?.extended_metrics ?? []} />
-					<ImpedanceSection readings={form.impedanceReadings ?? []} statuses={statuses} errors={errors} onUpdate={onImpedanceUpdate} />
+					<section className="rounded-2xl border border-slate-200 bg-white p-4"><h3 className="font-bold text-slate-950">Composição corporal</h3><label className="mt-3 block text-sm font-semibold">Data e hora<input type="datetime-local" required max={localDatetimeNow()} value={form.general.evaluated_at} onChange={(event) => onGeneralUpdate('evaluated_at', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label><div className="mt-3 grid gap-2 sm:grid-cols-2">{compositionFields.map(([field, label]) => { const flagged = ['missing', 'unrecognized', 'suspicious'].includes(statuses[`metrics.${field}`]); const rawText = extraction?.raw_values?.metric_text?.[field]; return <label key={field} className={`rounded-xl border p-3 text-xs font-semibold ${flagged ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}`}>{label}{flagged ? <span className="ml-2 text-[10px] font-bold text-amber-800">CONFERIR</span> : null}{field === 'obesity_level' ? <select required value={form.general[field]} onChange={(event) => onGeneralUpdate(field, event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 font-normal"><option value="">Selecione após conferir</option>{(extraction?.allowed_values?.obesity_level ?? []).map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input required type="text" inputMode={relaxmedicTextFields.includes(field) ? 'text' : relaxmedicIntegerFields.includes(field) ? 'numeric' : 'decimal'} value={form.general[field]} onChange={(event) => onGeneralUpdate(field, event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 font-normal" />}{rawText ? <span className="mt-1 block font-normal text-slate-500">Leitura bruta: {rawText}</span> : null}{firstError(errors, field) ? <span className="mt-1 block text-rose-700">{firstError(errors, field)}</span> : null}</label>; })}</div></section>
+					<ExtendedMetrics metrics={extendedMetrics} />
 					<div className="grid gap-4 xl:grid-cols-2"><SegmentalBodyMap measurements={form.segments} type="fat" /><SegmentalBodyMap measurements={form.segments} type="muscle" /></div>
 					<SegmentSection title="Gordura segmentar" type="fat" segments={grouped.fat} statuses={statuses} errors={errors} onUpdate={onSegmentUpdate} />
 					<SegmentSection title="Equilíbrio muscular" type="muscle" segments={grouped.muscle} statuses={statuses} errors={errors} onUpdate={onSegmentUpdate} />
+					<ImpedanceSection readings={form.impedanceReadings ?? []} statuses={statuses} errors={errors} onUpdate={onImpedanceUpdate} />
+					<ExtendedMetrics metrics={weightControlMetrics} title="Controle de peso do aplicativo" controlSection />
 					<label className="block text-sm font-semibold">Observações<input maxLength={2000} value={form.general.notes} onChange={(event) => onGeneralUpdate('notes', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label>
 				</div>
 			</div>
@@ -179,6 +197,6 @@ export default function BodyscanReview({ previewUrl, form, extraction, client, c
 	);
 }
 
-function ProfileValue({ label, value }) {
-	return <div className="rounded-xl border border-white bg-white px-3 py-2"><span className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</span><strong className="text-sm text-slate-900">{value}</strong></div>;
+function ProfileValue({ label, value, printedValue = null, matches = true }) {
+	return <div className={`rounded-xl border px-3 py-2 ${matches ? 'border-white bg-white' : 'border-amber-300 bg-amber-50'}`}><span className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</span><strong className="text-sm text-slate-900">{value}</strong>{printedValue !== null ? <span className={`mt-1 block text-xs ${matches ? 'text-emerald-700' : 'font-bold text-amber-900'}`}>Impresso: {printedValue} · {matches ? 'confere' : 'diverge'}</span> : null}</div>;
 }
