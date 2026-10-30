@@ -12,7 +12,7 @@ import PwaJourneyHeader from '../../components/ui/PwaJourneyHeader';
 import PwaStepIndicator from '../../components/ui/PwaStepIndicator';
 import useActionLock from '../../../hooks/useActionLock';
 import BodyscanReview from './BodyscanReview';
-import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocolComplete, emptyBodyscanProtocol, updateBodyscanSegment } from './bodyscanAssessmentForm';
+import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocolComplete, emptyBodyscanProtocol, updateBodyscanImpedance, updateBodyscanSegment } from './bodyscanAssessmentForm';
 import BodyscanOcrProgress from './BodyscanOcrProgress';
 import BodyscanProtocolChecklist from './BodyscanProtocolChecklist';
 
@@ -126,6 +126,11 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 		setErrors({});
 	}
 
+	function updateImpedance(index, field, value) {
+		setConfirmed(false);
+		setBodyscanForm((current) => ({ ...current, impedanceReadings: updateBodyscanImpedance(current.impedanceReadings ?? [], index, field, value) }));
+	}
+
 	function updateBodyscanProfile(field, value) {
 		setBodyscanForm((current) => ({ ...current, profile: { ...current.profile, [field]: value } }));
 		setConfirmed(false);
@@ -211,7 +216,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 				</>
 			) : (
 				scaleModel === 'relaxmedic_bodyscan_pro'
-					? <BodyscanReview previewUrl={previewUrl} form={bodyscanForm} extraction={extraction} client={client} confirmed={confirmed} errors={errors} saving={saving} online={isOnline} onGeneralUpdate={updateBodyscanGeneral} onProfileUpdate={updateBodyscanProfile} onSegmentUpdate={updateSegment} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />
+					? <BodyscanReview previewUrl={previewUrl} form={bodyscanForm} extraction={extraction} client={client} confirmed={confirmed} errors={errors} saving={saving} online={isOnline} onGeneralUpdate={updateBodyscanGeneral} onProfileUpdate={updateBodyscanProfile} onSegmentUpdate={updateSegment} onImpedanceUpdate={updateImpedance} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />
 					: <RelaxmedicReview previewUrl={previewUrl} form={form} extraction={extraction} confirmed={confirmed} errors={errors} saving={saving} online={isOnline} onUpdate={update} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />
 			)}
 			{generalError ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{generalError}</p> : null}

@@ -43,6 +43,35 @@ function ExtendedMetrics({ metrics }) {
 	);
 }
 
+const impedanceRegionLabels = {
+	'arm|left': 'Braço esquerdo (L)',
+	'arm|right': 'Braço direito (R)',
+	'trunk|center': 'Tronco',
+	'leg|left': 'Perna esquerda (L)',
+	'leg|right': 'Perna direita (R)',
+};
+
+const impedanceStateLabels = {
+	clear: 'Legível',
+	uncertain: 'Conferir',
+	unreadable: 'Ilegível',
+};
+
+function ImpedanceSection({ readings, statuses, errors, onUpdate }) {
+	if (!readings?.length) return null;
+
+	return (
+		<section className="rounded-2xl border border-indigo-200 bg-indigo-50/30 p-4">
+			<h3 className="font-bold text-slate-950">Impedância bioelétrica segmentar</h3>
+			<p className="mt-1 text-xs leading-5 text-slate-600">Leitura técnica em ohms. L e R são determinados pelos cabeçalhos da tabela original. Estes valores não geram diagnóstico.</p>
+			<div className="mt-3 space-y-4">
+				{[20, 100].map((frequency) => <div key={frequency}><h4 className="text-sm font-bold text-indigo-950">{frequency} kHz</h4><div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">{readings.map((reading, index) => ({ reading, index })).filter(({ reading }) => Number(reading.frequency_khz) === frequency).map(({ reading, index }) => { const key = `${frequency}|${reading.region}|${reading.side}`; const status = statuses?.[`impedance_readings.${key}`]; const flagged = reading.reading_state !== 'clear' || !String(reading.impedance_ohms ?? '').trim() || ['missing', 'suspicious'].includes(status); const error = firstError(errors, `impedance_readings.${index}.impedance_ohms`) ?? firstError(errors, `impedance_readings.${index}.reading_state`); return <fieldset key={key} className={`rounded-xl border p-3 ${error ? 'border-rose-300 bg-rose-50' : flagged ? 'border-amber-300 bg-amber-50' : 'border-indigo-100 bg-white'}`}><legend className="px-1 text-xs font-bold text-slate-800">{impedanceRegionLabels[`${reading.region}|${reading.side}`]}</legend><label className="mt-1 block text-xs font-semibold text-slate-700">Impedância (Ω)<input inputMode="decimal" value={reading.impedance_ohms ?? ''} onChange={(event) => onUpdate(index, 'impedance_ohms', event.target.value)} placeholder="Valor ilegível" className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 font-normal" /></label><label className="mt-2 block text-xs font-semibold text-slate-700">Estado<select required value={reading.reading_state ?? ''} onChange={(event) => onUpdate(index, 'reading_state', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 font-normal"><option value="">Selecione</option>{Object.entries(impedanceStateLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>{reading.raw_value ? <span className="mt-2 block text-[11px] text-slate-500">Leitura bruta: {reading.raw_value}</span> : null}{error ? <span role="alert" className="mt-2 block text-xs font-semibold text-rose-700">{error}</span> : null}</fieldset>; })}</div></div>)}
+			</div>
+			<p className="mt-3 text-xs font-semibold text-indigo-900">Valores ausentes, ilegíveis ou exatamente repetidos entre regiões devem ser comparados com a tabela original.</p>
+		</section>
+	);
+}
+
 function firstError(errors, key) {
 	const value = errors?.[key];
 	return Array.isArray(value) ? value[0] : value;
@@ -93,7 +122,7 @@ function SegmentInput({ label, value, onChange }) {
 	return <label className="text-xs font-semibold text-slate-700">{label}<input required inputMode="decimal" value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-2 font-normal outline-none focus:ring-2 focus:ring-emerald-400" /></label>;
 }
 
-export default function BodyscanReview({ previewUrl, form, extraction, client, confirmed, errors, saving, online, onGeneralUpdate, onProfileUpdate, onSegmentUpdate, onConfirm, onSubmit, onRestart }) {
+export default function BodyscanReview({ previewUrl, form, extraction, client, confirmed, errors, saving, online, onGeneralUpdate, onProfileUpdate, onSegmentUpdate, onImpedanceUpdate, onConfirm, onSubmit, onRestart }) {
 	const [panel, setPanel] = useState('values');
 	const statuses = extraction?.field_statuses ?? {};
 	const grouped = useMemo(() => ({
@@ -136,13 +165,14 @@ export default function BodyscanReview({ previewUrl, form, extraction, client, c
 					</section>
 					<section className="rounded-2xl border border-slate-200 bg-white p-4"><h3 className="font-bold text-slate-950">Métricas gerais</h3><label className="mt-3 block text-sm font-semibold">Data e hora<input type="datetime-local" required max={localDatetimeNow()} value={form.general.evaluated_at} onChange={(event) => onGeneralUpdate('evaluated_at', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label><div className="mt-3 grid gap-2 sm:grid-cols-2">{Object.entries(relaxmedicMetricLabels).map(([field, label]) => { const available = availableMetricFields.has(field); const flagged = available && ['missing', 'unrecognized', 'suspicious'].includes(statuses[`metrics.${field}`]); const rawText = extraction?.raw_values?.metric_text?.[field]; return <label key={field} className={`rounded-xl border p-3 text-xs font-semibold ${!available ? 'border-slate-200 bg-slate-100 text-slate-500' : flagged ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}`}>{label}{!available ? <span className="ml-2 text-[10px] font-bold text-slate-500">NÃO DISPONÍVEL NESTE FORMATO</span> : flagged ? <span className="ml-2 text-[10px] font-bold text-amber-800">CONFERIR</span> : null}{field === 'obesity_level' ? <select required={available} disabled={!available} value={form.general[field]} onChange={(event) => onGeneralUpdate(field, event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 font-normal disabled:cursor-not-allowed disabled:bg-slate-100"><option value="">{available ? 'Selecione após conferir' : 'Ausente neste layout'}</option>{(extraction?.allowed_values?.obesity_level ?? []).map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input required={available} disabled={!available} type="text" inputMode={relaxmedicTextFields.includes(field) ? 'text' : relaxmedicIntegerFields.includes(field) ? 'numeric' : 'decimal'} value={form.general[field]} onChange={(event) => onGeneralUpdate(field, event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 font-normal disabled:cursor-not-allowed disabled:bg-slate-100" />}{available && rawText ? <span className="mt-1 block font-normal text-slate-500">Leitura bruta: {rawText}</span> : null}{firstError(errors, field) ? <span className="mt-1 block text-rose-700">{firstError(errors, field)}</span> : null}</label>; })}</div></section>
 					<ExtendedMetrics metrics={extraction?.extended_metrics ?? []} />
+					<ImpedanceSection readings={form.impedanceReadings ?? []} statuses={statuses} errors={errors} onUpdate={onImpedanceUpdate} />
 					<div className="grid gap-4 xl:grid-cols-2"><SegmentalBodyMap measurements={form.segments} type="fat" /><SegmentalBodyMap measurements={form.segments} type="muscle" /></div>
 					<SegmentSection title="Gordura segmentar" type="fat" segments={grouped.fat} statuses={statuses} errors={errors} onUpdate={onSegmentUpdate} />
 					<SegmentSection title="Equilíbrio muscular" type="muscle" segments={grouped.muscle} statuses={statuses} errors={errors} onUpdate={onSegmentUpdate} />
 					<label className="block text-sm font-semibold">Observações<input maxLength={2000} value={form.general.notes} onChange={(event) => onGeneralUpdate('notes', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label>
 				</div>
 			</div>
-			<label className="mt-5 flex items-start gap-3 rounded-2xl border border-ricosty-200 bg-ricosty-50 p-4 text-sm font-semibold"><input type="checkbox" checked={confirmed} disabled={incomplete} onChange={(event) => onConfirm(event.target.checked)} className="mt-0.5 h-5 w-5" /><span>Comparei a imagem original e confirmo o perfil usado na medição, as métricas gerais e estendidas, os cinco segmentos de gordura e os cinco segmentos musculares.</span></label>
+			<label className="mt-5 flex items-start gap-3 rounded-2xl border border-ricosty-200 bg-ricosty-50 p-4 text-sm font-semibold"><input type="checkbox" checked={confirmed} disabled={incomplete} onChange={(event) => onConfirm(event.target.checked)} className="mt-0.5 h-5 w-5" /><span>Comparei a imagem original e confirmo o perfil usado na medição, as métricas gerais e estendidas, os segmentos corporais e, quando disponível, a tabela técnica de impedância.</span></label>
 			{firstError(errors, 'source_metadata') || firstError(errors, 'bodyscan_review_confirmed') || firstError(errors, 'segmental_measurements') ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-700">{firstError(errors, 'source_metadata') ?? firstError(errors, 'bodyscan_review_confirmed') ?? firstError(errors, 'segmental_measurements')}</p> : null}
 			<PwaButton type="submit" disabled={incomplete || !confirmed || saving || !online} loading={saving} icon="check" className="mt-4 w-full">{saving ? 'Criando avaliação...' : 'Confirmar e criar avaliação'}</PwaButton>
 		</form>

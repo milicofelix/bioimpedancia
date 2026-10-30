@@ -47,6 +47,10 @@ export function bodyscanFormFromExtraction(extraction) {
 			reference_min_percentage: displayNumber(segment.reference_min_percentage),
 			reference_max_percentage: displayNumber(segment.reference_max_percentage),
 		})),
+		impedanceReadings: (extraction?.impedance_readings ?? []).map((reading) => ({
+			...reading,
+			impedance_ohms: displayNumber(reading.impedance_ohms),
+		})),
 	};
 }
 
@@ -54,6 +58,12 @@ export function updateBodyscanSegment(segments, index, field, value) {
 	return segments.map((segment, currentIndex) => currentIndex === index
 		? { ...segment, [field]: field === 'classification' ? value : maskRelaxmedicValue(field, value) }
 		: segment);
+}
+
+export function updateBodyscanImpedance(readings, index, field, value) {
+	return readings.map((reading, currentIndex) => currentIndex === index
+		? { ...reading, [field]: field === 'impedance_ohms' ? maskRelaxmedicValue(field, value) : value }
+		: reading);
 }
 
 export function bodyscanAssessmentPayload(form, clientId, sourceMetadata, confirmed) {
@@ -72,6 +82,10 @@ export function bodyscanAssessmentPayload(form, clientId, sourceMetadata, confir
 			reference_percentage: normalizeDecimal(reference_percentage),
 			reference_min_percentage: normalizeDecimal(reference_min_percentage),
 			reference_max_percentage: normalizeDecimal(reference_max_percentage),
+		})),
+		impedance_readings: (form.impedanceReadings ?? []).map(({ frequency_khz, region, side, impedance_ohms, reading_state }) => ({
+			frequency_khz, region, side, reading_state,
+			impedance_ohms: String(impedance_ohms ?? '').trim() === '' ? null : normalizeDecimal(impedance_ohms),
 		})),
 	};
 }

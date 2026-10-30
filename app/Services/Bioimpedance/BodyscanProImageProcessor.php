@@ -7,6 +7,7 @@ use App\Domain\Bioimpedance\BodyscanExtendedMetricCatalog;
 use App\Domain\Bioimpedance\BodyscanOcrProfileRegistry;
 use App\Domain\Bioimpedance\ScaleModel;
 use App\Models\Bioimpedance\BioimpedanceSegmentalMeasurement as Segment;
+use App\Models\Bioimpedance\BioimpedanceImpedanceReading as ImpedanceReading;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -115,6 +116,7 @@ class BodyscanProImageProcessor
             'measured_at' => $result['measured_at'],
             'metrics' => $result['metrics'],
             'extended_metrics' => $result['extended_metrics'],
+            'impedance_readings' => $result['impedance_readings'],
             'segmental_measurements' => $result['segmental_measurements'],
             'raw_values' => $result['raw_values'],
             'detected_sections' => $result['detected_sections'],
@@ -279,6 +281,15 @@ class BodyscanProImageProcessor
             }
         }
 
+        $impedanceReadings = $this->normalizeImpedanceReadings(
+            is_array($payload['impedance_readings'] ?? null) ? $payload['impedance_readings'] : [],
+            $reportLayout,
+            $sourceApplication,
+            $missingFields,
+            $suspiciousValues,
+            $fieldStatuses,
+        );
+
         $segmentalMeasurements = $this->normalizeSegments(
             is_array($payload['segmental_measurements'] ?? null) ? $payload['segmental_measurements'] : [],
             $missingFields,
@@ -321,6 +332,7 @@ class BodyscanProImageProcessor
             'measured_at' => $measuredAt,
             'metrics' => $metrics,
             'extended_metrics' => $extendedMetrics,
+            'impedance_readings' => $impedanceReadings,
             'segmental_measurements' => $segmentalMeasurements,
             'side_consistency' => $sideConsistency,
             'missing_fields' => $missingFields->unique()->values()->all(),
@@ -332,6 +344,7 @@ class BodyscanProImageProcessor
                 'metric_source_labels' => $rawMetricLabels,
                 'metric_text' => $rawMetricTexts,
                 'extended_metrics' => $payload['extended_metrics'] ?? [],
+                'impedance_readings' => $payload['impedance_readings'] ?? [],
                 'segmental_measurements' => $payload['segmental_measurements'] ?? [],
             ],
             'detected_sections' => $detectedSections->all(),
@@ -472,6 +485,101 @@ class BodyscanProImageProcessor
                 ];
             });
         })->values()->all();
+    }
+
+    private function normalizeImpedanceReadings(
+        array $rawReadings,
+        string $layout,
+        string $application,
+        $missingFields,
+        $suspiciousValues,
+        array &$fieldStatuses,
+    ): array {
+        if ($layout !== BodyscanReportLayout::FITDAYS_TECHNICAL) {
+            return [];
+        }
+
+        $indexed = [];
+        foreach ($rawReadings as $rawReading) {
+            if (! is_array($rawReading)) {
+                continue;
+            }
+
+            $frequency = (int) ($rawReading['frequency_khz'] ?? 0);
+            $region = $this->normalizeText($rawReading['region'] ?? null);
+            $side = $this->normalizeText($rawReading['side'] ?? null);
+            if (! in_array($frequency, ImpedanceReading::FREQUENCIES_KHZ, true)
+                || ! in_array($region, ImpedanceReading::REGIONS, true)
+                || ! in_array($side, ImpedanceReading::SIDES, true)
+                || ($region === 'trunk') !== ($side === 'center')) {
+                continue;
+            }
+
+            $key = $frequency.'|'.$region.'|'.$side;
+            if (isset($indexed[$key])) {
+                $suspiciousValues->push([
+                    'field' => 'impedance_readings.'.$key,
+                    'value' => $rawReading['impedance_ohms'] ?? null,
+                    'reason' => 'A tabela contém mais de uma leitura para a mesma frequência, região e lado.',
+                ]);
+                continue;
+            }
+            $indexed[$key] = $rawReading;
+        }
+
+        $readings = [];
+        foreach (ImpedanceReading::FREQUENCIES_KHZ as $frequency) {
+            foreach (ImpedanceReading::EXPECTED_POSITIONS as $position) {
+                $key = $frequency.'|'.$position['region'].'|'.$position['side'];
+                $raw = $indexed[$key] ?? [];
+                $value = $this->normalizeNumber($raw['impedance_ohms'] ?? null);
+                $state = $this->normalizeText($raw['reading_state'] ?? null);
+                if (! in_array($state, ImpedanceReading::STATES, true)) {
+                    $state = $value === null ? 'unreadable' : 'uncertain';
+                }
+                if ($value === null || $state !== 'clear') {
+                    $missingFields->push('impedance_readings.'.$key);
+                    $fieldStatuses['impedance_readings.'.$key] = $value === null ? 'missing' : 'suspicious';
+                } elseif ($value <= 0 || $value > 5000) {
+                    $fieldStatuses['impedance_readings.'.$key] = 'suspicious';
+                    $suspiciousValues->push([
+                        'field' => 'impedance_readings.'.$key,
+                        'value' => $value,
+                        'reason' => 'Impedância fora da faixa técnica de integridade usada pelo sistema.',
+                    ]);
+                } else {
+                    $fieldStatuses['impedance_readings.'.$key] = 'recognized';
+                }
+
+                $readings[] = [
+                    'frequency_khz' => $frequency,
+                    'region' => $position['region'],
+                    'side' => $position['side'],
+                    'impedance_ohms' => $value,
+                    'raw_value' => $this->normalizeText($raw['raw_value'] ?? null),
+                    'reading_state' => $state,
+                    'device_version' => ImpedanceReading::deviceVersion(),
+                    'source_application' => $application,
+                    'source_layout' => $layout,
+                ];
+            }
+        }
+
+        collect($readings)->groupBy('frequency_khz')->each(function ($frequencyReadings, $frequency) use ($suspiciousValues): void {
+            $duplicates = $frequencyReadings
+                ->filter(fn (array $reading) => $reading['impedance_ohms'] !== null)
+                ->groupBy(fn (array $reading) => number_format((float) $reading['impedance_ohms'], 2, '.', ''))
+                ->filter(fn ($sameValues) => $sameValues->count() > 1);
+            foreach ($duplicates as $value => $sameValues) {
+                $suspiciousValues->push([
+                    'field' => 'impedance_readings.'.$frequency.'khz',
+                    'value' => $value,
+                    'reason' => 'O mesmo valor de impedância aparece em regiões diferentes na frequência de '.$frequency.' kHz; confira a tabela original.',
+                ]);
+            }
+        });
+
+        return $readings;
     }
 
     private function sideConsistency(mixed $raw, $suspiciousValues): array
@@ -698,7 +806,7 @@ class BodyscanProImageProcessor
     {
         $payload = collect([
             'type', 'name', 'size_bytes', 'mime_type', 'stored', 'sha256', 'processed_at',
-            'processor_model', 'reference_version', 'measured_at', 'metrics', 'extended_metrics', 'segmental_measurements',
+            'processor_model', 'reference_version', 'measured_at', 'metrics', 'extended_metrics', 'impedance_readings', 'segmental_measurements',
             'raw_values', 'detected_sections', 'field_statuses', 'missing_fields', 'suspicious_values',
             'quality_issues', 'side_consistency', 'source_application', 'report_layout',
             'layout_profile_version', 'layout_evidence', 'available_metric_fields', 'weight_unit',
@@ -735,6 +843,9 @@ Use os códigos: waist_hip_ratio, body_score, recommended_target_weight, weight_
 Para preservar classificações e faixas do aplicativo nas métricas gerais, também podem ser usados: weight, bmi, body_fat_percentage, fat_mass, bone_mass, protein_mass, body_water, muscle_mass, muscle_rate, skeletal_muscle, subcutaneous_fat e visceral_fat. Extraia somente os que estiverem impressos, mesmo que o valor também esteja em metrics.
 Para body_balance_assessment, use text_value para reunir fielmente os itens impressos; nos demais, use numeric_value. Não inclua a lista "Consumo comum de exercícios" nem calorias de atividades.
 Classificações como Alto, Muito alto e Excelente são textos proprietários do aplicativo: apenas copie, sem interpretação clínica. Pontuação corporal não é diagnóstico e peso-alvo é referência proprietária do Fitdays.
+No fitdays_technical_report, leia a tabela "Impedância bioelétrica" por cabeçalhos de frequência e região. Extraia exatamente dez impedance_readings: cinco em 20 kHz e cinco em 100 kHz. Use region arm, trunk ou leg e side left, right ou center; somente o tronco usa center.
+Determine left/right exclusivamente pelos cabeçalhos textuais "direito" e "esquerdo", nunca pela posição da coluna. Preserve o texto bruto, a impedância em ohms e reading_state clear, uncertain ou unreadable. Quando ilegível, use impedance_ohms null e mantenha o registro.
+Nos layouts fitdays_vertical_report e relaxfit_vertical_report, retorne impedance_readings vazio; a ausência da tabela nesses formatos é esperada. Impedância é dado técnico de integridade e não deve receber diagnóstico ou interpretação clínica.
 Preserve exatamente o valor decimal impresso. Não acrescente casas decimais nem alegue margem de erro ou precisão que não esteja escrita no relatório.
 Não calcule, estime, deduza ou complete valores ausentes. Use null quando algo não estiver legível.
 Converta a data e hora para YYYY-MM-DDTHH:MM:SS sem inventar fuso horário.
@@ -766,7 +877,7 @@ PROMPT;
         return [
             'type' => 'object',
             'additionalProperties' => false,
-            'required' => ['recognized', 'is_complete', 'quality_issues', 'source_application', 'report_layout', 'layout_evidence', 'weight_unit', 'measured_at', 'detected_sections', 'metrics', 'metric_source_labels', 'metric_raw_values', 'extended_metrics', 'segmental_measurements', 'side_consistency', 'suspicious_values'],
+            'required' => ['recognized', 'is_complete', 'quality_issues', 'source_application', 'report_layout', 'layout_evidence', 'weight_unit', 'measured_at', 'detected_sections', 'metrics', 'metric_source_labels', 'metric_raw_values', 'extended_metrics', 'impedance_readings', 'segmental_measurements', 'side_consistency', 'suspicious_values'],
             'properties' => [
                 'recognized' => ['type' => 'boolean'],
                 'is_complete' => ['type' => 'boolean'],
@@ -812,6 +923,22 @@ PROMPT;
                             'printed_maximum' => $nullableNumber,
                             'weight_proportion_percentage' => $nullableNumber,
                             'raw_value' => ['type' => 'string'],
+                        ],
+                    ],
+                ],
+                'impedance_readings' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'additionalProperties' => false,
+                        'required' => ['frequency_khz', 'region', 'side', 'impedance_ohms', 'raw_value', 'reading_state'],
+                        'properties' => [
+                            'frequency_khz' => ['type' => 'integer', 'enum' => ImpedanceReading::FREQUENCIES_KHZ],
+                            'region' => ['type' => 'string', 'enum' => ImpedanceReading::REGIONS],
+                            'side' => ['type' => 'string', 'enum' => ImpedanceReading::SIDES],
+                            'impedance_ohms' => $nullableNumber,
+                            'raw_value' => $nullableString,
+                            'reading_state' => ['type' => 'string', 'enum' => ImpedanceReading::STATES],
                         ],
                     ],
                 ],

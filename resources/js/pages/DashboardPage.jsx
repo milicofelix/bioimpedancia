@@ -20,7 +20,7 @@ import useActionLock from '../hooks/useActionLock';
 import CareGuidanceAssistant from '../pwa/features/assistant/CareGuidanceAssistant';
 import KnowledgeDocumentsPanel from '../components/bioimpedance/KnowledgeDocumentsPanel';
 import BodyscanReview from '../pwa/features/assessment/BodyscanReview';
-import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocolComplete, emptyBodyscanProtocol, updateBodyscanSegment } from '../pwa/features/assessment/bodyscanAssessmentForm';
+import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocolComplete, emptyBodyscanProtocol, updateBodyscanImpedance, updateBodyscanSegment } from '../pwa/features/assessment/bodyscanAssessmentForm';
 import BodyscanProtocolChecklist from '../pwa/features/assessment/BodyscanProtocolChecklist';
 import VitaScanBrand from '../components/brand/VitaScanBrand';
 import ScreeningInvitationPanel from '../pwa/features/clients/ScreeningInvitationPanel';
@@ -898,6 +898,12 @@ export default function DashboardPage({ userName }) {
 		setBodyscanForm((current) => ({ ...current, segments: updateBodyscanSegment(current.segments, index, field, value) }));
 		setRelaxmedicReviewConfirmed(false);
 		setErrors({});
+	}
+
+	function updateBodyscanImpedanceField(index, field, value) {
+		setRelaxmedicReviewConfirmed(false);
+		setErrors({});
+		setBodyscanForm((current) => ({ ...current, impedanceReadings: updateBodyscanImpedance(current.impedanceReadings ?? [], index, field, value) }));
 	}
 
 	function updateBodyscanProfile(field, value) {
@@ -1878,6 +1884,7 @@ export default function DashboardPage({ userName }) {
 										onGeneralUpdate={updateBodyscanGeneral}
 										onProfileUpdate={updateBodyscanProfile}
 										onSegmentUpdate={updateBodyscanSegmentField}
+										onImpedanceUpdate={updateBodyscanImpedanceField}
 										onConfirm={setRelaxmedicReviewConfirmed}
 										onSubmit={(event) => runAction('save-assessment', () => submitAssessment(event))}
 										onRestart={clearRelaxmedicImage}

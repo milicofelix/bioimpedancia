@@ -4,6 +4,7 @@ namespace App\Services\Bioimpedance;
 
 use App\Domain\Bioimpedance\ScaleModel;
 use App\Models\Bioimpedance\BioimpedanceAssessment;
+use App\Models\Bioimpedance\BioimpedanceImpedanceReading;
 use App\Models\Bioimpedance\BioimpedanceSegmentalMeasurement;
 use Illuminate\Support\Collection;
 
@@ -26,17 +27,17 @@ class BioimpedanceReportComparison
     public function for(BioimpedanceAssessment $assessment): array
     {
         if ($assessment->canceled_at) {
-            return ['previous' => null, 'metrics' => [], 'trends' => [], 'segmental' => null, 'history_count' => 0];
+            return ['previous' => null, 'metrics' => [], 'trends' => [], 'segmental' => null, 'impedance' => null, 'history_count' => 0];
         }
 
-        $assessment->loadMissing('segmentalMeasurements');
+        $assessment->loadMissing(['segmentalMeasurements', 'impedanceReadings']);
 
         $history = $assessment->client->assessments()
             ->where('id', '!=', $assessment->id)
             ->where('device_model', $assessment->device_model)
             ->whereNull('canceled_at')
             ->where('evaluated_at', '<', $assessment->evaluated_at)
-            ->with('segmentalMeasurements')
+            ->with(['segmentalMeasurements', 'impedanceReadings'])
             ->latest('evaluated_at')
             ->limit(5)
             ->get()
@@ -52,6 +53,7 @@ class BioimpedanceReportComparison
                 'metrics' => [],
                 'trends' => $this->trends($assessment, $history),
                 'segmental' => $this->segmental($assessment, null),
+                'impedance' => $this->impedance($assessment, null),
                 'history_count' => $history->count(),
             ];
         }
@@ -89,7 +91,62 @@ class BioimpedanceReportComparison
             'metrics' => $metrics,
             'trends' => $this->trends($assessment, $history),
             'segmental' => $this->segmental($assessment, $previous),
+            'impedance' => $this->impedance($assessment, $previous),
             'history_count' => $history->count(),
+        ];
+    }
+
+    private function impedance(BioimpedanceAssessment $current, ?BioimpedanceAssessment $previous): ?array
+    {
+        if ($current->impedanceReadings->isEmpty()) {
+            return null;
+        }
+
+        $currentLayout = $current->impedanceReadings->first()?->source_layout;
+        $comparisonAssessment = $previous;
+        if (! $comparisonAssessment?->impedanceReadings?->contains(
+            fn (BioimpedanceImpedanceReading $reading) => $reading->source_layout === $currentLayout,
+        )) {
+            $comparisonAssessment = $current->client->assessments()
+                ->where('id', '!=', $current->id)
+                ->where('device_model', $current->device_model)
+                ->whereNull('canceled_at')
+                ->where('evaluated_at', '<', $current->evaluated_at)
+                ->whereHas('impedanceReadings', fn ($query) => $query->where('source_layout', $currentLayout))
+                ->with('impedanceReadings')
+                ->latest('evaluated_at')
+                ->first();
+        }
+        $previousReadings = $comparisonAssessment?->impedanceReadings?->filter(
+            fn (BioimpedanceImpedanceReading $reading) => $reading->source_layout === $currentLayout,
+        )->keyBy(fn (BioimpedanceImpedanceReading $reading) => $reading->frequency_khz.'|'.$reading->region.'|'.$reading->side) ?? collect();
+
+        return [
+            'is_baseline' => $previousReadings->isEmpty(),
+            'previous_assessment_id' => $comparisonAssessment?->id,
+            'source_layout' => $currentLayout,
+            'interpretation_scope' => 'technical_non_diagnostic',
+            'readings' => $current->impedanceReadings
+                ->sortBy(fn (BioimpedanceImpedanceReading $reading) => $reading->frequency_khz.'|'.$reading->region.'|'.$reading->side)
+                ->values()
+                ->map(function (BioimpedanceImpedanceReading $reading) use ($previousReadings): array {
+                    $key = $reading->frequency_khz.'|'.$reading->region.'|'.$reading->side;
+                    $prior = $previousReadings->get($key);
+                    $currentValue = $reading->impedance_ohms === null ? null : (float) $reading->impedance_ohms;
+                    $previousValue = $prior?->impedance_ohms === null ? null : (float) $prior->impedance_ohms;
+
+                    return [
+                        'frequency_khz' => $reading->frequency_khz,
+                        'region' => $reading->region,
+                        'side' => $reading->side,
+                        'reading_state' => $reading->reading_state,
+                        'current_ohms' => $currentValue,
+                        'previous_ohms' => $previousValue,
+                        'delta_ohms' => $currentValue !== null && $previousValue !== null
+                            ? round($currentValue - $previousValue, 2)
+                            : null,
+                    ];
+                })->all(),
         ];
     }
 

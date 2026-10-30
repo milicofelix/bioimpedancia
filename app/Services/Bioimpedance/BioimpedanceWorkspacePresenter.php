@@ -86,7 +86,7 @@ class BioimpedanceWorkspacePresenter
     public function loadClientAssessments(BioimpedanceClient $client): BioimpedanceClient
     {
         return $client->load(['assessments' => fn ($query) => $query
-            ->with(['shares', 'careGuidanceApprovedBy', 'aiAnalysisRequests.output', 'segmentalMeasurements', 'extendedMetrics'])
+            ->with(['shares', 'careGuidanceApprovedBy', 'aiAnalysisRequests.output', 'segmentalMeasurements', 'extendedMetrics', 'impedanceReadings'])
             ->latest('evaluated_at')]);
     }
 
@@ -94,7 +94,7 @@ class BioimpedanceWorkspacePresenter
     {
         $clients = BioimpedanceClient::query()
             ->with(['assessments' => fn ($query) => $query
-                ->with(['shares', 'careGuidanceApprovedBy', 'aiAnalysisRequests.output', 'segmentalMeasurements', 'extendedMetrics'])
+                ->with(['shares', 'careGuidanceApprovedBy', 'aiAnalysisRequests.output', 'segmentalMeasurements', 'extendedMetrics', 'impedanceReadings'])
                 ->latest('evaluated_at')])
             ->orderBy('full_name')
             ->get()
@@ -199,6 +199,23 @@ class BioimpedanceWorkspacePresenter
                     'reference_version' => $metric->reference_version,
                     'interpretation_scope' => 'proprietary_informational',
                 ])->values()->all()
+                : [],
+            'impedance_readings' => $assessment->relationLoaded('impedanceReadings')
+                ? $assessment->impedanceReadings
+                    ->sortBy(fn ($reading) => $reading->frequency_khz.'|'.$reading->region.'|'.$reading->side)
+                    ->values()
+                    ->map(fn ($reading) => [
+                        'frequency_khz' => $reading->frequency_khz,
+                        'region' => $reading->region,
+                        'side' => $reading->side,
+                        'impedance_ohms' => $reading->impedance_ohms === null ? null : (float) $reading->impedance_ohms,
+                        'raw_value' => $reading->raw_value,
+                        'reading_state' => $reading->reading_state,
+                        'device_version' => $reading->device_version,
+                        'source_application' => $reading->source_application,
+                        'source_layout' => $reading->source_layout,
+                        'interpretation_scope' => 'technical_non_diagnostic',
+                    ])->all()
                 : [],
             'weight_kg' => (float) $assessment->weight_kg,
             'scale_bmi' => $assessment->scale_bmi === null ? null : (float) $assessment->scale_bmi,

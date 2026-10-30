@@ -10,6 +10,7 @@ use App\Models\AppAudit;
 use App\Models\Bioimpedance\BioimpedanceAiAnalysisOutput;
 use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceAssessmentAudit;
+use App\Models\Bioimpedance\BioimpedanceImpedanceReading;
 use App\Models\Bioimpedance\BioimpedanceSegmentalMeasurement;
 use App\Models\Bioimpedance\BioimpedanceClient;
 use App\Models\Bioimpedance\BioimpedanceClinicSetting;
@@ -314,11 +315,12 @@ class BioimpedanceWorkflow
         $sourceMetadata = null;
         $segmentalMeasurements = [];
         $extendedMetrics = [];
+        $impedanceReadings = [];
         $measurementProfile = [];
 
         if ($scaleModel === BioimpedanceClinicSetting::SCALE_MODEL_BODYSCAN_PRO) {
             $this->authorizeClinicalProfessional($request);
-            [$sourceMetadata, $segmentalMeasurements, $measurementProfile, $extendedMetrics] = $this->validateBodyscanReview($request, $bodyscanProcessor);
+            [$sourceMetadata, $segmentalMeasurements, $measurementProfile, $extendedMetrics, $impedanceReadings] = $this->validateBodyscanReview($request, $bodyscanProcessor);
             $request->validate(collect($sourceMetadata['available_metric_fields'])
                 ->mapWithKeys(fn (string $field) => [$field => ['required']])->all(), [], [
                 'weight_kg' => 'peso',
@@ -431,7 +433,7 @@ class BioimpedanceWorkflow
                 ]);
             }
 
-            $assessment = DB::transaction(function () use ($validated, $snapshot, $request, $analysis, $sourceMetadata, $segmentalMeasurements, $extendedMetrics): BioimpedanceAssessment {
+            $assessment = DB::transaction(function () use ($validated, $snapshot, $request, $analysis, $sourceMetadata, $segmentalMeasurements, $extendedMetrics, $impedanceReadings): BioimpedanceAssessment {
                 $assessment = BioimpedanceAssessment::query()->create([
                     ...$validated,
                     ...$snapshot,
@@ -450,7 +452,11 @@ class BioimpedanceWorkflow
                     $assessment->extendedMetrics()->createMany($extendedMetrics);
                 }
 
-                $assessment->load(['segmentalMeasurements', 'extendedMetrics']);
+                if ($impedanceReadings !== []) {
+                    $assessment->impedanceReadings()->createMany($impedanceReadings);
+                }
+
+                $assessment->load(['segmentalMeasurements', 'extendedMetrics', 'impedanceReadings']);
 
                 $this->auditAssessment(
                     $assessment,
@@ -571,14 +577,14 @@ class BioimpedanceWorkflow
 
     public function downloadAssessmentPdf(BioimpedanceAssessment $assessment, LegacyBioimpedanceAnalysisRefresher $legacyAnalysisRefresher): Response
     {
-        $assessment->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements', 'extendedMetrics']);
+        $assessment->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements', 'extendedMetrics', 'impedanceReadings']);
         $legacyAnalysisRefresher->refreshIfLegacy($assessment);
-        $assessment->refresh()->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements', 'extendedMetrics']);
+        $assessment->refresh()->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements', 'extendedMetrics', 'impedanceReadings']);
         $assessment->update([
             'report_issued_at' => now(),
             'report_issue_count' => $assessment->report_issue_count + 1,
         ]);
-        $assessment->refresh()->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements', 'extendedMetrics']);
+        $assessment->refresh()->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements', 'extendedMetrics', 'impedanceReadings']);
         config(['dompdf.public_path' => public_path()]);
         $this->audit(request(), 'bioimpedance_assessment.report_downloaded', $assessment, 'Relatório PDF acessado', null, [
             'assessment_id' => $assessment->id,
@@ -827,7 +833,7 @@ class BioimpedanceWorkflow
     {
         $share = BioimpedanceReportShare::query()
             ->where('token_hash', hash('sha256', $token))
-            ->with(['assessment.client', 'assessment.professional', 'assessment.correctedBy', 'assessment.canceledBy', 'assessment.segmentalMeasurements', 'assessment.extendedMetrics'])
+            ->with(['assessment.client', 'assessment.professional', 'assessment.correctedBy', 'assessment.canceledBy', 'assessment.segmentalMeasurements', 'assessment.extendedMetrics', 'assessment.impedanceReadings'])
             ->firstOrFail();
 
         abort_if($share->revoked_at || $share->expires_at->isPast(), 410, 'Link expirado ou revogado.');
@@ -934,11 +940,22 @@ class BioimpedanceWorkflow
             'source_metadata.extended_metrics.*.source_layout' => ['required', Rule::in(BodyscanReportLayout::LAYOUTS)],
             'source_metadata.extended_metrics.*.raw_extracted_value' => ['required', 'string', 'max:2000'],
             'source_metadata.extended_metrics.*.reference_version' => ['required', 'string', 'max:60'],
+            'source_metadata.impedance_readings' => ['present', 'array', 'max:10'],
+            'source_metadata.impedance_readings.*.frequency_khz' => ['required', 'integer', Rule::in(BioimpedanceImpedanceReading::FREQUENCIES_KHZ)],
+            'source_metadata.impedance_readings.*.region' => ['required', Rule::in(BioimpedanceImpedanceReading::REGIONS)],
+            'source_metadata.impedance_readings.*.side' => ['required', Rule::in(BioimpedanceImpedanceReading::SIDES)],
+            'source_metadata.impedance_readings.*.impedance_ohms' => ['nullable', 'numeric', 'between:0.01,5000'],
+            'source_metadata.impedance_readings.*.raw_value' => ['nullable', 'string', 'max:255'],
+            'source_metadata.impedance_readings.*.reading_state' => ['required', Rule::in(BioimpedanceImpedanceReading::STATES)],
+            'source_metadata.impedance_readings.*.device_version' => ['required', 'string', 'max:80'],
+            'source_metadata.impedance_readings.*.source_application' => ['required', Rule::in(ScaleModel::BODYSCAN_APPLICATIONS)],
+            'source_metadata.impedance_readings.*.source_layout' => ['required', Rule::in(BodyscanReportLayout::LAYOUTS)],
             'source_metadata.segmental_measurements' => ['required', 'array', 'size:10'],
             'source_metadata.raw_values' => ['present', 'array'],
             'source_metadata.raw_values.metrics' => ['required', 'array'],
             'source_metadata.raw_values.metric_source_labels' => ['required', 'array'],
             'source_metadata.raw_values.metric_text' => ['required', 'array'],
+            'source_metadata.raw_values.impedance_readings' => ['present', 'array'],
             'source_metadata.raw_values.segmental_measurements' => ['required', 'array'],
             'source_metadata.detected_sections' => ['required', 'array', 'min:2'],
             'source_metadata.field_statuses' => ['present', 'array'],
@@ -960,6 +977,12 @@ class BioimpedanceWorkflow
             'segmental_measurements.*.classification' => ['required', Rule::in(BioimpedanceSegmentalMeasurement::CLASSIFICATIONS)],
             'segmental_measurements.*.reference_min_percentage' => ['required', 'numeric', 'between:0,1000'],
             'segmental_measurements.*.reference_max_percentage' => ['required', 'numeric', 'between:0,1000'],
+            'impedance_readings' => ['present', 'array', 'max:10'],
+            'impedance_readings.*.frequency_khz' => ['required', 'integer', Rule::in(BioimpedanceImpedanceReading::FREQUENCIES_KHZ)],
+            'impedance_readings.*.region' => ['required', Rule::in(BioimpedanceImpedanceReading::REGIONS)],
+            'impedance_readings.*.side' => ['required', Rule::in(BioimpedanceImpedanceReading::SIDES)],
+            'impedance_readings.*.impedance_ohms' => ['nullable', 'numeric', 'between:0.01,5000'],
+            'impedance_readings.*.reading_state' => ['required', Rule::in(BioimpedanceImpedanceReading::STATES)],
         ], [
             'bodyscan_review_confirmed.accepted' => 'Confirme que todos os dados foram comparados com a imagem.',
             'source_metadata.required' => 'Processe novamente a imagem Bodyscan Pro antes de salvar.',
@@ -1022,6 +1045,68 @@ class BioimpedanceWorkflow
                 ]);
             }
         }
+
+        $isTechnicalLayout = $reportLayout === BodyscanReportLayout::FITDAYS_TECHNICAL;
+        $expectedImpedanceKeys = collect(BioimpedanceImpedanceReading::FREQUENCIES_KHZ)
+            ->flatMap(fn (int $frequency) => collect(BioimpedanceImpedanceReading::EXPECTED_POSITIONS)
+                ->map(fn (array $position) => $frequency.'|'.$position['region'].'|'.$position['side']))
+            ->sort()->values();
+        $sourceImpedanceKeys = collect($validated['source_metadata']['impedance_readings'])
+            ->map(fn (array $reading) => $reading['frequency_khz'].'|'.$reading['region'].'|'.$reading['side'])
+            ->sort()->values();
+        $reviewedImpedanceKeys = collect($validated['impedance_readings'])
+            ->map(fn (array $reading) => $reading['frequency_khz'].'|'.$reading['region'].'|'.$reading['side'])
+            ->sort()->values();
+        if (($isTechnicalLayout && ($sourceImpedanceKeys->all() !== $expectedImpedanceKeys->all()
+                || $reviewedImpedanceKeys->all() !== $expectedImpedanceKeys->all()))
+            || (! $isTechnicalLayout && ($sourceImpedanceKeys->isNotEmpty() || $reviewedImpedanceKeys->isNotEmpty()))) {
+            throw ValidationException::withMessages([
+                'impedance_readings' => $isTechnicalLayout
+                    ? 'Confira as cinco regiões nas frequências de 20 kHz e 100 kHz.'
+                    : 'Este layout não possui tabela de impedância bioelétrica.',
+            ]);
+        }
+
+        $sourceImpedance = collect($validated['source_metadata']['impedance_readings'])->keyBy(
+            fn (array $reading) => $reading['frequency_khz'].'|'.$reading['region'].'|'.$reading['side'],
+        );
+        $impedanceReadings = collect($validated['impedance_readings'])->map(function (array $reading) use ($sourceImpedance, $sourceApplication, $reportLayout): array {
+            $key = $reading['frequency_khz'].'|'.$reading['region'].'|'.$reading['side'];
+            $original = $sourceImpedance->get($key, []);
+
+            return [
+                ...$reading,
+                'raw_value' => $original['raw_value'] ?? null,
+                'device_version' => BioimpedanceImpedanceReading::deviceVersion(),
+                'source_application' => $sourceApplication,
+                'source_layout' => $reportLayout,
+            ];
+        })->all();
+        foreach ($impedanceReadings as $index => $reading) {
+            if (($reading['reading_state'] === 'clear' && ! is_numeric($reading['impedance_ohms'] ?? null))
+                || ($reading['reading_state'] === 'unreadable' && ($reading['impedance_ohms'] ?? null) !== null)) {
+                throw ValidationException::withMessages([
+                    "impedance_readings.{$index}.reading_state" => 'Leitura legível exige um valor; leitura ilegível deve permanecer sem valor numérico.',
+                ]);
+            }
+        }
+        $impedanceReviewCorrections = collect($impedanceReadings)->map(function (array $reading) use ($sourceImpedance): ?array {
+            $key = $reading['frequency_khz'].'|'.$reading['region'].'|'.$reading['side'];
+            $original = $sourceImpedance->get($key, []);
+            $originalValue = $original['impedance_ohms'] ?? null;
+            $confirmedValue = $reading['impedance_ohms'] ?? null;
+            $sameValue = ($originalValue === null && $confirmedValue === null)
+                || (is_numeric($originalValue) && is_numeric($confirmedValue) && abs((float) $originalValue - (float) $confirmedValue) < 0.001);
+            $sameState = ($original['reading_state'] ?? null) === ($reading['reading_state'] ?? null);
+
+            return $sameValue && $sameState ? null : [
+                'frequency_khz' => $reading['frequency_khz'],
+                'region' => $reading['region'],
+                'side' => $reading['side'],
+                'extracted' => ['impedance_ohms' => $originalValue, 'reading_state' => $original['reading_state'] ?? null],
+                'confirmed' => ['impedance_ohms' => $confirmedValue, 'reading_state' => $reading['reading_state']],
+            ];
+        })->filter()->values()->all();
 
         $expectedKeys = collect(BioimpedanceSegmentalMeasurement::TYPES)
             ->flatMap(fn (string $type) => collect(BioimpedanceSegmentalMeasurement::EXPECTED_SEGMENTS)
@@ -1092,6 +1177,7 @@ class BioimpedanceWorkflow
             'layout_evidence' => $validated['source_metadata']['layout_evidence'],
             'available_metric_fields' => $validated['source_metadata']['available_metric_fields'],
             'extended_metric_codes' => collect($validated['source_metadata']['extended_metrics'])->pluck('metric_code')->values()->all(),
+            'impedance_reading_count' => count($impedanceReadings),
             'weight_unit' => $validated['source_metadata']['weight_unit'],
             'confirmed_application' => $validated['measurement_application'],
             'athlete_mode_at_assessment' => (bool) $validated['athlete_mode_at_assessment'],
@@ -1106,6 +1192,7 @@ class BioimpedanceWorkflow
             'ocr_raw_values' => $validated['source_metadata']['raw_values'],
             'side_consistency' => $validated['source_metadata']['side_consistency'],
             'segmental_review_corrections' => $segmentalReviewCorrections,
+            'impedance_review_corrections' => $impedanceReviewCorrections,
             'review_confirmed_at' => now()->toIso8601String(),
             'reviewed_by_user_id' => $request->user()->id,
         ], $segments, [
@@ -1114,7 +1201,7 @@ class BioimpedanceWorkflow
             'device_model_code' => ScaleModel::BODYSCAN_PRO_MODEL_CODE,
             'device_manual_version' => ScaleModel::BODYSCAN_PRO_MANUAL_VERSION,
             'measurement_protocol' => $validated['measurement_protocol'],
-        ], $validated['source_metadata']['extended_metrics']];
+        ], $validated['source_metadata']['extended_metrics'], $impedanceReadings];
     }
 
     private function validateAssessment(Request $request, bool $requireClient = true, ?string $deviceModel = null): array
@@ -1362,6 +1449,14 @@ class BioimpedanceWorkflow
                     'application_classification', 'printed_minimum', 'printed_maximum',
                     'weight_proportion_percentage', 'source_application', 'source_layout',
                     'raw_extracted_value', 'reference_version',
+                ]))->values()->all();
+        }
+
+        if ($assessment->relationLoaded('impedanceReadings')) {
+            $values['impedance_readings'] = $assessment->impedanceReadings
+                ->map(fn (BioimpedanceImpedanceReading $reading) => $reading->only([
+                    'frequency_khz', 'region', 'side', 'impedance_ohms', 'raw_value',
+                    'reading_state', 'device_version', 'source_application', 'source_layout',
                 ]))->values()->all();
         }
 
