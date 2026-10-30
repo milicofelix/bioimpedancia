@@ -26,6 +26,7 @@ import VitaScanBrand from '../components/brand/VitaScanBrand';
 import ScreeningInvitationPanel from '../pwa/features/clients/ScreeningInvitationPanel';
 import ClientModuleSummary from '../shared/ClientModuleSummary';
 import ClientWorkspaceTabs from '../shared/ClientWorkspaceTabs';
+import ClientAssessmentHeader from '../shared/ClientAssessmentHeader';
 
 const emptyClient = {
 	full_name: '',
@@ -799,6 +800,11 @@ export default function DashboardPage({ userName }) {
 	function openClientScreenings() {
 		setClientWorkspaceTab('screenings');
 		window.setTimeout(() => document.getElementById('client-panel-screenings')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+	}
+
+	function openClientEvolution() {
+		setClientWorkspaceTab('assessment');
+		window.setTimeout(() => document.getElementById('client-assessment-evolution')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
 	}
 
 	function clearRelaxmedicImage() {
@@ -1596,10 +1602,18 @@ export default function DashboardPage({ userName }) {
 						</div>
 						<ClientWorkspaceTabs activeTab={clientWorkspaceTab} onChange={setClientWorkspaceTab} />
 						<div id="client-panel-assessment" role="tabpanel" aria-labelledby="client-tab-assessment" className={clientWorkspaceTab === 'assessment' ? 'contents' : 'hidden'}>
+						<ClientAssessmentHeader
+							assessmentCount={selectedClient.assessments?.length ?? 0}
+							canStartAssessment={canCreateCurrentAssessment}
+							hasReport={Boolean(selectedClient.assessments?.some((assessment) => !assessment.is_canceled))}
+							onStartAssessment={startNewAssessment}
+							onOpenEvolution={openClientEvolution}
+							onOpenReport={openLatestClientReport}
+						/>
 						<div className="no-print rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
 							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 								<div>
-									<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Histórico de avaliações</p>
+									<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Histórico de bioimpedância</p>
 									<h2 className="mt-1 text-lg font-semibold text-slate-950">{selectedClient.assessments?.length ?? 0} registro(s)</h2>
 								</div>
 								<button type="button" disabled={!canCreateCurrentAssessment} onClick={startNewAssessment} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
@@ -1769,7 +1783,7 @@ export default function DashboardPage({ userName }) {
 						</>
 					) : null}
 
-					{clientWorkspaceTab === 'assessment' ? <EvolutionPanel client={selectedClient} selectedAssessment={selectedAssessment} /> : null}
+					{clientWorkspaceTab === 'assessment' ? <div id="client-assessment-evolution" className="scroll-mt-20"><EvolutionPanel client={selectedClient} selectedAssessment={selectedAssessment} /></div> : null}
 
 						<div id="avaliacao" ref={assessmentSectionRef} className={`no-print scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${clientWorkspaceTab === 'assessment' ? '' : 'hidden'}`}>
 							<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

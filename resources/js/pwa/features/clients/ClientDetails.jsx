@@ -8,6 +8,7 @@ import PwaIcon from '../../components/ui/PwaIcon';
 import ScreeningInvitationPanel from './ScreeningInvitationPanel';
 import ClientModuleSummary from '../../../shared/ClientModuleSummary';
 import ClientWorkspaceTabs from '../../../shared/ClientWorkspaceTabs';
+import ClientAssessmentHeader from '../../../shared/ClientAssessmentHeader';
 
 const sexLabels = { female: 'Feminino', male: 'Masculino' };
 
@@ -77,9 +78,18 @@ export default function ClientDetails({ client, currentUser, scaleModel, onBack,
 			<div className="mt-4"><ClientWorkspaceTabs activeTab={activeTab} onChange={setActiveTab} /></div>
 
 			<div id="client-panel-assessment" role="tabpanel" aria-labelledby="client-tab-assessment" className={activeTab === 'assessment' ? '' : 'hidden'}>
+			<div className="mt-4">
+				<ClientAssessmentHeader
+					assessmentCount={assessments.length}
+					canStartAssessment={access.allowed}
+					hasReport={Boolean(latestActiveAssessment)}
+					onStartAssessment={() => onNewAssessment(client)}
+					onOpenReport={() => latestActiveAssessment && onOpenReport(client, latestActiveAssessment)}
+				/>
+			</div>
 			<PwaCard className="mt-4 p-5">
 				<div className="flex items-center justify-between gap-3">
-					<h3 className="flex items-center gap-2 font-extrabold text-ricosty-ink"><PwaIcon name="history" className="text-ricosty-600" />Histórico resumido</h3>
+					<h3 className="flex items-center gap-2 font-extrabold text-ricosty-ink"><PwaIcon name="history" className="text-ricosty-600" />Histórico de bioimpedância</h3>
 					<span className="text-xs text-slate-500">{assessments.length} avaliação(ões)</span>
 				</div>
 
@@ -94,7 +104,7 @@ export default function ClientDetails({ client, currentUser, scaleModel, onBack,
 								</div>
 								<div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-lg bg-white/80 px-3 py-2"><span className="block text-[11px] font-bold uppercase text-slate-600">Peso</span><strong className="text-sm text-slate-800">{numberBr(assessment.weight_kg, 1)} kg</strong></div><div className="rounded-lg bg-white/80 px-3 py-2"><span className="block text-[11px] font-bold uppercase text-slate-600">IMC</span><strong className="text-sm text-slate-800">{numberBr(assessment.calculated_bmi ?? assessment.scale_bmi, 1)}</strong></div></div>
 								<div className="mt-3 flex flex-wrap gap-2">
-									<PwaButton type="button" onClick={() => onOpenReport(client, assessment)} variant="secondary" icon="fileText" className="px-3 text-xs">Relatório</PwaButton>
+									<PwaButton type="button" onClick={() => onOpenReport(client, assessment)} variant="secondary" icon="fileText" className="px-3 text-xs">Relatório corporal</PwaButton>
 									{canUseClinicalFeatures(currentUser) ? <PwaButton type="button" onClick={() => onOpenAssistant(client, assessment)} variant="ghost" icon="sparkles" className="px-3 text-xs">Assistente</PwaButton> : null}
 								</div>
 							</div>
