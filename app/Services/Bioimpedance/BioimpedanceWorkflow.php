@@ -527,7 +527,7 @@ class BioimpedanceWorkflow
     public function updateAssessment(Request $request, BioimpedanceAssessment $assessment, BioimpedanceAnalyzer $analyzer): JsonResponse
     {
         $this->authorizeClinicalProfessional($request);
-        $assessment->loadMissing('segmentalMeasurements');
+        $assessment->loadMissing(['segmentalMeasurements', 'extendedMetrics', 'impedanceReadings']);
         if ($assessment->canceled_at) {
             throw ValidationException::withMessages([
                 'bioimpedance_assessment_id' => 'Avaliação cancelada não pode ser alterada.',
@@ -563,15 +563,17 @@ class BioimpedanceWorkflow
                 'care_guidance_approved_at' => null,
             ]);
 
-            $assessment->refresh()->load('segmentalMeasurements');
-            $this->auditAssessment($assessment, $request, 'corrected', $changeReason, $oldValues, $this->assessmentAuditValues($assessment));
+            $assessment->refresh()->load(['segmentalMeasurements', 'extendedMetrics', 'impedanceReadings']);
+            $newValues = $this->assessmentAuditValues($assessment);
+            $newValues['field_changes'] = $this->assessmentFieldChanges($oldValues, $newValues);
+            $this->auditAssessment($assessment, $request, 'corrected', $changeReason, $oldValues, $newValues);
             $this->audit(
                 $request,
                 'bioimpedance_assessment.corrected',
                 $assessment,
                 'Avaliação de bioimpedância corrigida: '.$changeReason,
                 $oldValues,
-                $this->assessmentAuditValues($assessment),
+                $newValues,
             );
         });
 
@@ -805,21 +807,20 @@ class BioimpedanceWorkflow
                     ->pluck('id')->values()->all(),
             ])->filter(fn ($source) => filled($source['id']))->values()->all();
 
-        $segmentalSources = collect(data_get($output->request->structured_context, 'segmental_analysis.current', []))
-            ->concat(data_get($output->request->structured_context, 'segmental_analysis.previous_same_model.measurements', []))
-            ->filter(fn (array $measurement) => $usedSourceIds->contains($measurement['evidence_id'] ?? null))
-            ->map(fn (array $measurement) => [
-                'id' => $measurement['evidence_id'],
-                'document' => 'Avaliação Bodyscan Pro',
-                'version' => $measurement['reference_version'] ?? $assessment->reference_version,
-                'section' => $this->segmentalAuditLabel($measurement),
-                'url' => null,
-                'checksum' => null,
+        $internalSources = collect(data_get($output->request->structured_context, 'evidence_catalog', []))
+            ->filter(fn (array $evidence) => $usedSourceIds->contains($evidence['id'] ?? null))
+            ->map(fn (array $evidence) => [
+                'id' => $evidence['id'],
+                'document' => $evidence['document'],
+                'version' => $evidence['version'] ?? $assessment->reference_version,
+                'section' => $evidence['section'],
+                'url' => $evidence['url'] ?? null,
+                'checksum' => $evidence['checksum'] ?? null,
                 'claim_ids' => collect($output->structured_claims ?? [])
-                    ->filter(fn (array $claim) => in_array($measurement['evidence_id'], $claim['source_ids'] ?? [], true))
+                    ->filter(fn (array $claim) => in_array($evidence['id'], $claim['source_ids'] ?? [], true))
                     ->pluck('id')->values()->all(),
             ])->values()->all();
-        $sources = [...$sources, ...$segmentalSources];
+        $sources = [...$sources, ...$internalSources];
 
         DB::transaction(function () use ($assessment, $request, $validated, $output, $sources): void {
             $oldValues = $this->assessmentAuditValues($assessment);
@@ -1515,21 +1516,6 @@ class BioimpedanceWorkflow
         return $values;
     }
 
-    private function segmentalAuditLabel(array $measurement): string
-    {
-        $type = ($measurement['type'] ?? null) === BioimpedanceSegmentalMeasurement::TYPE_FAT ? 'Gordura' : 'Músculo';
-        $region = match ([$measurement['region'] ?? null, $measurement['side'] ?? null]) {
-            ['arm', 'left'] => 'braço esquerdo',
-            ['arm', 'right'] => 'braço direito',
-            ['trunk', 'center'] => 'tronco',
-            ['leg', 'left'] => 'perna esquerda',
-            ['leg', 'right'] => 'perna direita',
-            default => 'região não identificada',
-        };
-
-        return $type.' segmentar - '.$region;
-    }
-
     private function auditAssessment(BioimpedanceAssessment $assessment, Request $request, string $action, string $reason, array $oldValues, array $newValues): void
     {
         BioimpedanceAssessmentAudit::query()->create([
@@ -1541,6 +1527,18 @@ class BioimpedanceWorkflow
             'new_values' => $newValues,
             'ip_address' => $request->ip(),
         ]);
+    }
+
+    private function assessmentFieldChanges(array $oldValues, array $newValues): array
+    {
+        return collect(array_unique([...array_keys($oldValues), ...array_keys($newValues)]))
+            ->reject(fn (string $field) => $field === 'field_changes')
+            ->filter(fn (string $field) => ($oldValues[$field] ?? null) !== ($newValues[$field] ?? null))
+            ->mapWithKeys(fn (string $field) => [$field => [
+                'before' => $oldValues[$field] ?? null,
+                'after' => $newValues[$field] ?? null,
+            ]])
+            ->all();
     }
 
     private function normalizeHeightToCentimeters(mixed $value): mixed

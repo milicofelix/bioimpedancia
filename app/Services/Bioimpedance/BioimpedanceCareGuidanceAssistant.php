@@ -16,13 +16,13 @@ use Illuminate\Support\Facades\Http;
 
 class BioimpedanceCareGuidanceAssistant
 {
-    public const PROMPT_VERSION = 'care-guidance-2.1.0';
+    public const PROMPT_VERSION = 'care-guidance-2.2.0';
 
     public function __construct(
         private readonly CareGuidanceSemanticValidator $semanticValidator,
         private readonly KnowledgeSourceSnapshot $sourceSnapshot,
         private readonly PublishedKnowledgeSourceRepository $publishedSources,
-        private readonly BioimpedanceSegmentalClinicalContext $segmentalContext,
+        private readonly BioimpedanceAssistantContext $assistantContext,
     ) {}
 
     private const SOURCE_DEFINITIONS = [
@@ -92,7 +92,7 @@ class BioimpedanceCareGuidanceAssistant
 
     public function suggest(BioimpedanceAssessment $assessment, User $requestedBy): array
     {
-        $assessment->loadMissing('client');
+        $assessment->loadMissing(['client', 'segmentalMeasurements', 'extendedMetrics', 'impedanceReadings']);
         $chunks = $this->approvedChunks($requestedBy);
         $context = $this->context($assessment);
         $request = BioimpedanceAiAnalysisRequest::query()->create([
@@ -172,23 +172,16 @@ class BioimpedanceCareGuidanceAssistant
                 ->filter(fn (array $claim) => in_array($chunk->chunk_key, $claim['source_ids'], true))
                 ->pluck('id')->values()->all(),
         ])->values()->all();
-        $segmentalSources = collect($context['segmental_analysis']['current'] ?? [])
-            ->concat(data_get($context, 'segmental_analysis.previous_same_model.measurements', []))
-            ->filter(fn (array $measurement) => $usedSourceIds->contains($measurement['evidence_id'] ?? null))
-            ->map(fn (array $measurement) => [
-                'id' => $measurement['evidence_id'],
-                'document' => 'Avaliação Bodyscan Pro',
-                'version' => $measurement['reference_version'] ?? null,
-                'publication_status' => 'internal_clinical_record',
+        $internalSources = collect($context['evidence_catalog'] ?? [])
+            ->filter(fn (array $evidence) => $usedSourceIds->contains($evidence['id'] ?? null))
+            ->map(fn (array $evidence) => [
+                ...$evidence,
                 'published_at' => null,
-                'section' => $this->segmentalEvidenceLabel($measurement),
-                'url' => null,
-                'checksum' => null,
                 'claim_ids' => collect($validation['accepted_claims'])
-                    ->filter(fn (array $claim) => in_array($measurement['evidence_id'], $claim['source_ids'] ?? [], true))
+                    ->filter(fn (array $claim) => in_array($evidence['id'], $claim['source_ids'] ?? [], true))
                     ->pluck('id')->values()->all(),
             ])->values()->all();
-        $sources = [...$sources, ...$segmentalSources];
+        $sources = [...$sources, ...$internalSources];
 
         return [
             'status' => $status,
@@ -227,10 +220,8 @@ class BioimpedanceCareGuidanceAssistant
                             'contexto' => $context,
                             'fontes' => $chunks->map(fn ($chunk) => ['id' => $chunk->chunk_key, 'conteudo' => $chunk->content])->values()->all(),
                             'fontes_internas_disponiveis' => collect([
-                                'assessment:current',
-                                ! empty($context['history_changes']) ? 'assessment:history' : null,
+                                ...($context['evidence_ids'] ?? []),
                                 filled($context['professional_observation'] ?? null) ? 'observation:approved' : null,
-                                ...($context['segmental_evidence_ids'] ?? []),
                             ])->filter()->values()->all(),
                         ], JSON_UNESCAPED_UNICODE)]]],
                     ],
@@ -257,7 +248,7 @@ class BioimpedanceCareGuidanceAssistant
     private function systemPrompt(): string
     {
         return <<<'PROMPT'
-Você é o agente de orientações educativas da Ricosty. Escreva em português do Brasil para o cliente, usando apenas o contexto, a observação aprovada, o histórico e as fontes fornecidas. Relacione os hábitos somente aos pontos de atenção e tendências realmente presentes, sem inventar doença, exame, colesterol, deficiência vitamínica ou contraindicação. Não diagnostique nem prescreva dieta, exercício, medicamento, vitamina ou suplemento. Não defina objetivo somente por IMC ou peso ideal do fabricante e não afirme perda muscular, assimetria clínica ou musculatura e função preservadas a partir das estimativas da balança. Dados segmentares podem sustentar somente descrições cautelosas de valores e tendências, sempre citando os respectivos IDs assessment:segmental. Para pessoas idosas, priorize preservação de força, função, equilíbrio e autonomia, com avaliação profissional. Considere que hidratação, alimentação, horário e atividade recente podem alterar a medição. Ofereça opções gerais, realistas e graduais, sempre condicionando atividade física à capacidade e eventual liberação profissional. Não prometa resultados. Divida a resposta em afirmações independentes. Cada afirmação deve informar categoria, texto, nível de segurança, revisão profissional obrigatória e todas as fontes que a sustentam. Use os IDs das fontes fornecidas e, para dados internos, somente os IDs explicitamente disponíveis no contexto. Não esconda incertezas elevando o nível de segurança. Responda apenas no schema solicitado.
+Você é o agente de orientações educativas da Ricosty. Escreva em português do Brasil para o cliente, usando apenas o contexto, a observação aprovada, o histórico e as fontes fornecidas. Relacione os hábitos somente aos pontos de atenção e tendências realmente presentes, sem inventar doença, exame, colesterol, deficiência vitamínica ou contraindicação. Não diagnostique nem prescreva dieta, exercício, medicamento, vitamina ou suplemento. Não defina objetivo por IMC, peso-alvo ou peso ideal do fabricante e não afirme perda muscular, sarcopenia, assimetria clínica ou musculatura e função preservadas a partir das estimativas da balança. Não trate idade corporal como idade biológica real, WHR como diagnóstico ou pontuação corporal como medida clínica. WHR, ASMI, segmentos e impedâncias podem sustentar somente descrições cautelosas dos valores, sempre citando seus IDs de evidência. Considere aplicativo, layout e modo atleta. Se os perfis do histórico forem incompatíveis, informe isso e não classifique a diferença como melhora ou piora. Para pessoas idosas, priorize preservação de força, função, equilíbrio e autonomia, com avaliação profissional. Considere que hidratação, alimentação, horário e atividade recente podem alterar a medição. Ofereça opções gerais, realistas e graduais, sempre condicionando atividade física à capacidade e eventual liberação profissional. Não prometa resultados. Divida a resposta em afirmações independentes. Cada afirmação deve informar categoria, texto, nível de segurança, revisão profissional obrigatória e todas as fontes que a sustentam. Use os IDs das fontes fornecidas e, para dados internos, somente os IDs explicitamente disponíveis no contexto. Não esconda incertezas elevando o nível de segurança. Responda apenas no schema solicitado.
 PROMPT;
     }
 
@@ -291,11 +282,19 @@ PROMPT;
     {
         $claims = [];
         $attention = collect($context['attention_points'])->implode(', ');
+        $assessmentSources = ['assessment:current'];
+        if (filled($context['professional_observation'] ?? null)) {
+            $assessmentSources[] = 'observation:approved';
+        }
         $claims[] = $this->claim('assessment-context', 'assessment_context', $attention
             ? 'Os pontos que merecem atenção nesta avaliação são: '.$attention.'. Eles devem ser interpretados em conjunto com o histórico e a avaliação profissional.'
-            : 'Esta avaliação isolada não justifica uma conduta individualizada; os resultados devem ser interpretados pelo profissional junto ao histórico.', 'moderate', ['assessment:current', 'observation:approved']);
+            : 'Esta avaliação isolada não justifica uma conduta individualizada; os resultados devem ser interpretados pelo profissional junto ao histórico.', 'moderate', $assessmentSources);
         if (! empty($context['history_changes'])) {
-            $claims[] = $this->claim('assessment-history', 'assessment_context', 'Em relação à avaliação anterior, foi observada '.collect($context['history_changes'])->implode(', ').'. A tendência depende também das condições de cada medição.', 'moderate', ['assessment:history']);
+            $claims[] = $this->claim('assessment-history', 'assessment_context', 'Em relação à avaliação anterior comparável, foi observada '.collect($context['history_changes'])->implode(', ').'. A tendência depende também das condições de cada medição.', 'moderate', ['assessment:history-profile']);
+        }
+        $profileWarnings = collect(data_get($context, 'history_comparison.warnings', []))->implode(' ');
+        if (data_get($context, 'history_comparison.has_previous') && ($profileWarnings || ! data_get($context, 'history_comparison.automatic_interpretation_allowed'))) {
+            $claims[] = $this->claim('assessment-profile-limit', 'assessment_context', 'A comparação exige cautela porque o perfil de medição possui diferenças. '.($profileWarnings ?: 'Os valores podem ser exibidos, mas não devem ser classificados automaticamente como melhora ou piora.'), 'high', ['assessment:history-profile']);
         }
         if (($context['age_at_assessment'] ?? 0) >= 60) {
             $claims[] = $this->claim('older-adult-function', 'movement_education', 'Nesta faixa etária, preservar força, equilíbrio, mobilidade e autonomia merece atenção; a estimativa muscular da balança, isoladamente, não comprova função preservada.', 'high', ['assessment:current', 'who-older-adult-functional-activity', 'brazil-older-adult-functionality']);
@@ -305,6 +304,10 @@ PROMPT;
                 'assessment:current',
                 ...$context['segmental_analysis']['current_evidence_ids'],
             ]);
+        }
+        if (! empty($context['extended_indices'])) {
+            $indexLabels = collect($context['extended_indices'])->pluck('label')->implode(' e ');
+            $claims[] = $this->claim('equipment-indices-limit', 'assessment_context', $indexLabels.' são índices estimados pelo equipamento. Eles precisam ser contextualizados pelo profissional e, isoladamente, não diagnosticam risco, sarcopenia ou outra condição.', 'high', collect($context['extended_indices'])->pluck('evidence_id')->all());
         }
         $claims[] = $this->claim('nutrition-general', 'nutrition_education', 'Priorize refeições variadas baseadas em alimentos in natura ou minimamente processados, incluindo frutas, legumes, verduras e feijões, e reduza a frequência de ultraprocessados e bebidas açucaradas.', 'high', ['brazil-food-guide-natural-foods', 'brazil-food-guide-ultraprocessed']);
         $claims[] = $this->claim('movement-general', 'movement_education', 'Se estiver apto, aumente o movimento gradualmente. Caminhada, bicicleta, dança e fortalecimento são opções que devem ser adaptadas à capacidade individual e à orientação profissional.', 'high', ['who-adult-physical-activity', 'ricosty-care-guidance-safety']);
@@ -336,21 +339,6 @@ PROMPT;
         ];
     }
 
-    private function segmentalEvidenceLabel(array $measurement): string
-    {
-        $type = ($measurement['type'] ?? null) === 'fat' ? 'Gordura' : 'Músculo';
-        $region = match ([$measurement['region'] ?? null, $measurement['side'] ?? null]) {
-            ['arm', 'left'] => 'braço esquerdo',
-            ['arm', 'right'] => 'braço direito',
-            ['trunk', 'center'] => 'tronco',
-            ['leg', 'left'] => 'perna esquerda',
-            ['leg', 'right'] => 'perna direita',
-            default => 'região não identificada',
-        };
-
-        return $type.' segmentar - '.$region;
-    }
-
     private function renderGuidance(array $claims): string
     {
         $labels = [
@@ -370,7 +358,8 @@ PROMPT;
     private function context(BioimpedanceAssessment $assessment): array
     {
         $indicators = $assessment->analysis['indicators'] ?? [];
-        $segmentalAnalysis = $this->segmentalContext->for($assessment);
+        $clinicalContext = $this->assistantContext->for($assessment);
+        $segmentalAnalysis = $clinicalContext['segmental_analysis'] ?? null;
         $labels = ['bmi' => 'IMC', 'body_fat' => 'gordura corporal', 'skeletal_muscle' => 'músculo esquelético', 'visceral_fat' => 'gordura visceral'];
         $attention = collect($labels)->map(function ($label, $key) use ($indicators) {
             $indicator = $indicators[$key] ?? [];
@@ -380,19 +369,13 @@ PROMPT;
         if (in_array($assessment->device_model, ['Relaxmedic', 'Bodyscan Pro'], true)) {
             $attention = [];
         }
-        $previous = $assessment->client->assessments()
-            ->where('id', '!=', $assessment->id)
-            ->where('device_model', $assessment->device_model)
-            ->whereNull('canceled_at')
-            ->where('evaluated_at', '<', $assessment->evaluated_at)
-            ->latest('evaluated_at')
-            ->first();
-        $historyChanges = $previous ? collect([
-            $this->changeText('peso', $previous->weight_kg, $assessment->weight_kg, 'kg'),
-            $this->changeText('gordura corporal', $previous->body_fat_percentage, $assessment->body_fat_percentage, 'ponto percentual'),
-            $this->changeText('massa magra', $previous->lean_body_mass_kg, $assessment->lean_body_mass_kg, 'kg'),
-            $this->changeText('músculo esquelético estimado', $previous->skeletal_muscle_percentage, $assessment->skeletal_muscle_percentage, 'ponto percentual'),
-        ])->filter()->values()->all() : [];
+        $historyChanges = collect(data_get($clinicalContext, 'history_comparison.comparable_metrics', []))
+            ->map(fn (array $metric) => $this->changeText(
+                mb_strtolower($metric['label']),
+                $metric['previous'],
+                $metric['current'],
+                $metric['unit'],
+            ))->filter()->values()->all();
 
         return [
             'assessment_id' => $assessment->id,
@@ -403,8 +386,8 @@ PROMPT;
             'device_model' => $assessment->device_model,
             'history_changes' => $historyChanges,
             'segmental_analysis' => $segmentalAnalysis,
-            'segmental_evidence_ids' => $segmentalAnalysis['evidence_ids'] ?? [],
             'available_data_notice' => 'A avaliação contém composição corporal; não contém exames laboratoriais, diagnósticos, medicações, alergias ou deficiências vitamínicas.',
+            ...$clinicalContext,
         ];
     }
 

@@ -32,6 +32,17 @@ class CareGuidanceSemanticValidator
         'apresenta assimetria clínica',
         'comprova função muscular preservada',
         'confirma musculatura preservada',
+        'sarcopenia confirmada',
+        'apresenta sarcopenia',
+        'sua idade biológica real é',
+        'idade biológica real confirmada',
+        'peso ideal prescrito pelo aplicativo',
+        'seu peso ideal é',
+        'diagnóstico pelo whr',
+        'diagnóstico com base no whr',
+        'whr indica',
+        'whr demonstra',
+        'pontuação corporal',
     ];
 
     public function validate(array $response, Collection $chunks, array $context): array
@@ -166,16 +177,11 @@ class CareGuidanceSemanticValidator
 
     private function availableInternalSources(array $context): array
     {
-        $sources = ['assessment:current'];
-        if (! empty($context['history_changes'])) {
-            $sources[] = 'assessment:history';
-        }
+        $sources = $context['evidence_ids'] ?? ['assessment:current'];
         if (filled($context['professional_observation'] ?? null)) {
             $sources[] = 'observation:approved';
         }
 
-        $sources = [...$sources, ...($context['segmental_evidence_ids'] ?? [])];
-
-        return $sources;
+        return array_values(array_unique($sources));
     }
 }
