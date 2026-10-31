@@ -10,7 +10,10 @@ use Illuminate\Support\Facades\Http;
 
 class BodyscanSegmentalOcrCompleter
 {
-    public function __construct(private readonly BodyscanOcrProfileRegistry $ocrProfiles) {}
+    public function __construct(
+        private readonly BodyscanOcrProfileRegistry $ocrProfiles,
+        private readonly BodyscanSegmentalImagePreparer $imagePreparer,
+    ) {}
 
     public function complete(string $imageContents, string $model, array $segments, ?string $reportLayout = null): array
     {
@@ -29,6 +32,7 @@ class BodyscanSegmentalOcrCompleter
                         'content' => [
                             ['type' => 'input_text', 'text' => $this->prompt($segments, $reportLayout)],
                             ['type' => 'input_image', 'image_url' => 'data:image/jpeg;base64,'.base64_encode($imageContents), 'detail' => 'high'],
+                            ...$this->preparedImageContent($imageContents, $reportLayout),
                         ],
                     ]],
                     'text' => [
@@ -83,10 +87,10 @@ class BodyscanSegmentalOcrCompleter
                     ->filter(fn (string $field) => $this->valuesConflict($field, $original[$field] ?? null, $retry[$field] ?? null))
                     ->values();
                 if ($conflictingFields->isNotEmpty()) {
-                    $merged = $original;
-                    foreach ($conflictingFields as $field) {
-                        $merged[$field] = null;
-                    }
+                    // A segunda passagem trabalha com ampliações exclusivas das
+                    // seções segmentares. Seus valores permanecem disponíveis
+                    // para a conferência, enquanto a divergência fica auditável.
+                    $merged = [...$original, ...$retry];
                     $merged['legibility'] = 'uncertain';
                     $merged['raw_value'] = 'Leitura inicial: '.($original['raw_value'] ?? 'não informada')
                         .' | Segunda leitura: '.($retry['raw_value'] ?? 'não informada');
@@ -172,6 +176,10 @@ Em cada seção há cinco regiões: braço esquerdo, braço direito, tronco, per
 Para cada região, leia na ordem apresentada: massa em kg, percentual relativo à referência e classificação textual.
 Não confunda percentual de referência com massa. Não transforme 3.7 kg em 37 e não remova o primeiro dígito de percentuais como 397.8% ou 97.4%.
 Use os marcadores L e R escritos na imagem; não determine o lado somente pela posição visual.
+No relatório técnico Fitdays, há dois diagramas adjacentes: gordura segmentar à esquerda e equilíbrio muscular à direita. Não misture os valores de um diagrama com o outro.
+Associe cada conjunto de três linhas ao marcador impresso: massa em kg, percentual e classificação. O marcador L identifica side left e o marcador R identifica side right. Não espelhe os lados pela perspectiva anatômica.
+Na ampliação do relatório técnico, os valores ligados ao marcador L ficam na coluna visual esquerda e os ligados ao marcador R na coluna visual direita; essa regra só vale quando os próprios marcadores L/R estiverem legíveis.
+No diagrama técnico, a linha central ligada ao torso é trunk/center. As linhas superiores são arm e as inferiores são leg.
 As faixas de referência impressas no cabeçalho da seção podem ser aplicadas aos cinco segmentos daquela mesma seção, mas nunca entre seções diferentes.
 Classificação deve ser apenas low, standard ou high conforme o texto Baixo, Padrão ou Alto realmente visível.
 Ignore cores como fonte de classificação quando o texto não estiver legível.
@@ -182,6 +190,15 @@ PROMPT
         .$profileContext
         ."\n\nPrimeira leitura, fornecida apenas para indicar os pontos que precisam ser relidos; não a trate como fonte confiável:\n"
         .json_encode($firstReading, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    private function preparedImageContent(string $imageContents, ?string $reportLayout): array
+    {
+        return collect($this->imagePreparer->prepare($imageContents, $reportLayout))
+            ->flatMap(fn (array $image) => [
+                ['type' => 'input_text', 'text' => $image['label'].':'],
+                ['type' => 'input_image', 'image_url' => 'data:image/jpeg;base64,'.base64_encode($image['contents']), 'detail' => 'high'],
+            ])->values()->all();
     }
 
     private function schema(): array

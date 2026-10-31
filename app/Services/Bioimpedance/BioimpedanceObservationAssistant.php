@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
 
 class BioimpedanceObservationAssistant
 {
-    public const PROMPT_VERSION = 'rag-client-1.3.1';
+    public const PROMPT_VERSION = 'rag-client-1.3.2';
 
     public const MODEL_NAME = 'local-validated-rag-agent';
 
@@ -579,12 +579,16 @@ PROMPT;
         $tags = collect(['measurement_protocol', 'safety_policy', 'prohibited_content']);
         foreach (array_keys(self::METRIC_CHUNKS) as $metric) {
             if (filled($context['metrics'][$metric]['classification'] ?? null)) {
-                $tags->push($metric, 'classification');
+                $tags->push($metric);
             }
         }
 
         return $this->publishedSources
-            ->matching($tags->unique()->values()->all(), $keys->unique()->values()->all())
+            ->matching(
+                $tags->unique()->values()->all(),
+                $keys->unique()->values()->all(),
+                $context['device_model'] ?? null,
+            )
             ->sortBy(fn (BioimpedanceKnowledgeChunk $chunk) => ($position = $keys->search($chunk->chunk_key)) === false ? 999 : $position)
             ->values();
     }

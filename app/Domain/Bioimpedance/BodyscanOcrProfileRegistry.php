@@ -75,6 +75,8 @@ final class BodyscanOcrProfileRegistry
                 'Leia a tabela de composição por linha e associe Medição, Proporção de peso e Avaliação ao rótulo da mesma linha.',
                 'Não use a coluna Proporção de peso como massa em kg.',
                 'Confirme que a tabela segmentar contém L e R legíveis nos braços e pernas.',
+                'Nos diagramas técnicos, leia cada bloco na ordem massa em kg, percentual relativo e classificação; não espelhe L/R pela perspectiva anatômica.',
+                'A referência de gordura segmentar impressa é 80%-160%; no equilíbrio muscular é 80%-115% para braços e 90%-110% para tronco e pernas.',
                 'A tabela de impedância precisa estar visível para reconhecer este perfil, mas será estruturada em fase própria.',
             ],
         );

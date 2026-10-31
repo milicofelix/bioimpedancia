@@ -322,6 +322,7 @@ class BodyscanProImageProcessor
 
         $segmentalMeasurements = $this->normalizeSegments(
             is_array($payload['segmental_measurements'] ?? null) ? $payload['segmental_measurements'] : [],
+            $reportLayout,
             $missingFields,
             $suspiciousValues,
             $fieldStatuses,
@@ -393,7 +394,7 @@ class BodyscanProImageProcessor
         ];
     }
 
-    private function normalizeSegments(array $rawSegments, $missingFields, $suspiciousValues, array &$fieldStatuses): array
+    private function normalizeSegments(array $rawSegments, string $reportLayout, $missingFields, $suspiciousValues, array &$fieldStatuses): array
     {
         $indexed = [];
         foreach ($rawSegments as $rawSegment) {
@@ -421,8 +422,8 @@ class BodyscanProImageProcessor
             $indexed[$key] = $rawSegment;
         }
 
-        return collect(Segment::TYPES)->flatMap(function (string $type) use ($indexed, $missingFields, $suspiciousValues, &$fieldStatuses) {
-            return collect(Segment::EXPECTED_SEGMENTS)->map(function (array $expected) use ($type, $indexed, $missingFields, $suspiciousValues, &$fieldStatuses) {
+        return collect(Segment::TYPES)->flatMap(function (string $type) use ($indexed, $reportLayout, $missingFields, $suspiciousValues, &$fieldStatuses) {
+            return collect(Segment::EXPECTED_SEGMENTS)->map(function (array $expected) use ($type, $indexed, $reportLayout, $missingFields, $suspiciousValues, &$fieldStatuses) {
                 $key = $type.'|'.$expected['region'].'|'.$expected['side'];
                 $fieldPrefix = 'segmental.'.$type.'.'.$expected['region'].'.'.$expected['side'];
                 $raw = $indexed[$key] ?? [];
@@ -430,8 +431,22 @@ class BodyscanProImageProcessor
                 $referencePercentage = $this->normalizeNumber($raw['reference_percentage'] ?? null);
                 $referenceMin = $this->normalizeNumber($raw['reference_min_percentage'] ?? null);
                 $referenceMax = $this->normalizeNumber($raw['reference_max_percentage'] ?? null);
+                $rangeSource = $referenceMin !== null && $referenceMax !== null ? 'printed' : null;
+                if ($referenceMin === null || $referenceMax === null) {
+                    $profileRange = $this->segmentalReferenceRange($reportLayout, $type, $expected['region']);
+                    $referenceMin ??= $profileRange[0] ?? null;
+                    $referenceMax ??= $profileRange[1] ?? null;
+                    $rangeSource = $profileRange === null ? null : 'layout_profile';
+                }
                 $rawClassification = $this->normalizeText($raw['classification'] ?? null);
                 $classification = $this->normalizeClassification($rawClassification);
+                $classificationSource = $classification === null ? null : 'printed';
+                if ($classification === null && $referencePercentage !== null && $referenceMin !== null && $referenceMax !== null) {
+                    $classification = $referencePercentage < $referenceMin
+                        ? Segment::CLASSIFICATION_LOW
+                        : ($referencePercentage > $referenceMax ? Segment::CLASSIFICATION_HIGH : Segment::CLASSIFICATION_STANDARD);
+                    $classificationSource = 'reference_range';
+                }
                 $legibility = $this->normalizeText($raw['legibility'] ?? null) ?? 'unreadable';
 
                 foreach (['mass_kg' => $massKg, 'reference_percentage' => $referencePercentage] as $field => $value) {
@@ -511,12 +526,32 @@ class BodyscanProImageProcessor
                         'mass_kg' => $raw['mass_kg'] ?? null,
                         'reference_percentage' => $raw['reference_percentage'] ?? null,
                         'classification' => $rawClassification,
+                        'classification_source' => $classificationSource,
+                        'reference_range_source' => $rangeSource,
                         'text' => $raw['raw_value'] ?? null,
                         'legibility' => $legibility,
                     ],
                 ];
             });
         })->values()->all();
+    }
+
+    /** @return array{0: float, 1: float}|null */
+    private function segmentalReferenceRange(string $layout, string $type, string $region): ?array
+    {
+        if ($layout !== BodyscanReportLayout::FITDAYS_TECHNICAL) {
+            return null;
+        }
+
+        if ($type === Segment::TYPE_FAT) {
+            return [80.0, 160.0];
+        }
+
+        if ($type === Segment::TYPE_MUSCLE) {
+            return $region === Segment::REGION_ARM ? [80.0, 115.0] : [90.0, 110.0];
+        }
+
+        return null;
     }
 
     private function normalizeImpedanceReadings(
