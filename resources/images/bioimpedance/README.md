@@ -50,3 +50,10 @@ O ativo aceita as seguintes propriedades CSS, todas com valores de fallback:
 - `--vita-body-print-detail`
 
 As cores representam somente o estado fornecido pelo aplicativo de origem. A camada de apresentação não deve inferir diagnóstico, risco ou alteração clínica a partir delas.
+
+### Modos de apresentação
+
+- **Gordura segmentar:** utiliza textura vetorial suave por região, mantendo o valor e o percentual como informações principais.
+- **Equilíbrio muscular:** utiliza preenchimento sólido para facilitar a comparação visual entre esquerda e direita.
+
+Os dois modos usam exatamente a mesma geometria. Massa, percentual e classificação nunca deformam ou redimensionam partes do corpo, e nenhuma diferença visual deve ser descrita automaticamente como diagnóstico ou assimetria clínica.

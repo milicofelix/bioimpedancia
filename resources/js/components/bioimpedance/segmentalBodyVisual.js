@@ -9,10 +9,23 @@ export const segmentalBodyRegions = [
 ];
 
 export const segmentalBodyStates = {
-	low: { label: 'Abaixo da referência', marker: '↓', color: '#2563eb', fill: '#dbeafe', printFill: '#d9d9d9' },
-	standard: { label: 'Padrão', marker: '●', color: '#047857', fill: '#d1fae5', printFill: '#bfbfbf' },
-	high: { label: 'Alto', marker: '↑', color: '#be123c', fill: '#ffe4e6', printFill: '#969696' },
-	unknown: { label: 'Não identificado', marker: '?', color: '#475569', fill: '#e2e8f0', printFill: '#eeeeee' },
+	low: { label: 'Abaixo da referência', marker: '↓', color: '#2563eb', fill: '#dbeafe', muscleFill: '#93c5fd', printFill: '#d9d9d9' },
+	standard: { label: 'Padrão', marker: '●', color: '#047857', fill: '#d1fae5', muscleFill: '#6ee7b7', printFill: '#bfbfbf' },
+	high: { label: 'Alto', marker: '↑', color: '#be123c', fill: '#ffe4e6', muscleFill: '#fda4af', printFill: '#969696' },
+	unknown: { label: 'Não identificado', marker: '?', color: '#475569', fill: '#e2e8f0', muscleFill: '#cbd5e1', printFill: '#eeeeee' },
+};
+
+export const segmentalAnalysisPresentation = {
+	fat: {
+		label: 'Gordura segmentar',
+		description: 'O preenchimento texturizado diferencia as classificações informadas pelo aplicativo em cada região.',
+		visualMode: 'texture',
+	},
+	muscle: {
+		label: 'Equilíbrio muscular',
+		description: 'O preenchimento sólido facilita a comparação visual entre os lados esquerdo e direito.',
+		visualMode: 'solid',
+	},
 };
 
 export const segmentalBodyNeutralPalette = {
@@ -30,4 +43,8 @@ export const segmentalSideMarkers = [
 
 export function segmentalState(classification) {
 	return segmentalBodyStates[classification] ?? segmentalBodyStates.unknown;
+}
+
+export function segmentalPresentation(type) {
+	return segmentalAnalysisPresentation[type] ?? segmentalAnalysisPresentation.fat;
 }
