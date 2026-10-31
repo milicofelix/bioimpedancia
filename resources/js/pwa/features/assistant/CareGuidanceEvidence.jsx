@@ -21,7 +21,7 @@ export default function CareGuidanceEvidence({ assistant }) {
 		<div className="space-y-4">
 			<div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
 				<p><strong>Provedor utilizado:</strong> {assistant.provider === 'openai' ? 'OpenAI' : 'Motor local de referências'}</p>
-				{assistant.fallback_used ? <p className="mt-1 text-amber-800"><strong>Fallback local:</strong> {assistant.fallback_reason}</p> : null}
+				{assistant.fallback_used ? <p className="mt-1 text-amber-800"><strong>Processamento alternativo:</strong> {assistant.fallback_reason}</p> : null}
 			</div>
 
 			<div>

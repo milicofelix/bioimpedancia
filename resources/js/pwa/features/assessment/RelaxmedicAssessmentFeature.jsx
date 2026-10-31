@@ -184,7 +184,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 	}
 
 	if (!['relaxmedic', 'relaxmedic_bodyscan_pro'].includes(scaleModel)) {
-		return <BlockedState title="Relaxmedic não está selecionada" description="A versão PWA desta etapa aceita apenas avaliações Relaxmedic. Altere o modelo nas configurações do painel para continuar." onBack={onBackToClients} />;
+		return <BlockedState title="Modelo de balança incompatível" description="A área operacional aceita avaliações Relaxmedic e Bodyscan Pro. Altere o modelo da balança nas configurações da clínica para continuar." onBack={onBackToClients} />;
 	}
 
 	const access = assessmentAccess(client, currentUser, scaleModel);
@@ -196,7 +196,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 				<PwaStepIndicator steps={journeySteps} current={journeySteps.length} />
 				<div className="mx-auto mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-ricosty-100 text-2xl font-black text-ricosty-700">✓</div>
 				<h2 className="mt-3 text-xl font-bold text-slate-950">Avaliação criada com segurança</h2>
-				<p className="mt-2 text-sm leading-6 text-slate-600">Os dados de {client.full_name} foram salvos após a confirmação. A prévia temporária foi removida da PWA.</p>
+				<p className="mt-2 text-sm leading-6 text-slate-600">Os dados de {client.full_name} foram salvos após a confirmação. A imagem temporária foi removida do aplicativo.</p>
 				{!canOpenReport ? <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900">O relatório corporal não aparece porque esse módulo está desativado nas configurações da clínica.</p> : null}
 				<div className={`mt-5 grid gap-3 ${canOpenReport ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
 					<PwaButton type="button" onClick={onBackToClients} variant="secondary" icon="arrowLeft">Voltar para clientes</PwaButton>

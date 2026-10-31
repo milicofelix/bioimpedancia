@@ -59,9 +59,9 @@ export default function OperationalShell({ activeSection, currentUser, enabledMo
 					<div className="relative flex items-center gap-4">
 						<div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/25 bg-white/15 text-lg font-black shadow-inner backdrop-blur">{userInitial(currentUser?.name)}</div>
 						<div className="min-w-0">
-							<p className="text-[11px] font-bold uppercase tracking-[0.2em] text-ricosty-100">Sua melhor versão, em cada detalhe</p>
+							<p className="text-[11px] font-bold uppercase tracking-[0.2em] text-ricosty-100">Atendimento Vita Scan</p>
 							<h1 className="mt-1 break-words text-xl font-bold">Olá, {currentUser?.name ?? 'profissional'}</h1>
-							<p className="mt-1 text-sm text-ricosty-100">Tudo que você precisa para conduzir o atendimento.</p>
+							<p className="mt-1 text-sm text-ricosty-100">Selecione um cliente para iniciar ou continuar o atendimento.</p>
 						</div>
 					</div>
 				</div>
