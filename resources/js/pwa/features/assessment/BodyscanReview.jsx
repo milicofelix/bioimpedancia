@@ -9,6 +9,13 @@ import SegmentalBodyMap from '../../../components/bioimpedance/SegmentalBodyMap'
 import { bodyscanLayoutPresentation, isVerticalBodyscanLayout } from './BodyscanReportFormatGuide';
 
 const valueFields = ['mass_kg', 'reference_percentage', 'classification', 'reference_min_percentage', 'reference_max_percentage'];
+const segmentFieldLabels = {
+	mass_kg: 'massa',
+	reference_percentage: 'percentual de referência',
+	classification: 'classificação',
+	reference_min_percentage: 'faixa mínima',
+	reference_max_percentage: 'faixa máxima',
+};
 const extendedMetricLabels = {
 	waist_hip_ratio: 'WHR',
 	body_score: 'Pontuação corporal',
@@ -122,15 +129,27 @@ function SegmentInput({ label, value, onChange }) {
 
 export default function BodyscanReview({ previewUrl, form, extraction, client, confirmed, errors, saving, online, onGeneralUpdate, onProfileUpdate, onSegmentUpdate, onImpedanceUpdate, onConfirm, onSubmit, onRestart }) {
 	const [panel, setPanel] = useState('values');
+	const [confirmationAttempted, setConfirmationAttempted] = useState(false);
 	const statuses = extraction?.field_statuses ?? {};
 	const grouped = useMemo(() => ({
 		fat: form.segments.map((segment, index) => ({ segment, index })).filter(({ segment }) => segment.type === 'fat'),
 		muscle: form.segments.map((segment, index) => ({ segment, index })).filter(({ segment }) => segment.type === 'muscle'),
 	}), [form.segments]);
-	const incomplete = !form.profile?.measurement_application
-		|| String(form.profile?.athlete_mode_at_assessment ?? '') === ''
-		|| form.segments.length !== 10
-		|| form.segments.some((segment) => valueFields.some((field) => String(segment[field] ?? '').trim() === ''));
+	const confirmationPendingItems = useMemo(() => {
+		const pending = [];
+		if (!form.profile?.measurement_application) pending.push('Selecione o aplicativo de origem.');
+		if (String(form.profile?.athlete_mode_at_assessment ?? '') === '') pending.push('Confirme se o modo atleta estava ativado ou desativado.');
+		if (form.segments.length !== 10) pending.push(`Confira os dez segmentos corporais: ${form.segments.length} de 10 foram identificados.`);
+		form.segments.forEach((segment) => {
+			const missing = valueFields.filter((field) => String(segment[field] ?? '').trim() === '');
+			if (!missing.length) return;
+			const label = segmentLabels[`${segment.region}|${segment.side}`] ?? 'Segmento não identificado';
+			const type = segment.type === 'fat' ? 'gordura' : segment.type === 'muscle' ? 'músculo' : 'tipo não identificado';
+			pending.push(`${label} (${type}): preencha ${missing.map((field) => segmentFieldLabels[field]).join(', ')}.`);
+		});
+		return pending;
+	}, [form.profile?.athlete_mode_at_assessment, form.profile?.measurement_application, form.segments]);
+	const incomplete = confirmationPendingItems.length > 0;
 	const qualityWarnings = [...new Set(extraction?.quality_issues ?? [])];
 	const readingWarnings = [...new Set((extraction?.suspicious_values ?? []).map((item) => item.reason).filter(Boolean))];
 	const measurementAge = ageAtMeasurement(client?.birth_date, form.general.evaluated_at);
@@ -150,6 +169,15 @@ export default function BodyscanReview({ previewUrl, form, extraction, client, c
 	const hasProfileDivergence = isTechnicalLayout && Object.values(profileComparison).some((matches) => !matches);
 	const layoutPresentation = bodyscanLayoutPresentation[extraction?.report_layout];
 	const verticalWithoutImpedance = isVerticalBodyscanLayout(extraction?.report_layout) && !(form.impedanceReadings ?? []).length;
+	function handleConfirmationChange(checked) {
+		if (checked && confirmationPendingItems.length) {
+			setConfirmationAttempted(true);
+			onConfirm(false);
+			return;
+		}
+		setConfirmationAttempted(false);
+		onConfirm(checked);
+	}
 
 	return (
 		<form onSubmit={onSubmit} aria-busy={saving} className="pwa-card p-4 sm:p-5">
@@ -193,7 +221,8 @@ export default function BodyscanReview({ previewUrl, form, extraction, client, c
 					<label className="block text-sm font-semibold">Observações<input maxLength={2000} value={form.general.notes} onChange={(event) => onGeneralUpdate('notes', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label>
 				</div>
 			</div>
-			<label className="mt-5 flex items-start gap-3 rounded-2xl border border-ricosty-200 bg-ricosty-50 p-4 text-sm font-semibold"><input type="checkbox" checked={confirmed} disabled={incomplete} onChange={(event) => onConfirm(event.target.checked)} className="mt-0.5 h-5 w-5" /><span>Comparei a imagem original e confirmo o perfil usado na medição, as métricas gerais e estendidas, os segmentos corporais e, quando disponível, a tabela técnica de impedância.</span></label>
+			<label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border p-4 text-sm font-semibold ${confirmationAttempted && incomplete ? 'border-amber-400 bg-amber-50' : 'border-ricosty-200 bg-ricosty-50'}`}><input type="checkbox" checked={confirmed} onChange={(event) => handleConfirmationChange(event.target.checked)} aria-describedby={confirmationAttempted && incomplete ? 'bodyscan-confirmation-pending' : undefined} className="mt-0.5 h-5 w-5" /><span>Comparei a imagem original e confirmo o perfil usado na medição, as métricas gerais e estendidas, os segmentos corporais e, quando disponível, a tabela técnica de impedância.</span></label>
+			{confirmationAttempted && incomplete ? <div id="bodyscan-confirmation-pending" role="alert" className="mt-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"><strong className="block">Ainda não é possível confirmar a conferência.</strong><p className="mt-1 text-xs leading-5">Revise as pendências abaixo e marque novamente a confirmação:</p><ul className="mt-2 list-disc space-y-1 pl-5">{confirmationPendingItems.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
 			{firstError(errors, 'source_metadata') || firstError(errors, 'bodyscan_review_confirmed') || firstError(errors, 'segmental_measurements') ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-700">{firstError(errors, 'source_metadata') ?? firstError(errors, 'bodyscan_review_confirmed') ?? firstError(errors, 'segmental_measurements')}</p> : null}
 			<PwaButton type="submit" disabled={incomplete || !confirmed || saving || !online} loading={saving} icon="check" className="mt-4 w-full">{saving ? 'Criando avaliação...' : 'Confirmar e criar avaliação'}</PwaButton>
 		</form>
