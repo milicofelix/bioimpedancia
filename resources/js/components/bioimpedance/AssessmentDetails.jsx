@@ -63,7 +63,7 @@ export default function AssessmentDetails({ assessment, previousAssessment }) {
 				</div>
 			) : null}
 
-			{assessment.segmental_measurements?.length ? <div className="mt-4 grid gap-4 xl:grid-cols-2"><SegmentalBodyMap measurements={assessment.segmental_measurements} type="fat" /><SegmentalBodyMap measurements={assessment.segmental_measurements} type="muscle" /></div> : null}
+			{assessment.segmental_measurements?.length ? <div className="mt-4 grid gap-4 lg:grid-cols-2"><SegmentalBodyMap measurements={assessment.segmental_measurements} type="fat" /><SegmentalBodyMap measurements={assessment.segmental_measurements} type="muscle" /></div> : null}
 			{assessment.segmental_measurements?.length ? <SegmentalComparison current={assessment.segmental_measurements} previous={previousAssessment?.segmental_measurements ?? []} previousDate={previousAssessment ? formatDate(previousAssessment.evaluated_at) : null} comparability={comparability} /> : null}
 			{extendedComparisons.length ? <ComparisonList title="Métricas estendidas comparáveis" items={extendedComparisons.map((metric) => ({ key: metric.key, label: metric.label, previous: metric.previous, current: metric.current, unit: metric.unit }))} /> : null}
 			{impedanceComparisons.length ? <ComparisonList title="Impedâncias presentes nas duas avaliações" items={impedanceComparisons.map((reading) => ({ key: `${reading.frequency_khz}-${reading.region}-${reading.side}`, label: `${reading.frequency_khz} kHz · ${reading.region} · ${reading.side}`, previous: reading.previous_ohms, current: reading.current_ohms, unit: 'Ω' }))} /> : null}

@@ -9,10 +9,10 @@ export const segmentalBodyRegions = [
 ];
 
 export const segmentalBodyStates = {
-	low: { label: 'Abaixo da referência', marker: '↓', color: '#2563eb', fill: '#dbeafe', muscleFill: '#93c5fd', printFill: '#d9d9d9' },
-	standard: { label: 'Padrão', marker: '●', color: '#047857', fill: '#d1fae5', muscleFill: '#6ee7b7', printFill: '#bfbfbf' },
-	high: { label: 'Alto', marker: '↑', color: '#be123c', fill: '#ffe4e6', muscleFill: '#fda4af', printFill: '#969696' },
-	unknown: { label: 'Não identificado', marker: '?', color: '#475569', fill: '#e2e8f0', muscleFill: '#cbd5e1', printFill: '#eeeeee' },
+	low: { label: 'Abaixo da referência', compactLabel: 'Abaixo da ref.', marker: '↓', color: '#2563eb', fill: '#dbeafe', muscleFill: '#93c5fd', printFill: '#d9d9d9' },
+	standard: { label: 'Padrão', compactLabel: 'Padrão', marker: '●', color: '#047857', fill: '#d1fae5', muscleFill: '#6ee7b7', printFill: '#bfbfbf' },
+	high: { label: 'Alto', compactLabel: 'Alto', marker: '↑', color: '#be123c', fill: '#ffe4e6', muscleFill: '#fda4af', printFill: '#969696' },
+	unknown: { label: 'Não identificado', compactLabel: 'Não identificado', marker: '?', color: '#475569', fill: '#e2e8f0', muscleFill: '#cbd5e1', printFill: '#eeeeee' },
 };
 
 export const segmentalAnalysisPresentation = {
@@ -47,4 +47,11 @@ export function segmentalState(classification) {
 
 export function segmentalPresentation(type) {
 	return segmentalAnalysisPresentation[type] ?? segmentalAnalysisPresentation.fat;
+}
+
+export function formatSegmentalValue(value, suffix = '') {
+	if (value === null || value === undefined || value === '') return '—';
+	const numericValue = Number(value);
+	if (!Number.isFinite(numericValue)) return '—';
+	return `${numericValue.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}${suffix}`;
 }

@@ -57,3 +57,12 @@ As cores representam somente o estado fornecido pelo aplicativo de origem. A cam
 - **Equilíbrio muscular:** utiliza preenchimento sólido para facilitar a comparação visual entre esquerda e direita.
 
 Os dois modos usam exatamente a mesma geometria. Massa, percentual e classificação nunca deformam ou redimensionam partes do corpo, e nenhuma diferença visual deve ser descrita automaticamente como diagnóstico ou assimetria clínica.
+
+### Responsividade e acessibilidade
+
+- Em telas compactas, a figura exibe o corpo sem linhas comprimidas e os dados regionais aparecem em cartões logo abaixo.
+- A partir do breakpoint `sm`, linhas, pontos e rótulos voltam a compor o mapa completo.
+- Em telas amplas, gordura segmentar e equilíbrio muscular formam duas colunas.
+- A legenda usa rótulos abreviados somente no celular e preserva o nome completo para tecnologia assistiva.
+- A tabela textual permanece disponível, possui região rolável com foco por teclado e é a fonte acessível equivalente aos desenhos.
+- Valor ausente é apresentado como travessão e classificação ausente usa explicitamente `Não identificado`.
