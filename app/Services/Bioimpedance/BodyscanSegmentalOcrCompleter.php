@@ -78,7 +78,6 @@ class BodyscanSegmentalOcrCompleter
                 if (! is_array($retry)) {
                     return [
                         ...$original,
-                        'legibility' => 'uncertain',
                         'raw_value' => ($original['raw_value'] ?? 'Leitura inicial disponível').' | Segunda leitura indisponível',
                     ];
                 }
@@ -92,6 +91,7 @@ class BodyscanSegmentalOcrCompleter
                     // para a conferência, enquanto a divergência fica auditável.
                     $merged = [...$original, ...$retry];
                     $merged['legibility'] = 'uncertain';
+                    $merged['review_reason'] = $this->conflictReason($type, $expected, $conflictingFields->all());
                     $merged['raw_value'] = 'Leitura inicial: '.($original['raw_value'] ?? 'não informada')
                         .' | Segunda leitura: '.($retry['raw_value'] ?? 'não informada');
 
@@ -121,10 +121,32 @@ class BodyscanSegmentalOcrCompleter
 
             return [
                 ...$segment,
-                'legibility' => 'uncertain',
                 'raw_value' => ($segment['raw_value'] ?? 'Leitura inicial disponível').' | Segunda leitura indisponível',
             ];
         })->all();
+    }
+
+    private function conflictReason(string $type, array $segment, array $fields): string
+    {
+        $typeLabel = $type === Segment::TYPE_FAT ? 'Gordura segmentar' : 'Equilíbrio muscular';
+        $regionLabel = match ($segment['region']) {
+            Segment::REGION_ARM => 'braço',
+            Segment::REGION_LEG => 'perna',
+            default => 'tronco',
+        };
+        $sideLabel = match ($segment['side']) {
+            Segment::SIDE_LEFT => ' esquerdo',
+            Segment::SIDE_RIGHT => ' direito',
+            default => '',
+        };
+        $fieldLabels = [
+            'mass_kg' => 'massa',
+            'reference_percentage' => 'percentual de referência',
+            'classification' => 'classificação',
+        ];
+        $labels = collect($fields)->map(fn (string $field) => $fieldLabels[$field] ?? $field)->implode(', ');
+
+        return "{$typeLabel} — {$regionLabel}{$sideLabel}: as duas leituras divergiram em {$labels}.";
     }
 
     private function valuesConflict(string $field, mixed $first, mixed $second): bool

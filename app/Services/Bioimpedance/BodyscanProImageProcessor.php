@@ -240,13 +240,6 @@ class BodyscanProImageProcessor
             if (! $profile->supportsMetric($field)) {
                 $metrics[$field] = null;
                 $fieldStatuses['metrics.'.$field] = 'unavailable_in_layout';
-                if (($rawMetrics[$field] ?? null) !== null) {
-                    $suspiciousValues->push([
-                        'field' => 'metrics.'.$field,
-                        'value' => $rawMetrics[$field],
-                        'reason' => 'O perfil identificado não oferece este campo; a leitura pode ter associado outro indicador ao rótulo incorreto.',
-                    ]);
-                }
                 continue;
             }
             $rawValue = $rawMetrics[$field] ?? null;
@@ -504,10 +497,12 @@ class BodyscanProImageProcessor
                 }
 
                 if ($legibility !== 'clear' && ($massKg !== null || $referencePercentage !== null)) {
+                    $segmentLabel = $this->segmentLabel($type, $expected['region'], $expected['side']);
                     $suspiciousValues->push([
                         'field' => $fieldPrefix,
                         'value' => $raw['raw_value'] ?? null,
-                        'reason' => 'A leitura deste segmento foi marcada como incerta ou ilegível.',
+                        'reason' => $this->normalizeText($raw['review_reason'] ?? null)
+                            ?? "{$segmentLabel}: a leitura precisa ser comparada com a imagem original.",
                     ]);
                 }
 
@@ -552,6 +547,23 @@ class BodyscanProImageProcessor
         }
 
         return null;
+    }
+
+    private function segmentLabel(string $type, string $region, string $side): string
+    {
+        $typeLabel = $type === Segment::TYPE_FAT ? 'Gordura segmentar' : 'Equilíbrio muscular';
+        $regionLabel = match ($region) {
+            Segment::REGION_ARM => 'braço',
+            Segment::REGION_LEG => 'perna',
+            default => 'tronco',
+        };
+        $sideLabel = match ($side) {
+            Segment::SIDE_LEFT => ' esquerdo',
+            Segment::SIDE_RIGHT => ' direito',
+            default => '',
+        };
+
+        return $typeLabel.' — '.$regionLabel.$sideLabel;
     }
 
     private function normalizeImpedanceReadings(
