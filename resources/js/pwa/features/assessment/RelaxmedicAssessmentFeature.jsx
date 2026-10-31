@@ -17,7 +17,7 @@ import BodyscanOcrProgress from './BodyscanOcrProgress';
 import BodyscanProtocolChecklist from './BodyscanProtocolChecklist';
 import BodyscanReportFormatGuide from './BodyscanReportFormatGuide';
 
-export default function RelaxmedicAssessmentFeature({ client, currentUser, scaleModel, onBackToClients, onCreated, onOpenAssistant }) {
+export default function RelaxmedicAssessmentFeature({ client, currentUser, scaleModel, onBackToClients, onCreated, onOpenAssistant, onOpenReport, canOpenReport = false }) {
 	const runAction = useActionLock();
 	const previewReference = useRef('');
 	const [imageFile, setImageFile] = useState(null);
@@ -197,9 +197,11 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 				<div className="mx-auto mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-ricosty-100 text-2xl font-black text-ricosty-700">✓</div>
 				<h2 className="mt-3 text-xl font-bold text-slate-950">Avaliação criada com segurança</h2>
 				<p className="mt-2 text-sm leading-6 text-slate-600">Os dados de {client.full_name} foram salvos após a confirmação. A prévia temporária foi removida da PWA.</p>
-				<div className="mt-5 grid gap-3 sm:grid-cols-2">
+				{!canOpenReport ? <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900">O relatório corporal não aparece porque esse módulo está desativado nas configurações da clínica.</p> : null}
+				<div className={`mt-5 grid gap-3 ${canOpenReport ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
 					<PwaButton type="button" onClick={onBackToClients} variant="secondary" icon="arrowLeft">Voltar para clientes</PwaButton>
 					<PwaButton type="button" onClick={onOpenAssistant} icon="sparkles">Abrir assistente</PwaButton>
+					{canOpenReport ? <PwaButton type="button" onClick={onOpenReport} variant="secondary" icon="fileText">Abrir relatório</PwaButton> : null}
 				</div>
 			</PwaCard>
 		);

@@ -128,29 +128,6 @@ const evolutionPeriods = [
 	{ key: 'all', label: 'Tudo', days: null },
 ];
 
-const observationLoadingSteps = [
-	{
-		title: 'Preparando avaliação',
-		description: 'Organizando dados do cliente, snapshot de idade, sexo e resultados da Omron.',
-	},
-	{
-		title: 'Buscando referências',
-		description: 'Selecionando manual, protocolo e fontes aprovadas para esta avaliação.',
-	},
-	{
-		title: 'Gerando sugestão',
-		description: 'Consultando o assistente configurado e preservando as classificações oficiais.',
-	},
-	{
-		title: 'Validando segurança',
-		description: 'Conferindo fontes, linguagem permitida e possíveis inconsistências.',
-	},
-	{
-		title: 'Montando observação',
-		description: 'Preparando o texto para revisão e aprovação do profissional.',
-	},
-];
-
 function Field({ label, children }) {
 	return (
 		<label className="block">
@@ -528,7 +505,6 @@ export default function DashboardPage({ userName }) {
 	const [generatingObservation, setGeneratingObservation] = useState(false);
 	const [approvingObservation, setApprovingObservation] = useState(false);
 	const [revokingShareId, setRevokingShareId] = useState(null);
-	const [observationLoadingStep, setObservationLoadingStep] = useState(0);
 	const [observationAssistant, setObservationAssistant] = useState(null);
 	const [observationDraft, setObservationDraft] = useState('');
 	const [refreshingDashboard, setRefreshingDashboard] = useState(false);
@@ -559,19 +535,6 @@ export default function DashboardPage({ userName }) {
 			setSelectedAssessmentId(data.clients[0]?.assessments?.[0]?.id ?? null);
 		}).finally(() => setLoading(false));
 	}, []);
-
-	useEffect(() => {
-		if (!generatingObservation) {
-			setObservationLoadingStep(0);
-			return undefined;
-		}
-
-		const interval = window.setInterval(() => {
-			setObservationLoadingStep((current) => Math.min(current + 1, observationLoadingSteps.length - 1));
-		}, 1400);
-
-		return () => window.clearInterval(interval);
-	}, [generatingObservation]);
 
 	useEffect(() => {
 		const updateConnectionStatus = () => setIsOnline(navigator.onLine);
@@ -1237,11 +1200,9 @@ export default function DashboardPage({ userName }) {
 	async function generateObservationSuggestion() {
 		if (!selectedAssessment || !canClinicalProfessional || generatingObservation) return;
 
-		setObservationLoadingStep(0);
 		setGeneratingObservation(true);
 		try {
 			const { data } = await window.axios.get(`/bioimpedance/assessments/${selectedAssessment.id}/observation-suggestion`);
-			setObservationLoadingStep(observationLoadingSteps.length - 1);
 			setObservationAssistant(data.assistant);
 			setObservationDraft(data.assistant?.suggestion ?? '');
 		} finally {
@@ -2019,31 +1980,14 @@ export default function DashboardPage({ userName }) {
 							</div>
 							<div>
 								<p className="text-xs font-bold uppercase tracking-wide text-violet-700">Assistente inteligente</p>
-								<h2 id="assistant-loading-title" className="mt-1 text-lg font-bold text-slate-950">{observationLoadingSteps[observationLoadingStep]?.title}</h2>
-								<p className="mt-2 text-sm leading-6 text-slate-600">{observationLoadingSteps[observationLoadingStep]?.description}</p>
+								<h2 id="assistant-loading-title" className="mt-1 text-lg font-bold text-slate-950">Gerando observação para revisão</h2>
+								<p className="mt-2 text-sm leading-6 text-slate-600">O servidor está consultando as fontes, gerando o texto e validando a segurança da resposta.</p>
 							</div>
 						</div>
 
-						<div className="mt-5 space-y-3">
-							{observationLoadingSteps.map((step, index) => {
-								const isDone = index < observationLoadingStep;
-								const isCurrent = index === observationLoadingStep;
-
-								return (
-									<div key={step.title} className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isCurrent ? 'border-violet-200 bg-violet-50' : 'border-slate-100 bg-slate-50'}`}>
-										<span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${isDone ? 'bg-emerald-500 text-white' : isCurrent ? 'bg-violet-600 text-white' : 'bg-white text-slate-400'}`}>
-											{isDone ? '✓' : index + 1}
-										</span>
-										<div>
-											<p className={`text-sm font-semibold ${isCurrent ? 'text-violet-900' : 'text-slate-700'}`}>{step.title}</p>
-											<p className="text-xs text-slate-500">{step.description}</p>
-										</div>
-									</div>
-								);
-							})}
-						</div>
-
-						<p className="mt-5 text-xs leading-5 text-slate-500">A sugestão será entregue para revisão. As classificações oficiais da HBF-514C continuam sendo calculadas somente pelo backend.</p>
+						<div className="mt-5 h-2 overflow-hidden rounded-full bg-violet-100" aria-hidden="true"><div className="h-full w-2/5 animate-pulse rounded-full bg-gradient-to-r from-violet-500 to-ricosty-500" /></div>
+						<p className="mt-3 text-xs font-semibold leading-5 text-violet-700">A conclusão será exibida somente quando o servidor responder. O tempo pode variar conforme o serviço de IA.</p>
+						<p className="mt-3 text-xs leading-5 text-slate-500">A sugestão será entregue para revisão. As classificações oficiais continuam sendo calculadas somente pelo backend.</p>
 					</div>
 				</div>
 			) : null}

@@ -153,6 +153,8 @@ export default function OperationalAppPage() {
 					onBackToClients={() => navigate('clientes')}
 					onCreated={assessmentCreated}
 					onOpenAssistant={() => navigate('assistente')}
+					onOpenReport={() => navigate('relatorio')}
+					canOpenReport={enabledModules.reports}
 				/>
 			) : section === 'assistente' ? (
 				<AssessmentAssistantFeature

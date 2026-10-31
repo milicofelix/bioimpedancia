@@ -4,7 +4,7 @@ import useActionLock from '../../../hooks/useActionLock';
 import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaIcon from '../../components/ui/PwaIcon';
-import CareGuidanceProgress, { careGuidanceProcessingSteps } from './CareGuidanceProgress';
+import CareGuidanceProgress from './CareGuidanceProgress';
 import CareGuidanceEvidence from './CareGuidanceEvidence';
 
 export default function CareGuidanceAssistant({ assessment, online, onApproved }) {
@@ -12,28 +12,16 @@ export default function CareGuidanceAssistant({ assessment, online, onApproved }
 	const [assistant, setAssistant] = useState(null);
 	const [draft, setDraft] = useState('');
 	const [generating, setGenerating] = useState(false);
-	const [processingStep, setProcessingStep] = useState(0);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState('');
 	const edited = Boolean(assistant?.suggestion && draft !== assistant.suggestion);
 	const blocked = Boolean(assistant && assistant.status !== 'generated');
 
 	useEffect(() => {
-		if (!generating) return undefined;
-
-		const interval = window.setInterval(() => {
-			setProcessingStep((current) => Math.min(current + 1, careGuidanceProcessingSteps.length - 1));
-		}, 1200);
-
-		return () => window.clearInterval(interval);
-	}, [generating]);
-
-	useEffect(() => {
 		setAssistant(null);
 		setDraft('');
 		setError('');
 		setGenerating(false);
-		setProcessingStep(0);
 		setSaving(false);
 	}, [assessment.id]);
 
@@ -41,7 +29,6 @@ export default function CareGuidanceAssistant({ assessment, online, onApproved }
 		return runAction('generate-care-guidance', async () => {
 			if (!online || generating) return;
 			setGenerating(true);
-			setProcessingStep(0);
 			setError('');
 			try {
 				const result = await generateAssessmentCareGuidance(assessment.id);
@@ -78,7 +65,7 @@ export default function CareGuidanceAssistant({ assessment, online, onApproved }
 		});
 	}
 
-	if (generating) return <CareGuidanceProgress currentStep={processingStep} />;
+	if (generating) return <CareGuidanceProgress />;
 
 	return (
 		<PwaCard className="border-teal-200 p-5">

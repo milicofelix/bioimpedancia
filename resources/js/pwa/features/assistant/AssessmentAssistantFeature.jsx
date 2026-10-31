@@ -4,7 +4,6 @@ import { formatDate, numberBr } from '../../../shared/formatters';
 import { canUseClinicalFeatures } from '../clients/clientAccess';
 import AssistantProgress from './AssistantProgress';
 import ObservationSuggestion from './ObservationSuggestion';
-import { assistantProcessingSteps } from './assistantSteps';
 import useOnlineStatus from '../../hooks/useOnlineStatus';
 import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
@@ -18,7 +17,6 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 	const [draft, setDraft] = useState('');
 	const [generating, setGenerating] = useState(false);
 	const [saving, setSaving] = useState(false);
-	const [processingStep, setProcessingStep] = useState(0);
 	const [error, setError] = useState('');
 	const [approved, setApproved] = useState(false);
 	const [approvedAsEdited, setApprovedAsEdited] = useState(false);
@@ -34,21 +32,10 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 		setApprovedAssessment(null);
 	}, [assessment?.id]);
 
-	useEffect(() => {
-		if (!generating) return undefined;
-
-		const interval = window.setInterval(() => {
-			setProcessingStep((current) => Math.min(current + 1, assistantProcessingSteps.length - 1));
-		}, 1200);
-
-		return () => window.clearInterval(interval);
-	}, [generating]);
-
 	async function generate() {
 		return runAction('generate-observation', async () => {
 			if (!assessment || assessment.is_canceled || generating || !isOnline) return;
 			setGenerating(true);
-			setProcessingStep(0);
 			setAssistant(null);
 			setDraft('');
 			setError('');
@@ -133,7 +120,7 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 					<div className={`mt-4 grid gap-3 ${canOpenReport ? 'sm:grid-cols-2' : ''}`}><PwaButton type="button" onClick={() => setApproved(false)} variant="secondary" icon="refresh">Gerar outra sugestão</PwaButton>{canOpenReport ? <PwaButton type="button" onClick={onOpenReport} icon="fileText">Abrir relatório</PwaButton> : null}</div>
 				</PwaCard>
 			) : generating ? (
-				<AssistantProgress currentStep={processingStep} />
+				<AssistantProgress />
 			) : assistant ? (
 				<ObservationSuggestion assistant={assistant} draft={draft} saving={saving} online={isOnline} error={error} onDraftChange={setDraft} onApprove={approve} onDiscard={discard} />
 			) : (
