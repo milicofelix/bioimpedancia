@@ -19,8 +19,7 @@
     });
     $itemsByRegion = $items->keyBy(fn ($item) => $item['region'].'|'.$item['side']);
     $pdfNumber = fn ($value, $suffix = '') => $value === null || $value === '' ? '—' : number_format((float) $value, 1, ',', '.').$suffix;
-    $silhouette = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 300"><g fill="#f8e8eb" stroke="#9f5364" stroke-width="2"><circle cx="60" cy="27" r="20"/><path d="M43 52 C49 46 71 46 77 52 L87 125 C83 148 76 164 74 177 L46 177 C44 164 37 148 33 125 Z"/><path d="M38 58 C24 72 20 96 18 122 L10 180 C9 194 19 198 25 185 L35 126 L50 65 Z"/><path d="M82 58 C96 72 100 96 102 122 L110 180 C111 194 101 198 95 185 L85 126 L70 65 Z"/><path d="M47 176 C41 200 38 226 38 253 L34 292 C36 302 46 302 49 292 L58 250 L60 192 L60 177 Z"/><path d="M73 176 C79 200 82 226 82 253 L86 292 C84 302 74 302 71 292 L62 250 L60 192 L60 177 Z"/></g><path d="M60 51V177M34 121H86M60 177V252" stroke="#c98998" stroke-width="1.5" stroke-dasharray="4 4" fill="none"/><text x="24" y="205" fill="#7f1d3f" font-family="DejaVu Sans" font-size="12" font-weight="700">L</text><text x="89" y="205" fill="#7f1d3f" font-family="DejaVu Sans" font-size="12" font-weight="700">R</text></svg>';
-    $silhouetteDataUri = 'data:image/svg+xml;base64,'.base64_encode($silhouette);
+    $silhouetteDataUri = $segmentalBodyImages[$type] ?? null;
 @endphp
 <div class="segmental-map keep-together">
     <div class="segmental-title">{{ $title }}</div>
@@ -36,7 +35,7 @@
                 <td class="segmental-value segmental-value-right">
                     @if($leftItem)<strong>{{ $leftItem['label'] }}</strong><br>{{ $pdfNumber($leftItem['measurement']['mass_kg'] ?? null, ' kg') }}<br>{{ $pdfNumber($leftItem['measurement']['reference_percentage'] ?? null, '% ref.') }}<br><span style="color:{{ $leftItem['state'][2] }}; font-weight:700;">{{ $leftItem['state'][1] }} {{ $leftItem['state'][0] }}</span>@endif
                 </td>
-                @if($rowIndex === 0)<td class="body-column" rowspan="3"><img class="segmental-silhouette" src="{{ $silhouetteDataUri }}" alt="Silhueta corporal frontal com marcações L e R"></td>@endif
+                @if($rowIndex === 0)<td class="body-column" rowspan="3">@if($silhouetteDataUri)<img class="segmental-silhouette" src="{{ $silhouetteDataUri }}" alt="Mapa corporal frontal Vita Scan com regiões segmentares e marcações L e R">@endif</td>@endif
                 @php($rightItem = $itemsByRegion->get($keys[1]))
                 <td class="segmental-value"><strong>{{ $rightItem['label'] }}</strong><br>{{ $pdfNumber($rightItem['measurement']['mass_kg'] ?? null, ' kg') }}<br>{{ $pdfNumber($rightItem['measurement']['reference_percentage'] ?? null, '% ref.') }}<br><span style="color:{{ $rightItem['state'][2] }}; font-weight:700;">{{ $rightItem['state'][1] }} {{ $rightItem['state'][0] }}</span></td>
             </tr>

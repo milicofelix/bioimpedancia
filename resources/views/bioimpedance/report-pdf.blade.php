@@ -76,15 +76,15 @@
         .page-guidance .summary p, .page-guidance .notice p, .page-guidance .guidance p { margin-top: 3px; margin-bottom: 3px; }
         .page-guidance .validation { margin-top: 5px; }
         .page-guidance .validation td { padding: 5px 7px; }
-        .segmental-grid { width: 100%; border-collapse: separate; border-spacing: 8px; table-layout: fixed; }
+        .segmental-grid { width: 100%; border-collapse: separate; border-spacing: 7px; table-layout: fixed; page-break-inside: avoid; }
         .segmental-grid > tbody > tr > td { width: 50%; padding: 8px; border: 1px solid #f2d6dc; border-radius: 8px; background: #fff; vertical-align: top; }
-        .segmental-page .content, .segmental-grid, .segmental-map { page-break-inside: avoid; }
+        .segmental-page, .segmental-page .content, .segmental-grid, .segmental-grid tr, .segmental-grid td, .segmental-map, .segmental-visual, .segmental-table { page-break-inside: avoid; }
         .segmental-title { color: #7f1d3f; font-size: 11px; font-weight: 700; text-align: center; }
         .segmental-subtitle { margin-top: 2px; color: #667085; font-size: 6px; text-align: center; }
-        .segmental-visual { width: 100%; height: 270px; border-collapse: collapse; table-layout: fixed; }
+        .segmental-visual { width: 100%; height: 255px; border-collapse: collapse; table-layout: fixed; }
         .segmental-visual td { padding: 2px; border: 0; vertical-align: middle; }
         .segmental-visual .body-column { width: 42%; text-align: center; }
-        .segmental-silhouette { display: block; width: 100%; height: 250px; }
+        .segmental-silhouette { display: block; width: 100%; height: 238px; object-fit: contain; }
         .segmental-value { color: #334155; font-size: 6px; line-height: 1.35; }
         .segmental-value strong { color: #172033; font-size: 7px; }
         .segmental-value-right { text-align: right; }
