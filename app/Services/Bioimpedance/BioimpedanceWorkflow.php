@@ -47,6 +47,7 @@ class BioimpedanceWorkflow
         private readonly BioimpedanceAdminDashboard $adminDashboard,
         private readonly ScreeningPrivacyService $screeningPrivacyService,
         private readonly BodyscanOcrProfileRegistry $bodyscanOcrProfiles,
+        private readonly SegmentalBodySvgRenderer $segmentalBodySvgRenderer,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -630,13 +631,15 @@ class BioimpedanceWorkflow
             'report_issue_count' => $assessment->report_issue_count,
         ]);
 
+        $assessmentPayload = $this->assessmentPayload($assessment);
         $pdf = Pdf::loadView('bioimpedance.report-pdf', [
             'clinic' => [
                 ...$this->clinicPayload(),
                 'logo_data_uri' => $this->logoDataUri(),
             ],
             'client' => $this->clientPayload($assessment->client->setRelation('assessments', collect([$assessment]))),
-            'assessment' => $this->assessmentPayload($assessment),
+            'assessment' => $assessmentPayload,
+            'segmentalBodyImages' => $this->segmentalBodySvgRenderer->renderPair($assessmentPayload['segmental_measurements'] ?? []),
             'comparison' => $this->reportComparison->for($assessment),
             'issuedAt' => $assessment->report_issued_at,
         ])->setPaper('a4');
@@ -908,13 +911,15 @@ class BioimpedanceWorkflow
         $assessment = $share->assessment;
         config(['dompdf.public_path' => public_path()]);
 
+        $assessmentPayload = $this->assessmentPayload($assessment);
         $pdf = Pdf::loadView('bioimpedance.report-pdf', [
             'clinic' => [
                 ...$this->clinicPayload(),
                 'logo_data_uri' => $this->logoDataUri(),
             ],
             'client' => $this->clientPayload($assessment->client->setRelation('assessments', collect([$assessment]))),
-            'assessment' => $this->assessmentPayload($assessment),
+            'assessment' => $assessmentPayload,
+            'segmentalBodyImages' => $this->segmentalBodySvgRenderer->renderPair($assessmentPayload['segmental_measurements'] ?? []),
             'comparison' => $this->reportComparison->for($assessment),
             'issuedAt' => $assessment->report_issued_at ?? $assessment->evaluated_at,
         ])->setPaper('a4');

@@ -37,6 +37,8 @@ As mesmas coordenadas estão registradas no bloco `metadata` do SVG.
 
 Na interface React, o contrato de regiões, coordenadas, estados, paleta e marcadores laterais fica centralizado em `resources/js/components/bioimpedance/segmentalBodyVisual.js`. O componente `SegmentalBodyFigure.jsx` referencia os caminhos deste SVG; ele não mantém uma segunda cópia da geometria corporal.
 
+No PDF, `SegmentalBodySvgRenderer` lê este mesmo ativo, aplica somente a camada de estado de cada região e gera um SVG autocontido para o DomPDF. Assim, o documento não mantém outra cópia dos caminhos corporais e preserva a geometria da interface em impressão A4.
+
 ### Personalização
 
 O ativo aceita as seguintes propriedades CSS, todas com valores de fallback:
