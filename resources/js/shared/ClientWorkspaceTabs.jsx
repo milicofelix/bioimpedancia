@@ -9,7 +9,9 @@ export default function ClientWorkspaceTabs({ activeTab, onChange, sticky = fals
 		...(includeReports && enabledModules?.reports ? [{ id: 'reports', label: 'Relatórios corporais', icon: 'fileText' }] : []),
 	];
 
-	if (!tabs.length) return null;
+	// A tab only adds navigation value when there is somewhere else to go.
+	// Rendering a single tab makes the current section look like another action.
+	if (tabs.length <= 1) return null;
 	function handleKeyDown(event, currentIndex) {
 		if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
 		event.preventDefault();

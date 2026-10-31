@@ -67,16 +67,30 @@ export default function ClientModuleSummary({
 		enabledModules.screening ? 'triagens' : null,
 		enabledModules.reports ? 'relatórios corporais' : null,
 	].filter(Boolean);
+	const heading = enabledCount > 1
+		? 'Escolha o módulo para continuar'
+		: enabledModules.assessment
+			? 'Avaliação corporal'
+			: enabledModules.screening
+				? 'Triagens'
+				: enabledModules.reports
+					? 'Relatórios corporais'
+					: 'Atendimentos indisponíveis';
+	const introduction = enabledCount > 1
+		? `Módulos ativos: ${enabledLabels.join(', ')}.`
+		: enabledCount === 1
+			? 'Acesse abaixo o módulo disponível para este cliente.'
+			: 'Os módulos de atendimento podem ser definidos nas configurações da clínica.';
 
 	return (
 		<section aria-labelledby="client-modules-title" className="no-print rounded-2xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm sm:p-5">
 			<div>
 				<p className="text-xs font-bold uppercase tracking-[0.14em] text-teal-700">Atendimentos do cliente</p>
-				<h2 id="client-modules-title" className="mt-1 text-xl font-extrabold text-slate-950">Escolha o módulo para continuar</h2>
-				<p className="mt-1 text-sm leading-6 text-slate-600">{hasEnabledModules ? `Módulos ativos: ${enabledLabels.join(', ')}.` : 'Os módulos de atendimento podem ser definidos nas configurações da clínica.'}</p>
+				<h2 id="client-modules-title" className="mt-1 text-xl font-extrabold text-slate-950">{heading}</h2>
+				<p className="mt-1 text-sm leading-6 text-slate-600">{introduction}</p>
 			</div>
 
-			{hasEnabledModules ? <p className="mt-3 text-xs font-semibold text-slate-500 md:hidden">Deslize para ver os módulos ativos.</p> : null}
+			{enabledCount > 1 ? <p className="mt-3 text-xs font-semibold text-slate-500 md:hidden">Deslize para ver os módulos ativos.</p> : null}
 			<div role="list" aria-label="Módulos disponíveis para o cliente" className={`-mx-1 mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-1 pb-2 md:mx-0 md:grid md:overflow-visible md:px-0 md:pb-0 ${enabledCount === 1 ? 'md:grid-cols-1' : enabledCount === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
 				{enabledModules.assessment ? (
 				<ModuleCard

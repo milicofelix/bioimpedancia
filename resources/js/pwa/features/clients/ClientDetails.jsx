@@ -22,6 +22,9 @@ export default function ClientDetails({ client, currentUser, scaleModel, enabled
 	const latestActiveAssessment = assessments.find((assessment) => !assessment.is_canceled) ?? null;
 	const canAccessScreenings = ['admin', 'professional'].includes(currentUser?.role);
 	const firstActiveTab = enabledModules.assessment ? 'assessment' : enabledModules.screening ? 'screenings' : 'assessment';
+	const enabledModuleCount = [enabledModules.assessment, enabledModules.screening, enabledModules.reports].filter(Boolean).length;
+	const needsModuleChoice = enabledModuleCount > 1;
+	const opensSingleModuleDirectly = enabledModuleCount === 1 && (enabledModules.assessment || enabledModules.screening);
 	const [activeTab, setActiveTab] = useState(firstActiveTab);
 
 	useEffect(() => setActiveTab(firstActiveTab), [client.id, firstActiveTab]);
@@ -64,7 +67,7 @@ export default function ClientDetails({ client, currentUser, scaleModel, enabled
 
 			</PwaCard>
 
-			<div className="mt-4">
+			{!opensSingleModuleDirectly ? <div className="mt-4">
 				<ClientModuleSummary
 					client={client}
 					canStartAssessment={access.allowed}
@@ -75,9 +78,9 @@ export default function ClientDetails({ client, currentUser, scaleModel, enabled
 					enabledModules={enabledModules}
 				/>
 				{access.reason ? <p className="mt-2 text-center text-xs font-semibold text-amber-700">{access.reason}</p> : null}
-			</div>
+			</div> : access.reason && enabledModules.assessment ? <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-xs font-semibold text-amber-800">{access.reason}</p> : null}
 
-			<div className="mt-4"><ClientWorkspaceTabs activeTab={activeTab} onChange={setActiveTab} enabledModules={enabledModules} sticky /></div>
+			{needsModuleChoice ? <div className="mt-4"><ClientWorkspaceTabs activeTab={activeTab} onChange={setActiveTab} enabledModules={enabledModules} sticky /></div> : null}
 
 			<div id="client-panel-assessment" role="tabpanel" aria-labelledby="client-tab-assessment" className={enabledModules.assessment && activeTab === 'assessment' ? '' : 'hidden'}>
 			<div className="mt-4">
