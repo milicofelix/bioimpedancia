@@ -15,6 +15,7 @@ import BodyscanReview from './BodyscanReview';
 import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocolComplete, emptyBodyscanProtocol, updateBodyscanImpedance, updateBodyscanSegment } from './bodyscanAssessmentForm';
 import BodyscanOcrProgress from './BodyscanOcrProgress';
 import BodyscanProtocolChecklist from './BodyscanProtocolChecklist';
+import BodyscanReportFormatGuide from './BodyscanReportFormatGuide';
 
 export default function RelaxmedicAssessmentFeature({ client, currentUser, scaleModel, onBackToClients, onCreated, onOpenAssistant }) {
 	const runAction = useActionLock();
@@ -104,6 +105,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 				setConfirmed(false);
 				// A referência enviável é removida após o OCR; a URL temporária permanece apenas para conferência.
 				setImageFile(null);
+				setImageName('');
 				setPickerVersion((current) => current + 1);
 			} catch (error) {
 				setImageError(apiValidationErrors(error).image?.[0] ?? apiErrorMessage(error, 'Não foi possível processar a imagem.'));
@@ -210,6 +212,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 
 			{processing ? (isBodyscan ? <BodyscanOcrProgress previewUrl={previewUrl} onStageChange={setBodyscanProcessingStage} /> : <RelaxmedicOcrProgress previewUrl={previewUrl} />) : !extraction ? (
 				<>
+					{isBodyscan ? <BodyscanReportFormatGuide compact /> : null}
 					{isBodyscan ? <BodyscanProtocolChecklist value={bodyscanForm.protocol} onChange={updateBodyscanProtocol} /> : null}
 					<RelaxmedicImagePicker key={pickerVersion} reportName={scaleModel === 'relaxmedic_bodyscan_pro' ? 'Bodyscan Pro' : 'Relaxmedic'} previewUrl={previewUrl} fileName={imageName} disabled={!isOnline || (isBodyscan && !protocolComplete)} error={imageError} onSelect={selectImage} />
 					{previewUrl ? <PwaButton type="button" disabled={!imageFile || !isOnline || (isBodyscan && !protocolComplete)} onClick={processImage} icon="sparkles" className="w-full">{imageFile ? 'Enviar e processar imagem' : 'Selecione novamente para tentar'}</PwaButton> : null}

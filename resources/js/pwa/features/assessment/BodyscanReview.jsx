@@ -6,13 +6,9 @@ import PwaIcon from '../../components/ui/PwaIcon';
 import { relaxmedicIntegerFields, relaxmedicTextFields } from './relaxmedicAssessmentForm';
 import { segmentClassificationOptions, segmentLabels } from './bodyscanAssessmentForm';
 import SegmentalBodyMap from '../../../components/bioimpedance/SegmentalBodyMap';
+import { bodyscanLayoutPresentation, isVerticalBodyscanLayout } from './BodyscanReportFormatGuide';
 
 const valueFields = ['mass_kg', 'reference_percentage', 'classification', 'reference_min_percentage', 'reference_max_percentage'];
-const layoutLabels = {
-	fitdays_technical_report: 'Fitdays · relatório técnico completo',
-	fitdays_vertical_report: 'Fitdays · relatório vertical',
-	relaxfit_vertical_report: 'RelaxFit · relatório vertical',
-};
 const extendedMetricLabels = {
 	waist_hip_ratio: 'WHR',
 	body_score: 'Pontuação corporal',
@@ -152,6 +148,8 @@ export default function BodyscanReview({ previewUrl, form, extraction, client, c
 		height_cm: !isTechnicalLayout || printedProfile.height_cm === null || printedProfile.height_cm === undefined || (registeredHeight !== null && Math.abs(Number(printedProfile.height_cm) - registeredHeight) < 0.1),
 	};
 	const hasProfileDivergence = isTechnicalLayout && Object.values(profileComparison).some((matches) => !matches);
+	const layoutPresentation = bodyscanLayoutPresentation[extraction?.report_layout];
+	const verticalWithoutImpedance = isVerticalBodyscanLayout(extraction?.report_layout) && !(form.impedanceReadings ?? []).length;
 
 	return (
 		<form onSubmit={onSubmit} aria-busy={saving} className="pwa-card p-4 sm:p-5">
@@ -159,7 +157,12 @@ export default function BodyscanReview({ previewUrl, form, extraction, client, c
 			{extraction?.side_consistency?.possible_swap ? <p role="alert" className="mt-3 rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm font-bold text-rose-800">Possível troca entre os lados L (esquerdo) e R (direito). Confira os marcadores diretamente na imagem.</p> : null}
 			{qualityWarnings.length ? <details className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm"><summary className="min-h-11 cursor-pointer font-bold">Qualidade da imagem · {qualityWarnings.length} {qualityWarnings.length === 1 ? 'observação' : 'observações'}</summary><p className="mb-2 text-xs text-amber-900">Estas mensagens tratam apenas de nitidez, resolução ou enquadramento.</p><ul className="list-disc space-y-1 pl-5">{qualityWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></details> : null}
 			{readingWarnings.length ? <details className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm"><summary className="min-h-11 cursor-pointer font-bold">Campos para conferir · {readingWarnings.length}</summary><p className="mb-2 text-xs text-amber-900">Confira somente os textos, números, unidades ou lados que não puderam ser lidos com segurança.</p><ul className="list-disc space-y-1 pl-5">{readingWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></details> : null}
-			<div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-950"><strong>Formato identificado:</strong> {layoutLabels[extraction?.report_layout] ?? 'Não identificado'}{extraction?.layout_profile_version ? ` · perfil ${extraction.layout_profile_version}` : ''}</div>
+			<div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-950">
+				<div className="flex flex-wrap items-center gap-2"><strong>Layout detectado:</strong><span>{layoutPresentation ? `${layoutPresentation.application} · ${layoutPresentation.label}` : 'Não identificado'}</span>{layoutPresentation ? <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${layoutPresentation.tone === 'recommended' ? 'bg-emerald-100 text-emerald-800' : 'bg-white text-sky-800'}`}>{layoutPresentation.badge}</span> : null}</div>
+				{extraction?.layout_profile_version ? <span className="mt-1 block text-sky-800">Perfil de leitura: {extraction.layout_profile_version}</span> : null}
+			</div>
+			{verticalWithoutImpedance ? <div role="status" className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700"><strong className="text-slate-900">Relatório vertical processado normalmente.</strong><p className="mt-1 text-xs leading-5">Este formato não apresenta a tabela de impedância bioelétrica. Isso é esperado e não impede a conferência nem a criação da avaliação.</p></div> : null}
+			<p className="mt-3 text-xs text-slate-500">O arquivo selecionado foi removido da fila de envio após o processamento. A prévia local permanece somente durante esta conferência e será limpa ao concluir ou trocar a imagem.</p>
 			{hasProfileDivergence ? <p role="alert" className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">O perfil impresso diverge do cadastro. Confira sexo, idade e altura antes de confirmar a avaliação.</p> : null}
 			<div className="mt-4 grid grid-cols-2 gap-2 lg:hidden"><button type="button" onClick={() => setPanel('image')} className={`min-h-11 rounded-xl font-bold ${panel === 'image' ? 'bg-ricosty-700 text-white' : 'bg-slate-100'}`}>Imagem</button><button type="button" onClick={() => setPanel('values')} className={`min-h-11 rounded-xl font-bold ${panel === 'values' ? 'bg-ricosty-700 text-white' : 'bg-slate-100'}`}>Valores</button></div>
 			<div className="mt-4 lg:grid lg:grid-cols-[minmax(0,.7fr)_minmax(0,1.3fr)] lg:gap-5">

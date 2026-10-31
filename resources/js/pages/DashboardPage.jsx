@@ -22,6 +22,7 @@ import KnowledgeDocumentsPanel from '../components/bioimpedance/KnowledgeDocumen
 import BodyscanReview from '../pwa/features/assessment/BodyscanReview';
 import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocolComplete, emptyBodyscanProtocol, updateBodyscanImpedance, updateBodyscanSegment } from '../pwa/features/assessment/bodyscanAssessmentForm';
 import BodyscanProtocolChecklist from '../pwa/features/assessment/BodyscanProtocolChecklist';
+import BodyscanReportFormatGuide from '../pwa/features/assessment/BodyscanReportFormatGuide';
 import VitaScanBrand from '../components/brand/VitaScanBrand';
 import ScreeningInvitationPanel from '../pwa/features/clients/ScreeningInvitationPanel';
 import ClientModuleSummary from '../shared/ClientModuleSummary';
@@ -1842,7 +1843,7 @@ export default function DashboardPage({ userName }) {
 										{assessmentMode === 'edit'
 											? 'A correção exige justificativa e gera auditoria.'
 											: isImageAssessment
-												? `Envie o relatório completo gerado pelo aplicativo ${isBodyscanAssessment ? 'Bodyscan Pro/RelaxFit' : 'Relaxmedic'}.`
+												? `Envie o relatório gerado pelo aplicativo ${isBodyscanAssessment ? 'Fitdays ou RelaxFit' : 'Relaxmedic'}.`
 												: 'Digite os valores exibidos na balança Omron antiga após a pesagem.'}
 									</p>
 								</div>
@@ -1861,6 +1862,7 @@ export default function DashboardPage({ userName }) {
 
 						{isImageAssessment ? (
 							<div className="mt-5 space-y-4">
+				{isBodyscanAssessment && !relaxmedicExtraction ? <BodyscanReportFormatGuide /> : null}
 				{isBodyscanAssessment && !relaxmedicExtraction ? <BodyscanProtocolChecklist value={bodyscanForm.protocol} onChange={updateBodyscanProtocol} disabled={processingRelaxmedicImage} /> : null}
 				{isBodyscanAssessment ? <BodyscanDesktopProgress current={relaxmedicExtraction ? 4 : bodyscanProgressStep} /> : null}
 				<div className={`block rounded-2xl border-2 border-dashed p-5 transition ${relaxmedicImageError ? 'border-rose-300 bg-rose-50' : 'border-sky-200 bg-sky-50/60 hover:border-sky-300'}`}>
