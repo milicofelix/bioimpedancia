@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Http;
 
 class BioimpedanceCareGuidanceAssistant
 {
-    public const PROMPT_VERSION = 'care-guidance-2.2.0';
+    public const PROMPT_VERSION = 'care-guidance-2.3.0';
 
     public function __construct(
         private readonly CareGuidanceSemanticValidator $semanticValidator,
@@ -370,6 +370,14 @@ PROMPT;
             $attention = [];
         }
         $historyChanges = collect(data_get($clinicalContext, 'history_comparison.comparable_metrics', []))
+            ->whereIn('field', [
+                'weight_kg',
+                'body_fat_percentage',
+                'skeletal_muscle_percentage',
+                'visceral_fat_level',
+                'lean_body_mass_kg',
+                'body_water_percentage',
+            ])
             ->map(fn (array $metric) => $this->changeText(
                 mb_strtolower($metric['label']),
                 $metric['previous'],

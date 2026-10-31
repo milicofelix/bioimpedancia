@@ -42,7 +42,13 @@ class CareGuidanceSemanticValidator
         'diagnóstico com base no whr',
         'whr indica',
         'whr demonstra',
-        'pontuação corporal',
+        'pontuação corporal indica',
+        'pontuação corporal demonstra',
+        'pontuação corporal confirma',
+        'pontuação corporal comprova',
+        'pontuação corporal representa diagnóstico',
+        'pontuação corporal é uma medida clínica',
+        'pontuação corporal como nota clínica',
     ];
 
     public function validate(array $response, Collection $chunks, array $context): array
