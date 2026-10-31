@@ -552,14 +552,14 @@ class BodyscanProImageProcessor
     private function segmentLabel(string $type, string $region, string $side): string
     {
         $typeLabel = $type === Segment::TYPE_FAT ? 'Gordura segmentar' : 'Equilíbrio muscular';
-        $regionLabel = match ($region) {
-            Segment::REGION_ARM => 'braço',
-            Segment::REGION_LEG => 'perna',
-            default => 'tronco',
-        };
+        if ($region === Segment::REGION_TRUNK) {
+            return $typeLabel.' — tronco';
+        }
+
+        $regionLabel = $region === Segment::REGION_ARM ? 'braço' : 'perna';
         $sideLabel = match ($side) {
-            Segment::SIDE_LEFT => ' esquerdo',
-            Segment::SIDE_RIGHT => ' direito',
+            Segment::SIDE_LEFT => $region === Segment::REGION_LEG ? ' esquerda' : ' esquerdo',
+            Segment::SIDE_RIGHT => $region === Segment::REGION_LEG ? ' direita' : ' direito',
             default => '',
         };
 

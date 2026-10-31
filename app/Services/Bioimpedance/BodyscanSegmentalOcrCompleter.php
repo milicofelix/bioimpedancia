@@ -87,13 +87,18 @@ class BodyscanSegmentalOcrCompleter
                     ->values();
                 if ($conflictingFields->isNotEmpty()) {
                     // A segunda passagem trabalha com ampliações exclusivas das
-                    // seções segmentares. Seus valores permanecem disponíveis
-                    // para a conferência, enquanto a divergência fica auditável.
+                    // seções segmentares e prevalece quando está integralmente
+                    // legível. A divergência permanece no texto bruto para
+                    // auditoria, mas só vira pendência se essa releitura também
+                    // estiver incerta ou incompleta.
                     $merged = [...$original, ...$retry];
-                    $merged['legibility'] = 'uncertain';
-                    $merged['review_reason'] = $this->conflictReason($type, $expected, $conflictingFields->all());
                     $merged['raw_value'] = 'Leitura inicial: '.($original['raw_value'] ?? 'não informada')
                         .' | Segunda leitura: '.($retry['raw_value'] ?? 'não informada');
+
+                    if (! $this->hasClearCoreReading($retry)) {
+                        $merged['legibility'] = 'uncertain';
+                        $merged['review_reason'] = $this->conflictReason($type, $expected, $conflictingFields->all());
+                    }
 
                     return $merged;
                 }
@@ -129,16 +134,7 @@ class BodyscanSegmentalOcrCompleter
     private function conflictReason(string $type, array $segment, array $fields): string
     {
         $typeLabel = $type === Segment::TYPE_FAT ? 'Gordura segmentar' : 'Equilíbrio muscular';
-        $regionLabel = match ($segment['region']) {
-            Segment::REGION_ARM => 'braço',
-            Segment::REGION_LEG => 'perna',
-            default => 'tronco',
-        };
-        $sideLabel = match ($segment['side']) {
-            Segment::SIDE_LEFT => ' esquerdo',
-            Segment::SIDE_RIGHT => ' direito',
-            default => '',
-        };
+        $regionLabel = $this->regionLabel($segment['region'], $segment['side']);
         $fieldLabels = [
             'mass_kg' => 'massa',
             'reference_percentage' => 'percentual de referência',
@@ -146,7 +142,31 @@ class BodyscanSegmentalOcrCompleter
         ];
         $labels = collect($fields)->map(fn (string $field) => $fieldLabels[$field] ?? $field)->implode(', ');
 
-        return "{$typeLabel} — {$regionLabel}{$sideLabel}: as duas leituras divergiram em {$labels}.";
+        return "{$typeLabel} — {$regionLabel}: as duas leituras divergiram em {$labels}.";
+    }
+
+    private function hasClearCoreReading(array $segment): bool
+    {
+        return ($segment['legibility'] ?? null) === 'clear'
+            && is_numeric($segment['mass_kg'] ?? null)
+            && is_numeric($segment['reference_percentage'] ?? null)
+            && filled($segment['classification'] ?? null);
+    }
+
+    private function regionLabel(string $region, string $side): string
+    {
+        if ($region === Segment::REGION_TRUNK) {
+            return 'tronco';
+        }
+
+        $regionLabel = $region === Segment::REGION_ARM ? 'braço' : 'perna';
+        $sideLabel = match ($side) {
+            Segment::SIDE_LEFT => $region === Segment::REGION_LEG ? ' esquerda' : ' esquerdo',
+            Segment::SIDE_RIGHT => $region === Segment::REGION_LEG ? ' direita' : ' direito',
+            default => '',
+        };
+
+        return $regionLabel.$sideLabel;
     }
 
     private function valuesConflict(string $field, mixed $first, mixed $second): bool
