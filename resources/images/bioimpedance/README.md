@@ -35,7 +35,7 @@ O grupo `annotation-anchors` contém pontos invisíveis para conectar linhas e t
 
 As mesmas coordenadas estão registradas no bloco `metadata` do SVG.
 
-Na interface React, o contrato de regiões, coordenadas, estados, paleta e marcadores laterais fica centralizado em `resources/js/components/bioimpedance/segmentalBodyVisual.js`. O componente `SegmentalBodyFigure.jsx` referencia os caminhos deste SVG; ele não mantém uma segunda cópia da geometria corporal.
+Na interface React, o contrato de regiões, coordenadas, estados, paleta e marcadores laterais fica centralizado em `resources/js/components/bioimpedance/segmentalBodyVisual.js`. O componente `SegmentalBodyFigure.jsx` incorpora o conteúdo deste SVG como texto durante a compilação e cria IDs isolados para cada mapa. Isso evita falhas de referências externas por fragmento e não mantém uma segunda cópia da geometria corporal.
 
 No PDF, `SegmentalBodySvgRenderer` lê este mesmo ativo, aplica somente a camada de estado de cada região e gera um SVG autocontido para o DomPDF. Assim, o documento não mantém outra cópia dos caminhos corporais e preserva a geometria da interface em impressão A4.
 
@@ -57,6 +57,9 @@ As cores representam somente o estado fornecido pelo aplicativo de origem. A cam
 
 - **Gordura segmentar:** utiliza textura vetorial suave por região, mantendo o valor e o percentual como informações principais.
 - **Equilíbrio muscular:** utiliza preenchimento sólido para facilitar a comparação visual entre esquerda e direita.
+- **Escala de cinza:** baixo, alto e não identificado também usam contornos distintos; padrão permanece com contorno contínuo. Assim, a classificação não depende exclusivamente da cor.
+
+No PDF, os preenchimentos são sólidos porque a versão de `php-svg-lib` utilizada pelo DomPDF não implementa o elemento SVG `pattern`. Os contornos, marcadores e tabelas preservam a diferenciação dos estados sem rasterizar o mapa.
 
 Os dois modos usam exatamente a mesma geometria. Massa, percentual e classificação nunca deformam ou redimensionam partes do corpo, e nenhuma diferença visual deve ser descrita automaticamente como diagnóstico ou assimetria clínica.
 

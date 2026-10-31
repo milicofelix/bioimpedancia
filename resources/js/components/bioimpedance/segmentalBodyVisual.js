@@ -9,10 +9,10 @@ export const segmentalBodyRegions = [
 ];
 
 export const segmentalBodyStates = {
-	low: { label: 'Abaixo da referência', compactLabel: 'Abaixo da ref.', marker: '↓', color: '#2563eb', fill: '#dbeafe', muscleFill: '#93c5fd', printFill: '#d9d9d9' },
-	standard: { label: 'Padrão', compactLabel: 'Padrão', marker: '●', color: '#047857', fill: '#d1fae5', muscleFill: '#6ee7b7', printFill: '#bfbfbf' },
-	high: { label: 'Alto', compactLabel: 'Alto', marker: '↑', color: '#be123c', fill: '#ffe4e6', muscleFill: '#fda4af', printFill: '#969696' },
-	unknown: { label: 'Não identificado', compactLabel: 'Não identificado', marker: '?', color: '#475569', fill: '#e2e8f0', muscleFill: '#cbd5e1', printFill: '#eeeeee' },
+	low: { label: 'Abaixo da referência', compactLabel: 'Abaixo da ref.', marker: '↓', color: '#2563eb', fill: '#dbeafe', muscleFill: '#93c5fd', printFill: '#d9d9d9', strokeDasharray: '7 4' },
+	standard: { label: 'Padrão', compactLabel: 'Padrão', marker: '●', color: '#047857', fill: '#d1fae5', muscleFill: '#6ee7b7', printFill: '#bfbfbf', strokeDasharray: undefined },
+	high: { label: 'Alto', compactLabel: 'Alto', marker: '↑', color: '#be123c', fill: '#ffe4e6', muscleFill: '#fda4af', printFill: '#969696', strokeDasharray: '2 2' },
+	unknown: { label: 'Não identificado', compactLabel: 'Não identificado', marker: '?', color: '#475569', fill: '#e2e8f0', muscleFill: '#cbd5e1', printFill: '#eeeeee', strokeDasharray: '10 4 2 4' },
 };
 
 export const segmentalAnalysisPresentation = {

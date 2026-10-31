@@ -22,10 +22,10 @@ class SegmentalBodySvgRenderer
     ];
 
     private const STATES = [
-        'low' => ['color' => '#2563eb', 'fill' => '#dbeafe', 'muscle_fill' => '#93c5fd'],
-        'standard' => ['color' => '#047857', 'fill' => '#d1fae5', 'muscle_fill' => '#6ee7b7'],
-        'high' => ['color' => '#be123c', 'fill' => '#ffe4e6', 'muscle_fill' => '#fda4af'],
-        'unknown' => ['color' => '#475569', 'fill' => '#e2e8f0', 'muscle_fill' => '#cbd5e1'],
+        'low' => ['color' => '#2563eb', 'fill' => '#dbeafe', 'muscle_fill' => '#93c5fd', 'dash' => '7 4'],
+        'standard' => ['color' => '#047857', 'fill' => '#d1fae5', 'muscle_fill' => '#6ee7b7', 'dash' => 'none'],
+        'high' => ['color' => '#be123c', 'fill' => '#ffe4e6', 'muscle_fill' => '#fda4af', 'dash' => '2 2'],
+        'unknown' => ['color' => '#475569', 'fill' => '#e2e8f0', 'muscle_fill' => '#cbd5e1', 'dash' => '10 4 2 4'],
     ];
 
     public function renderPair(array $measurements): array
@@ -49,21 +49,18 @@ class SegmentalBodySvgRenderer
             $classification = $measurement['classification'] ?? 'unknown';
             $stateKey = array_key_exists($classification, self::STATES) ? $classification : 'unknown';
             $state = self::STATES[$stateKey];
-            $fill = $type === 'muscle'
-                ? $state['muscle_fill']
-                : "url(#vita-fat-{$stateKey}) {$state['fill']}";
-            $dash = $type === 'fat' ? 'stroke-dasharray:3 1.5;' : '';
+            $fill = $type === 'muscle' ? $state['muscle_fill'] : $state['fill'];
+            $dash = $state['dash'] === 'none' ? '' : "stroke-dasharray:{$state['dash']};";
 
             $styles[] = "#{$pathId}{fill:{$fill}!important;stroke:{$state['color']}!important;{$dash}}";
         }
 
-        $definitions = $this->fatPatterns();
         $presentation = '<g id="pdf-side-markers" aria-hidden="true">'
             .'<text x="111" y="397" fill="#7f1d3f" font-family="DejaVu Sans, sans-serif" font-size="18" font-weight="700">L</text>'
             .'<text x="241" y="397" fill="#7f1d3f" font-family="DejaVu Sans, sans-serif" font-size="18" font-weight="700">R</text>'
             .'</g>';
 
-        $svg = str_replace('</style>', implode('', $styles).'</style>'.$definitions, $svg);
+        $svg = str_replace('</style>', implode('', $styles).'</style>', $svg);
         $svg = str_replace('</svg>', $presentation.'</svg>', $svg);
 
         return 'data:image/svg+xml;base64,'.base64_encode($svg);
@@ -87,17 +84,4 @@ class SegmentalBodySvgRenderer
         return $svg;
     }
 
-    private function fatPatterns(): string
-    {
-        $patterns = [];
-
-        foreach (self::STATES as $key => $state) {
-            $patterns[] = '<pattern id="vita-fat-'.$key.'" patternUnits="userSpaceOnUse" width="8" height="8">'
-                .'<rect width="8" height="8" fill="'.$state['fill'].'"/>'
-                .'<path d="M-2 2L2-2M0 8L8 0M6 10L10 6" fill="none" stroke="'.$state['color'].'" stroke-width="0.8" opacity="0.38"/>'
-                .'</pattern>';
-        }
-
-        return '<defs>'.implode('', $patterns).'</defs>';
-    }
 }
