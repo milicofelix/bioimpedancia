@@ -6,7 +6,7 @@ export default function RelaxmedicOcrProgress({ previewUrl }) {
 		<section role="status" aria-live="polite" aria-busy="true" className="pwa-card overflow-hidden p-5">
 			<div className="flex items-center gap-3">
 				<span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-ricosty-100 text-ricosty-700"><PwaIcon name="sparkles" size={22} /></span>
-				<div><p className="text-xs font-bold uppercase tracking-[0.14em] text-ricosty-600">Processamento OCR</p><h2 className="mt-1 text-lg font-bold text-slate-950">Lendo o relatório</h2></div>
+				<div><p className="text-xs font-bold uppercase tracking-[0.14em] text-ricosty-600">Leitura automática</p><h2 className="mt-1 text-lg font-bold text-slate-950">Lendo o relatório</h2></div>
 			</div>
 			<p className="mt-3 text-sm leading-6 text-slate-600">Estamos identificando as métricas pelos nomes e conferindo números, unidades e data da medição.</p>
 

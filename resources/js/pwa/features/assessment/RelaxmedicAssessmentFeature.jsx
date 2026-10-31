@@ -12,11 +12,12 @@ import PwaJourneyHeader from '../../components/ui/PwaJourneyHeader';
 import PwaStepIndicator from '../../components/ui/PwaStepIndicator';
 import useActionLock from '../../../hooks/useActionLock';
 import BodyscanReview from './BodyscanReview';
-import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocolComplete, emptyBodyscanProtocol, updateBodyscanSegment } from './bodyscanAssessmentForm';
+import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocolComplete, emptyBodyscanProtocol, updateBodyscanImpedance, updateBodyscanSegment } from './bodyscanAssessmentForm';
 import BodyscanOcrProgress from './BodyscanOcrProgress';
 import BodyscanProtocolChecklist from './BodyscanProtocolChecklist';
+import BodyscanReportFormatGuide from './BodyscanReportFormatGuide';
 
-export default function RelaxmedicAssessmentFeature({ client, currentUser, scaleModel, onBackToClients, onCreated, onOpenAssistant }) {
+export default function RelaxmedicAssessmentFeature({ client, currentUser, scaleModel, onBackToClients, onCreated, onOpenAssistant, onOpenReport, canOpenReport = false }) {
 	const runAction = useActionLock();
 	const previewReference = useRef('');
 	const [imageFile, setImageFile] = useState(null);
@@ -104,6 +105,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 				setConfirmed(false);
 				// A referência enviável é removida após o OCR; a URL temporária permanece apenas para conferência.
 				setImageFile(null);
+				setImageName('');
 				setPickerVersion((current) => current + 1);
 			} catch (error) {
 				setImageError(apiValidationErrors(error).image?.[0] ?? apiErrorMessage(error, 'Não foi possível processar a imagem.'));
@@ -124,6 +126,11 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 		setBodyscanForm((current) => ({ ...current, segments: updateBodyscanSegment(current.segments, index, field, value) }));
 		setConfirmed(false);
 		setErrors({});
+	}
+
+	function updateImpedance(index, field, value) {
+		setConfirmed(false);
+		setBodyscanForm((current) => ({ ...current, impedanceReadings: updateBodyscanImpedance(current.impedanceReadings ?? [], index, field, value) }));
 	}
 
 	function updateBodyscanProfile(field, value) {
@@ -177,7 +184,7 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 	}
 
 	if (!['relaxmedic', 'relaxmedic_bodyscan_pro'].includes(scaleModel)) {
-		return <BlockedState title="Relaxmedic não está selecionada" description="A versão PWA desta etapa aceita apenas avaliações Relaxmedic. Altere o modelo nas configurações do painel para continuar." onBack={onBackToClients} />;
+		return <BlockedState title="Modelo de balança incompatível" description="A área operacional aceita avaliações Relaxmedic e Bodyscan Pro. Altere o modelo da balança nas configurações da clínica para continuar." onBack={onBackToClients} />;
 	}
 
 	const access = assessmentAccess(client, currentUser, scaleModel);
@@ -189,10 +196,12 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 				<PwaStepIndicator steps={journeySteps} current={journeySteps.length} />
 				<div className="mx-auto mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-ricosty-100 text-2xl font-black text-ricosty-700">✓</div>
 				<h2 className="mt-3 text-xl font-bold text-slate-950">Avaliação criada com segurança</h2>
-				<p className="mt-2 text-sm leading-6 text-slate-600">Os dados de {client.full_name} foram salvos após a confirmação. A prévia temporária foi removida da PWA.</p>
-				<div className="mt-5 grid gap-3 sm:grid-cols-2">
+				<p className="mt-2 text-sm leading-6 text-slate-600">Os dados de {client.full_name} foram salvos após a confirmação. A imagem temporária foi removida do aplicativo.</p>
+				{!canOpenReport ? <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900">O relatório corporal não aparece porque esse módulo está desativado nas configurações da clínica.</p> : null}
+				<div className={`mt-5 grid gap-3 ${canOpenReport ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
 					<PwaButton type="button" onClick={onBackToClients} variant="secondary" icon="arrowLeft">Voltar para clientes</PwaButton>
 					<PwaButton type="button" onClick={onOpenAssistant} icon="sparkles">Abrir assistente</PwaButton>
+					{canOpenReport ? <PwaButton type="button" onClick={onOpenReport} variant="secondary" icon="fileText">Abrir relatório</PwaButton> : null}
 				</div>
 			</PwaCard>
 		);
@@ -205,13 +214,14 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 
 			{processing ? (isBodyscan ? <BodyscanOcrProgress previewUrl={previewUrl} onStageChange={setBodyscanProcessingStage} /> : <RelaxmedicOcrProgress previewUrl={previewUrl} />) : !extraction ? (
 				<>
+					{isBodyscan ? <BodyscanReportFormatGuide compact /> : null}
 					{isBodyscan ? <BodyscanProtocolChecklist value={bodyscanForm.protocol} onChange={updateBodyscanProtocol} /> : null}
 					<RelaxmedicImagePicker key={pickerVersion} reportName={scaleModel === 'relaxmedic_bodyscan_pro' ? 'Bodyscan Pro' : 'Relaxmedic'} previewUrl={previewUrl} fileName={imageName} disabled={!isOnline || (isBodyscan && !protocolComplete)} error={imageError} onSelect={selectImage} />
 					{previewUrl ? <PwaButton type="button" disabled={!imageFile || !isOnline || (isBodyscan && !protocolComplete)} onClick={processImage} icon="sparkles" className="w-full">{imageFile ? 'Enviar e processar imagem' : 'Selecione novamente para tentar'}</PwaButton> : null}
 				</>
 			) : (
 				scaleModel === 'relaxmedic_bodyscan_pro'
-					? <BodyscanReview previewUrl={previewUrl} form={bodyscanForm} extraction={extraction} client={client} confirmed={confirmed} errors={errors} saving={saving} online={isOnline} onGeneralUpdate={updateBodyscanGeneral} onProfileUpdate={updateBodyscanProfile} onSegmentUpdate={updateSegment} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />
+					? <BodyscanReview previewUrl={previewUrl} form={bodyscanForm} extraction={extraction} client={client} confirmed={confirmed} errors={errors} saving={saving} online={isOnline} onGeneralUpdate={updateBodyscanGeneral} onProfileUpdate={updateBodyscanProfile} onSegmentUpdate={updateSegment} onImpedanceUpdate={updateImpedance} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />
 					: <RelaxmedicReview previewUrl={previewUrl} form={form} extraction={extraction} confirmed={confirmed} errors={errors} saving={saving} online={isOnline} onUpdate={update} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />
 			)}
 			{generalError ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{generalError}</p> : null}

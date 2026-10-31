@@ -7,6 +7,12 @@ import {
 import { formatDate, numberBr } from '../../shared/formatters';
 import SegmentalBodyMap from './SegmentalBodyMap';
 import SegmentalComparison from './SegmentalComparison';
+import {
+	assessmentComparability,
+	commonExtendedMetricComparisons,
+	commonImpedanceComparisons,
+	comparisonProfileLabel,
+} from '../../pwa/features/report/reportMetrics';
 
 function metricValue(field, value) {
 	if (value === null || value === undefined || value === '') return '-';
@@ -23,6 +29,9 @@ export default function AssessmentDetails({ assessment, previousAssessment }) {
 	const metrics = isRelaxmedic
 		? relaxmedicAdditionalMetricFields.filter((field) => assessment[field] !== null && assessment[field] !== undefined && assessment[field] !== '')
 		: [];
+	const comparability = assessmentComparability(assessment, previousAssessment);
+	const extendedComparisons = commonExtendedMetricComparisons(assessment, previousAssessment);
+	const impedanceComparisons = commonImpedanceComparisons(assessment, previousAssessment);
 
 	return (
 		<div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -34,6 +43,11 @@ export default function AssessmentDetails({ assessment, previousAssessment }) {
 				<span className={`rounded-full px-3 py-1 text-xs font-bold ${isRelaxmedic ? 'bg-sky-100 text-sky-700' : 'bg-slate-200 text-slate-700'}`}>
 					{isRelaxmedic ? 'Importada de imagem' : 'Entrada manual'}
 				</span>
+			</div>
+			<div className={`mt-4 rounded-xl border p-3 text-xs leading-5 ${comparability.level === 'limited' || comparability.warnings.length ? 'border-amber-200 bg-amber-50 text-amber-950' : 'border-sky-200 bg-sky-50 text-sky-950'}`}>
+				<strong>{comparability.label}.</strong> {comparability.message}
+				{previousAssessment ? <p className="mt-1"><strong>Anterior:</strong> {comparisonProfileLabel(comparability.previousProfile)}<br /><strong>Atual:</strong> {comparisonProfileLabel(comparability.currentProfile)}</p> : null}
+				{comparability.warnings.map((warning) => <p key={warning} className="mt-1">{warning}</p>)}
 			</div>
 
 			{metrics.length ? (
@@ -50,7 +64,9 @@ export default function AssessmentDetails({ assessment, previousAssessment }) {
 			) : null}
 
 			{assessment.segmental_measurements?.length ? <div className="mt-4 grid gap-4 xl:grid-cols-2"><SegmentalBodyMap measurements={assessment.segmental_measurements} type="fat" /><SegmentalBodyMap measurements={assessment.segmental_measurements} type="muscle" /></div> : null}
-			{assessment.segmental_measurements?.length ? <SegmentalComparison current={assessment.segmental_measurements} previous={previousAssessment?.segmental_measurements ?? []} previousDate={previousAssessment ? formatDate(previousAssessment.evaluated_at) : null} /> : null}
+			{assessment.segmental_measurements?.length ? <SegmentalComparison current={assessment.segmental_measurements} previous={previousAssessment?.segmental_measurements ?? []} previousDate={previousAssessment ? formatDate(previousAssessment.evaluated_at) : null} comparability={comparability} /> : null}
+			{extendedComparisons.length ? <ComparisonList title="Métricas estendidas comparáveis" items={extendedComparisons.map((metric) => ({ key: metric.key, label: metric.label, previous: metric.previous, current: metric.current, unit: metric.unit }))} /> : null}
+			{impedanceComparisons.length ? <ComparisonList title="Impedâncias presentes nas duas avaliações" items={impedanceComparisons.map((reading) => ({ key: `${reading.frequency_khz}-${reading.region}-${reading.side}`, label: `${reading.frequency_khz} kHz · ${reading.region} · ${reading.side}`, previous: reading.previous_ohms, current: reading.current_ohms, unit: 'Ω' }))} /> : null}
 
 			{isRelaxmedic && assessment.source_metadata ? (
 				<div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-900">
@@ -62,4 +78,12 @@ export default function AssessmentDetails({ assessment, previousAssessment }) {
 			) : null}
 		</div>
 	);
+}
+
+function ComparisonList({ title, items }) {
+	return <section className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+		<h3 className="bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800">{title}</h3>
+		{items.map((item) => <div key={item.key} className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-100 px-3 py-2 text-xs"><span>{item.label}</span><strong>{numberBr(item.previous, 2)} {item.unit} → {numberBr(item.current, 2)} {item.unit}</strong></div>)}
+		<p className="border-t border-slate-100 px-3 py-2 text-[11px] text-slate-500">Comparação numérica descritiva, sem classificação automática de melhora ou piora.</p>
+	</section>;
 }

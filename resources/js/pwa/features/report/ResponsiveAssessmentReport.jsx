@@ -1,6 +1,6 @@
 import React from 'react';
 import { formatDate } from '../../../shared/formatters';
-import { formatMetric, metricDelta, metricsForAssessment } from './reportMetrics';
+import { assessmentComparability, commonExtendedMetricComparisons, commonImpedanceComparisons, comparisonProfileLabel, formatMetric, metricDelta, metricsForAssessment } from './reportMetrics';
 import PwaIcon from '../../components/ui/PwaIcon';
 import SegmentalBodyMap from '../../../components/bioimpedance/SegmentalBodyMap';
 import SegmentalComparison from '../../../components/bioimpedance/SegmentalComparison';
@@ -13,6 +13,9 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 	const secondaryMetrics = metrics.filter((metric) => !primaryMetrics.includes(metric));
 	const specifications = assessment.device_technical_specifications;
 	const informationalReferences = assessment.analysis?.reference?.informational_references ?? [];
+	const comparability = assessmentComparability(assessment, previous);
+	const extendedComparisons = commonExtendedMetricComparisons(assessment, previous);
+	const impedanceComparisons = commonImpedanceComparisons(assessment, previous);
 
 	return (
 		<article className="pwa-card overflow-hidden">
@@ -52,11 +55,16 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 				{['Relaxmedic', 'Bodyscan Pro'].includes(assessment.device_model) ? <section className="mt-5 rounded-xl border border-sky-200 bg-sky-50 p-4 text-xs leading-5 text-sky-950"><strong>Como interpretar:</strong> os dados de composição corporal são estimativas produzidas por algoritmos do equipamento. Coerência matemática entre massa gorda, massa magra e peso não comprova precisão fisiológica. Compare tendências em condições semelhantes e não use IMC ou “peso ideal” isoladamente para definir objetivos.</section> : null}
 				{informationalReferences.length ? <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-4"><h3 className="font-bold text-slate-950">Referências informativas do manual</h3><p className="mt-1 text-xs leading-5 text-slate-600">Faixas genéricas, sem separação por sexo ou idade e sem classificação clínica. O manual descreve uso doméstico e não apresenta validação clínica. Apenas o IMC utiliza classificação automática convencional.</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{informationalReferences.map((reference) => <div key={reference.key} className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-bold text-slate-800">{reference.label}</p><p className="mt-1 text-base font-extrabold text-slate-950">{reference.manual_range}</p><p className="mt-1 text-xs leading-5 text-slate-600">{reference.note}</p></div>)}</div></section> : null}
 				{assessment.segmental_measurements?.length ? <section className="mt-5"><p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-ricosty-600">Análise segmentar Bodyscan</p><div className="grid gap-4 xl:grid-cols-2"><SegmentalBodyMap measurements={assessment.segmental_measurements} type="fat" /><SegmentalBodyMap measurements={assessment.segmental_measurements} type="muscle" /></div></section> : null}
-				{assessment.segmental_measurements?.length ? <SegmentalComparison current={assessment.segmental_measurements} previous={previous?.segmental_measurements ?? []} previousDate={previous ? formatDate(previous.evaluated_at) : null} /> : null}
+				{assessment.segmental_measurements?.length ? <SegmentalComparison current={assessment.segmental_measurements} previous={previous?.segmental_measurements ?? []} previousDate={previous ? formatDate(previous.evaluated_at) : null} comparability={comparability} /> : null}
 				{assessment.age_at_assessment >= 60 ? <section className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-950"><strong>Atenção à funcionalidade:</strong> em pessoas com 60 anos ou mais, o planejamento deve considerar preservação de massa, força, equilíbrio, mobilidade e autonomia. O percentual muscular estimado não comprova, isoladamente, força ou função preservada.</section> : null}
 
 				<section className="mt-5 rounded-2xl border border-ricosty-100 bg-ricosty-50/60 p-4">
 					<h3 className="flex items-center gap-2 font-bold text-ricosty-950"><PwaIcon name="history" size={18} />Comparação com a avaliação anterior</h3>
+					<div className={`mt-3 rounded-xl border p-3 text-xs leading-5 ${comparability.level === 'limited' || comparability.warnings.length ? 'border-amber-200 bg-amber-50 text-amber-950' : 'border-sky-200 bg-sky-50 text-sky-950'}`}>
+						<strong>{comparability.label}.</strong> {comparability.message}
+						{previous ? <p className="mt-1"><strong>Anterior:</strong> {comparisonProfileLabel(comparability.previousProfile)}<br /><strong>Atual:</strong> {comparisonProfileLabel(comparability.currentProfile)}</p> : null}
+						{comparability.warnings.map((warning) => <p key={warning} className="mt-1">{warning}</p>)}
+					</div>
 					{previous ? (
 						<>
 							<p className="mt-1 text-xs text-slate-500">Anterior: {formatDate(previous.evaluated_at)} · {previous.device_model}</p>
@@ -75,6 +83,8 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 									</div>
 								))}
 							</div>
+							{extendedComparisons.length ? <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white"><p className="bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800">Métricas estendidas presentes nos dois relatórios</p>{extendedComparisons.map((metric) => <div key={metric.key} className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-100 px-3 py-2 text-xs"><span>{metric.label}</span><strong>{metric.previous.toLocaleString('pt-BR')} {metric.unit} → {metric.current.toLocaleString('pt-BR')} {metric.unit}</strong></div>)}</div> : null}
+							{impedanceComparisons.length ? <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white"><p className="bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800">Impedância presente nas duas avaliações</p>{impedanceComparisons.map((reading) => <div key={`${reading.frequency_khz}-${reading.region}-${reading.side}`} className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-100 px-3 py-2 text-xs"><span>{reading.frequency_khz} kHz · {impedanceLabel(reading)}</span><strong>{reading.previous_ohms.toLocaleString('pt-BR')} Ω → {reading.current_ohms.toLocaleString('pt-BR')} Ω</strong></div>)}</div> : null}
 						</>
 					) : <p className="mt-2 text-sm text-slate-600">Esta é a primeira avaliação disponível para comparação.</p>}
 				</section>
@@ -85,6 +95,12 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 			</div>
 		</article>
 	);
+}
+
+function impedanceLabel(reading) {
+	const regions = { arm: 'Braço', trunk: 'Tronco', leg: 'Perna' };
+	const sides = { left: 'esquerdo', right: 'direito', center: 'centro' };
+	return `${regions[reading.region] ?? reading.region} ${sides[reading.side] ?? reading.side}`;
 }
 
 function DeltaBadge({ current, previous, value }) {

@@ -7,11 +7,21 @@ use Illuminate\Support\Collection;
 
 class PublishedKnowledgeSourceRepository
 {
-    public function matching(array $tags, array $chunkKeys = []): Collection
+    public function matching(array $tags, array $chunkKeys = [], ?string $deviceModel = null): Collection
     {
         $documents = BioimpedanceKnowledgeDocument::query()
             ->with('chunks.document')
             ->where('status', BioimpedanceKnowledgeDocument::STATUS_PUBLISHED)
+            ->when($deviceModel !== null, fn ($query) => $query->where(function ($scope) use ($deviceModel) {
+                $scope->where('device_model', $deviceModel)
+                    ->orWhere(function ($global) {
+                        $global->where(function ($withoutModel) {
+                            $withoutModel->whereNull('device_model')->orWhere('device_model', '');
+                        })->where(function ($notManufacturerManual) {
+                            $notManufacturerManual->whereNull('document_type')->orWhere('document_type', '!=', 'manufacturer_manual');
+                        });
+                    });
+            }))
             ->orderByDesc('published_at')
             ->orderByDesc('id')
             ->get()

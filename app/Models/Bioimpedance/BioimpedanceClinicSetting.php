@@ -7,6 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class BioimpedanceClinicSetting extends Model
 {
+    public const MODULE_ASSESSMENT = 'assessment';
+
+    public const MODULE_SCREENING = 'screening';
+
+    public const MODULE_REPORTS = 'reports';
+
     public const SCALE_MODEL_OMRON_HBF_514C = ScaleModel::OMRON_HBF_514C;
 
     public const SCALE_MODEL_RELAXMEDIC = ScaleModel::RELAXMEDIC;
@@ -34,6 +40,9 @@ class BioimpedanceClinicSetting extends Model
         'footer_text' => 'Vita Scan Análise clínica Biológica - Avaliação corporal e acompanhamento estético',
         'technical_notice' => 'Os resultados de bioimpedância são estimativas e podem variar conforme hidratação, alimentação, ciclo hormonal, medicamentos e condições de medição. Este documento não substitui avaliação médica ou nutricional.',
         'scale_model' => self::SCALE_MODEL_BODYSCAN_PRO,
+        'assessment_module_enabled' => true,
+        'screening_module_enabled' => true,
+        'reports_module_enabled' => true,
     ];
 
     protected $fillable = [
@@ -53,7 +62,19 @@ class BioimpedanceClinicSetting extends Model
         'footer_text',
         'technical_notice',
         'scale_model',
+        'assessment_module_enabled',
+        'screening_module_enabled',
+        'reports_module_enabled',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'assessment_module_enabled' => 'boolean',
+            'screening_module_enabled' => 'boolean',
+            'reports_module_enabled' => 'boolean',
+        ];
+    }
 
     public static function current(): self
     {
@@ -69,6 +90,27 @@ class BioimpedanceClinicSetting extends Model
             'scale_model_name' => $this->scaleModelName(),
             'scale_capabilities' => $this->scaleCapabilities(),
             'scale_reference_version' => $this->scaleReferenceVersion(),
+            'enabled_modules' => $this->enabledModules(),
+        ];
+    }
+
+    public function moduleEnabled(string $module): bool
+    {
+        return match ($module) {
+            self::MODULE_ASSESSMENT => (bool) $this->assessment_module_enabled,
+            self::MODULE_SCREENING => (bool) $this->screening_module_enabled,
+            self::MODULE_REPORTS => (bool) $this->reports_module_enabled,
+            default => false,
+        };
+    }
+
+    /** @return array{assessment: bool, screening: bool, reports: bool} */
+    public function enabledModules(): array
+    {
+        return [
+            self::MODULE_ASSESSMENT => $this->moduleEnabled(self::MODULE_ASSESSMENT),
+            self::MODULE_SCREENING => $this->moduleEnabled(self::MODULE_SCREENING),
+            self::MODULE_REPORTS => $this->moduleEnabled(self::MODULE_REPORTS),
         ];
     }
 

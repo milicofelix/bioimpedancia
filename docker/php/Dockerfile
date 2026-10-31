@@ -4,12 +4,17 @@ RUN apk add --no-cache \
         bash \
         git \
         icu-dev \
+        freetype-dev \
+        libjpeg-turbo-dev \
+        libpng-dev \
         libzip-dev \
         oniguruma-dev \
         unzip \
         zip \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install \
         bcmath \
+        gd \
         intl \
         mbstring \
         pdo_mysql \

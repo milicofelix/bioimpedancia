@@ -69,6 +69,11 @@ class ScreeningInvitationService
     {
         $requester = $this->authorizedRequester($request);
         $this->ensureOwnedPendingSession($session, $requester);
+        $session->loadMissing('client');
+        if (! $session->client) {
+            throw ValidationException::withMessages(['session' => 'Esta triagem não está mais vinculada a um cliente identificado.']);
+        }
+        $this->ensureClientCanReceiveInvitation($session->client);
 
         return DB::transaction(function () use ($request, $session, $expiresInMinutes): array {
             $plainToken = $this->newToken();

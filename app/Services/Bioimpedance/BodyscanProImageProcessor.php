@@ -2,8 +2,12 @@
 
 namespace App\Services\Bioimpedance;
 
+use App\Domain\Bioimpedance\BodyscanReportLayout;
+use App\Domain\Bioimpedance\BodyscanExtendedMetricCatalog;
+use App\Domain\Bioimpedance\BodyscanOcrProfileRegistry;
 use App\Domain\Bioimpedance\ScaleModel;
 use App\Models\Bioimpedance\BioimpedanceSegmentalMeasurement as Segment;
+use App\Models\Bioimpedance\BioimpedanceImpedanceReading as ImpedanceReading;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -12,28 +16,7 @@ use RuntimeException;
 
 class BodyscanProImageProcessor
 {
-    private const METRIC_FIELDS = [
-        'weight_kg',
-        'scale_bmi',
-        'body_fat_percentage',
-        'muscle_rate_percentage',
-        'lean_body_mass_kg',
-        'subcutaneous_fat_percentage',
-        'visceral_fat_level',
-        'body_water_percentage',
-        'skeletal_muscle_percentage',
-        'muscle_mass_kg',
-        'bone_mass_kg',
-        'protein_percentage',
-        'resting_metabolism_kcal',
-        'body_age',
-        'fat_mass_kg',
-        'water_weight_kg',
-        'protein_mass_kg',
-        'ideal_body_weight_kg',
-        'obesity_level',
-        'body_type',
-    ];
+    private const METRIC_FIELDS = BodyscanOcrProfileRegistry::METRIC_FIELDS;
 
     private const NUMERIC_RANGES = [
         'weight_kg' => [ScaleModel::BODYSCAN_MIN_WEIGHT_KG, ScaleModel::BODYSCAN_MAX_WEIGHT_KG],
@@ -56,17 +39,12 @@ class BodyscanProImageProcessor
         'ideal_body_weight_kg' => [2, 300],
     ];
 
-    private const REQUIRED_SECTIONS = [
-        'dados de membro',
-        'analise de gordura segmentar',
-        'equilibrio muscular',
-        'indice corporal',
-    ];
-
     public function __construct(
         private readonly BioimpedanceJpegInspector $jpegInspector,
         private readonly RelaxmedicValueNormalizer $valueNormalizer,
         private readonly BodyscanSegmentalOcrCompleter $segmentalCompleter,
+        private readonly BodyscanOcrProfileRegistry $ocrProfiles,
+        private readonly BodyscanExtendedMetricNormalizer $extendedMetricNormalizer,
     ) {}
 
     public function process(UploadedFile $image): array
@@ -86,7 +64,7 @@ class BodyscanProImageProcessor
             ->post(rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/').'/responses', [
                 'model' => $processorModel,
                 'store' => false,
-                'max_output_tokens' => 6500,
+                'max_output_tokens' => 9000,
                 'input' => [[
                     'role' => 'user',
                     'content' => [
@@ -115,6 +93,7 @@ class BodyscanProImageProcessor
             $contents,
             $processorModel,
             is_array($payload['segmental_measurements'] ?? null) ? $payload['segmental_measurements'] : [],
+            is_string($payload['report_layout'] ?? null) ? $payload['report_layout'] : null,
         );
 
         $result = $this->normalize($payload, $image);
@@ -129,9 +108,16 @@ class BodyscanProImageProcessor
             'processor_model' => $processorModel,
             'reference_version' => ScaleModel::BODYSCAN_REFERENCE_VERSION,
             'source_application' => $result['source_application'],
+            'report_layout' => $result['report_layout'],
+            'layout_profile_version' => $result['layout_profile_version'],
+            'layout_evidence' => $result['layout_evidence'],
+            'available_metric_fields' => $result['available_metric_fields'],
             'weight_unit' => $result['weight_unit'],
             'measured_at' => $result['measured_at'],
+            'printed_measurement_profile' => $result['printed_measurement_profile'],
             'metrics' => $result['metrics'],
+            'extended_metrics' => $result['extended_metrics'],
+            'impedance_readings' => $result['impedance_readings'],
             'segmental_measurements' => $result['segmental_measurements'],
             'raw_values' => $result['raw_values'],
             'detected_sections' => $result['detected_sections'],
@@ -165,18 +151,30 @@ class BodyscanProImageProcessor
             ->map(fn (string $section) => $this->normalizedLabel($section))
             ->unique()
             ->values();
-        $matchedSections = collect(self::REQUIRED_SECTIONS)->filter(
-            fn (string $required) => $detectedSections->contains(
-                fn (string $detected) => str_contains($detected, $required) || str_contains($required, $detected),
-            ),
+        $layoutEvidence = collect($payload['layout_evidence'] ?? [])
+            ->filter(fn ($evidence) => is_string($evidence) && trim($evidence) !== '')
+            ->map(fn (string $evidence) => mb_substr(trim($evidence), 0, 200))
+            ->unique()
+            ->values();
+        $sourceApplication = $this->normalizeSourceApplication($payload['source_application'] ?? null);
+        $reportLayout = BodyscanReportLayout::identify(
+            $sourceApplication,
+            $layoutEvidence->concat($detectedSections)->values()->all(),
         );
-
-        $requiredSegmentalSections = collect(['analise de gordura segmentar', 'equilibrio muscular']);
+        $reportedLayout = $this->normalizeText($payload['report_layout'] ?? null);
 
         if (! ($payload['recognized'] ?? false)
-            || $matchedSections->count() < 3
-            || $requiredSegmentalSections->diff($matchedSections)->isNotEmpty()) {
-            throw new RuntimeException('A imagem não possui as seções segmentares necessárias para um relatório Bodyscan Pro compatível.');
+            || $sourceApplication === null
+            || $reportLayout === null
+            || $reportedLayout !== $reportLayout
+            || ! BodyscanReportLayout::belongsToApplication($reportLayout, $sourceApplication)) {
+            throw new RuntimeException('A imagem não corresponde a um layout Bodyscan Pro compatível do RelaxFit ou Fitdays. Gere novamente um dos relatórios reconhecidos pelo sistema.');
+        }
+
+        $profile = $this->ocrProfiles->forLayout($reportLayout);
+        $missingRequiredSections = $profile->missingRequiredSections($detectedSections->all());
+        if ($missingRequiredSections !== []) {
+            throw new RuntimeException('A imagem não possui todas as seções obrigatórias do perfil '.$reportLayout.': '.implode(', ', $missingRequiredSections).'.');
         }
 
         $weightUnit = $this->normalizeWeightUnit($payload['weight_unit'] ?? null);
@@ -192,10 +190,7 @@ class BodyscanProImageProcessor
             ->map(fn (string $issue) => trim($issue))
             ->filter(fn (string $issue) => $this->isVisualQualityIssue($issue))
             ->values();
-        $missingFields = collect(self::REQUIRED_SECTIONS)
-            ->reject(fn (string $required) => $matchedSections->contains($required))
-            ->map(fn (string $section) => 'section:'.$section)
-            ->values();
+        $missingFields = collect();
         $suspiciousValues = collect($payload['suspicious_values'] ?? [])
             ->filter(fn ($item) => is_array($item) && filled($item['field'] ?? null) && filled($item['reason'] ?? null))
             ->filter(fn (array $item) => $this->isReadingUncertainty((string) $item['reason']))
@@ -206,14 +201,47 @@ class BodyscanProImageProcessor
             ]);
 
         $rawMetrics = is_array($payload['metrics'] ?? null) ? $payload['metrics'] : [];
+        $rawMetricLabels = is_array($payload['metric_source_labels'] ?? null) ? $payload['metric_source_labels'] : [];
+        $rawMetricTexts = is_array($payload['metric_raw_values'] ?? null) ? $payload['metric_raw_values'] : [];
         $metrics = [];
         $fieldStatuses = [];
-        $sourceApplication = $this->normalizeSourceApplication($payload['source_application'] ?? null);
-        $fieldStatuses['source_application'] = $sourceApplication === null ? 'missing' : 'recognized';
-        if ($sourceApplication === null) {
-            $missingFields->push('source_application');
+        $fieldStatuses['source_application'] = 'recognized';
+        $fieldStatuses['report_layout'] = 'recognized';
+
+        $rawPrintedProfile = is_array($payload['printed_measurement_profile'] ?? null)
+            ? $payload['printed_measurement_profile']
+            : [];
+        $printedProfile = [
+            'biological_sex' => $this->normalizeBiologicalSex($rawPrintedProfile['biological_sex'] ?? null),
+            'age_years' => $this->normalizeNumber($rawPrintedProfile['age_years'] ?? null),
+            'height_cm' => $this->normalizeNumber($rawPrintedProfile['height_cm'] ?? null),
+            'raw_value' => $this->normalizeText($rawPrintedProfile['raw_value'] ?? null),
+        ];
+        if ($reportLayout === BodyscanReportLayout::FITDAYS_TECHNICAL) {
+            foreach (['biological_sex', 'age_years', 'height_cm'] as $field) {
+                $statusKey = 'printed_measurement_profile.'.$field;
+                $fieldStatuses[$statusKey] = $printedProfile[$field] === null ? 'missing' : 'recognized';
+                if ($printedProfile[$field] === null) {
+                    $missingFields->push($statusKey);
+                }
+            }
+            foreach (['age_years' => [1, 120], 'height_cm' => [50, 250]] as $field => [$minimum, $maximum]) {
+                if ($printedProfile[$field] !== null && ($printedProfile[$field] < $minimum || $printedProfile[$field] > $maximum)) {
+                    $fieldStatuses['printed_measurement_profile.'.$field] = 'suspicious';
+                    $suspiciousValues->push([
+                        'field' => 'printed_measurement_profile.'.$field,
+                        'value' => $printedProfile[$field],
+                        'reason' => 'Dado do perfil impresso fora da faixa de integridade esperada.',
+                    ]);
+                }
+            }
         }
         foreach (self::METRIC_FIELDS as $field) {
+            if (! $profile->supportsMetric($field)) {
+                $metrics[$field] = null;
+                $fieldStatuses['metrics.'.$field] = 'unavailable_in_layout';
+                continue;
+            }
             $rawValue = $rawMetrics[$field] ?? null;
             $metrics[$field] = array_key_exists($field, self::NUMERIC_RANGES)
                 ? $this->normalizeNumber($rawValue)
@@ -221,6 +249,15 @@ class BodyscanProImageProcessor
             $fieldStatuses['metrics.'.$field] = $metrics[$field] === null ? 'missing' : 'recognized';
             if ($metrics[$field] === null) {
                 $missingFields->push('metrics.'.$field);
+            } elseif (! $profile->recognizesMetricLabel($field, $rawMetricLabels[$field] ?? null)
+                || ! is_string($rawMetricTexts[$field] ?? null)
+                || trim($rawMetricTexts[$field]) === '') {
+                $fieldStatuses['metrics.'.$field] = 'suspicious';
+                $suspiciousValues->push([
+                    'field' => 'metrics.'.$field,
+                    'value' => $rawMetricLabels[$field] ?? null,
+                    'reason' => 'O rótulo ou o texto bruto da métrica não corresponde aos aliases do perfil identificado.',
+                ]);
             }
         }
 
@@ -252,8 +289,33 @@ class BodyscanProImageProcessor
             }
         }
 
+        $extendedMetrics = $this->extendedMetricNormalizer->normalize(
+            is_array($payload['extended_metrics'] ?? null) ? $payload['extended_metrics'] : [],
+            $sourceApplication,
+            $reportLayout,
+        );
+        $extractedExtendedCodes = collect($extendedMetrics)->pluck('metric_code');
+        foreach (BodyscanExtendedMetricCatalog::requiredForLayout($reportLayout) as $requiredCode) {
+            if (! $extractedExtendedCodes->contains($requiredCode)) {
+                $missingFields->push('extended_metrics.'.$requiredCode);
+                $fieldStatuses['extended_metrics.'.$requiredCode] = 'missing';
+            } else {
+                $fieldStatuses['extended_metrics.'.$requiredCode] = 'recognized';
+            }
+        }
+
+        $impedanceReadings = $this->normalizeImpedanceReadings(
+            is_array($payload['impedance_readings'] ?? null) ? $payload['impedance_readings'] : [],
+            $reportLayout,
+            $sourceApplication,
+            $missingFields,
+            $suspiciousValues,
+            $fieldStatuses,
+        );
+
         $segmentalMeasurements = $this->normalizeSegments(
             is_array($payload['segmental_measurements'] ?? null) ? $payload['segmental_measurements'] : [],
+            $reportLayout,
             $missingFields,
             $suspiciousValues,
             $fieldStatuses,
@@ -286,9 +348,16 @@ class BodyscanProImageProcessor
             'report_type' => 'Bodyscan Pro',
             'reference_version' => ScaleModel::BODYSCAN_REFERENCE_VERSION,
             'source_application' => $sourceApplication,
+            'report_layout' => $reportLayout,
+            'layout_profile_version' => BodyscanReportLayout::profileVersion($reportLayout),
+            'layout_evidence' => $layoutEvidence->all(),
+            'available_metric_fields' => $profile->availableMetricFields,
             'weight_unit' => $weightUnit,
             'measured_at' => $measuredAt,
+            'printed_measurement_profile' => $printedProfile,
             'metrics' => $metrics,
+            'extended_metrics' => $extendedMetrics,
+            'impedance_readings' => $impedanceReadings,
             'segmental_measurements' => $segmentalMeasurements,
             'side_consistency' => $sideConsistency,
             'missing_fields' => $missingFields->unique()->values()->all(),
@@ -297,6 +366,11 @@ class BodyscanProImageProcessor
             'field_statuses' => $fieldStatuses,
             'raw_values' => [
                 'metrics' => $rawMetrics,
+                'metric_source_labels' => $rawMetricLabels,
+                'metric_text' => $rawMetricTexts,
+                'printed_measurement_profile' => $rawPrintedProfile,
+                'extended_metrics' => $payload['extended_metrics'] ?? [],
+                'impedance_readings' => $payload['impedance_readings'] ?? [],
                 'segmental_measurements' => $payload['segmental_measurements'] ?? [],
             ],
             'detected_sections' => $detectedSections->all(),
@@ -313,7 +387,7 @@ class BodyscanProImageProcessor
         ];
     }
 
-    private function normalizeSegments(array $rawSegments, $missingFields, $suspiciousValues, array &$fieldStatuses): array
+    private function normalizeSegments(array $rawSegments, string $reportLayout, $missingFields, $suspiciousValues, array &$fieldStatuses): array
     {
         $indexed = [];
         foreach ($rawSegments as $rawSegment) {
@@ -341,8 +415,8 @@ class BodyscanProImageProcessor
             $indexed[$key] = $rawSegment;
         }
 
-        return collect(Segment::TYPES)->flatMap(function (string $type) use ($indexed, $missingFields, $suspiciousValues, &$fieldStatuses) {
-            return collect(Segment::EXPECTED_SEGMENTS)->map(function (array $expected) use ($type, $indexed, $missingFields, $suspiciousValues, &$fieldStatuses) {
+        return collect(Segment::TYPES)->flatMap(function (string $type) use ($indexed, $reportLayout, $missingFields, $suspiciousValues, &$fieldStatuses) {
+            return collect(Segment::EXPECTED_SEGMENTS)->map(function (array $expected) use ($type, $indexed, $reportLayout, $missingFields, $suspiciousValues, &$fieldStatuses) {
                 $key = $type.'|'.$expected['region'].'|'.$expected['side'];
                 $fieldPrefix = 'segmental.'.$type.'.'.$expected['region'].'.'.$expected['side'];
                 $raw = $indexed[$key] ?? [];
@@ -350,8 +424,22 @@ class BodyscanProImageProcessor
                 $referencePercentage = $this->normalizeNumber($raw['reference_percentage'] ?? null);
                 $referenceMin = $this->normalizeNumber($raw['reference_min_percentage'] ?? null);
                 $referenceMax = $this->normalizeNumber($raw['reference_max_percentage'] ?? null);
+                $rangeSource = $referenceMin !== null && $referenceMax !== null ? 'printed' : null;
+                if ($referenceMin === null || $referenceMax === null) {
+                    $profileRange = $this->segmentalReferenceRange($reportLayout, $type, $expected['region']);
+                    $referenceMin ??= $profileRange[0] ?? null;
+                    $referenceMax ??= $profileRange[1] ?? null;
+                    $rangeSource = $profileRange === null ? null : 'layout_profile';
+                }
                 $rawClassification = $this->normalizeText($raw['classification'] ?? null);
                 $classification = $this->normalizeClassification($rawClassification);
+                $classificationSource = $classification === null ? null : 'printed';
+                if ($classification === null && $referencePercentage !== null && $referenceMin !== null && $referenceMax !== null) {
+                    $classification = $referencePercentage < $referenceMin
+                        ? Segment::CLASSIFICATION_LOW
+                        : ($referencePercentage > $referenceMax ? Segment::CLASSIFICATION_HIGH : Segment::CLASSIFICATION_STANDARD);
+                    $classificationSource = 'reference_range';
+                }
                 $legibility = $this->normalizeText($raw['legibility'] ?? null) ?? 'unreadable';
 
                 foreach (['mass_kg' => $massKg, 'reference_percentage' => $referencePercentage] as $field => $value) {
@@ -409,10 +497,12 @@ class BodyscanProImageProcessor
                 }
 
                 if ($legibility !== 'clear' && ($massKg !== null || $referencePercentage !== null)) {
+                    $segmentLabel = $this->segmentLabel($type, $expected['region'], $expected['side']);
                     $suspiciousValues->push([
                         'field' => $fieldPrefix,
                         'value' => $raw['raw_value'] ?? null,
-                        'reason' => 'A leitura deste segmento foi marcada como incerta ou ilegível.',
+                        'reason' => $this->normalizeText($raw['review_reason'] ?? null)
+                            ?? "{$segmentLabel}: a leitura precisa ser comparada com a imagem original.",
                     ]);
                 }
 
@@ -431,12 +521,144 @@ class BodyscanProImageProcessor
                         'mass_kg' => $raw['mass_kg'] ?? null,
                         'reference_percentage' => $raw['reference_percentage'] ?? null,
                         'classification' => $rawClassification,
+                        'classification_source' => $classificationSource,
+                        'reference_range_source' => $rangeSource,
                         'text' => $raw['raw_value'] ?? null,
                         'legibility' => $legibility,
                     ],
                 ];
             });
         })->values()->all();
+    }
+
+    /** @return array{0: float, 1: float}|null */
+    private function segmentalReferenceRange(string $layout, string $type, string $region): ?array
+    {
+        if ($layout !== BodyscanReportLayout::FITDAYS_TECHNICAL) {
+            return null;
+        }
+
+        if ($type === Segment::TYPE_FAT) {
+            return [80.0, 160.0];
+        }
+
+        if ($type === Segment::TYPE_MUSCLE) {
+            return $region === Segment::REGION_ARM ? [80.0, 115.0] : [90.0, 110.0];
+        }
+
+        return null;
+    }
+
+    private function segmentLabel(string $type, string $region, string $side): string
+    {
+        $typeLabel = $type === Segment::TYPE_FAT ? 'Gordura segmentar' : 'Equilíbrio muscular';
+        if ($region === Segment::REGION_TRUNK) {
+            return $typeLabel.' — tronco';
+        }
+
+        $regionLabel = $region === Segment::REGION_ARM ? 'braço' : 'perna';
+        $sideLabel = match ($side) {
+            Segment::SIDE_LEFT => $region === Segment::REGION_LEG ? ' esquerda' : ' esquerdo',
+            Segment::SIDE_RIGHT => $region === Segment::REGION_LEG ? ' direita' : ' direito',
+            default => '',
+        };
+
+        return $typeLabel.' — '.$regionLabel.$sideLabel;
+    }
+
+    private function normalizeImpedanceReadings(
+        array $rawReadings,
+        string $layout,
+        string $application,
+        $missingFields,
+        $suspiciousValues,
+        array &$fieldStatuses,
+    ): array {
+        if ($layout !== BodyscanReportLayout::FITDAYS_TECHNICAL) {
+            return [];
+        }
+
+        $indexed = [];
+        foreach ($rawReadings as $rawReading) {
+            if (! is_array($rawReading)) {
+                continue;
+            }
+
+            $frequency = (int) ($rawReading['frequency_khz'] ?? 0);
+            $region = $this->normalizeText($rawReading['region'] ?? null);
+            $side = $this->normalizeText($rawReading['side'] ?? null);
+            if (! in_array($frequency, ImpedanceReading::FREQUENCIES_KHZ, true)
+                || ! in_array($region, ImpedanceReading::REGIONS, true)
+                || ! in_array($side, ImpedanceReading::SIDES, true)
+                || ($region === 'trunk') !== ($side === 'center')) {
+                continue;
+            }
+
+            $key = $frequency.'|'.$region.'|'.$side;
+            if (isset($indexed[$key])) {
+                $suspiciousValues->push([
+                    'field' => 'impedance_readings.'.$key,
+                    'value' => $rawReading['impedance_ohms'] ?? null,
+                    'reason' => 'A tabela contém mais de uma leitura para a mesma frequência, região e lado.',
+                ]);
+                continue;
+            }
+            $indexed[$key] = $rawReading;
+        }
+
+        $readings = [];
+        foreach (ImpedanceReading::FREQUENCIES_KHZ as $frequency) {
+            foreach (ImpedanceReading::EXPECTED_POSITIONS as $position) {
+                $key = $frequency.'|'.$position['region'].'|'.$position['side'];
+                $raw = $indexed[$key] ?? [];
+                $value = $this->normalizeNumber($raw['impedance_ohms'] ?? null);
+                $state = $this->normalizeText($raw['reading_state'] ?? null);
+                if (! in_array($state, ImpedanceReading::STATES, true)) {
+                    $state = $value === null ? 'unreadable' : 'uncertain';
+                }
+                if ($value === null || $state !== 'clear') {
+                    $missingFields->push('impedance_readings.'.$key);
+                    $fieldStatuses['impedance_readings.'.$key] = $value === null ? 'missing' : 'suspicious';
+                } elseif ($value <= 0 || $value > 5000) {
+                    $fieldStatuses['impedance_readings.'.$key] = 'suspicious';
+                    $suspiciousValues->push([
+                        'field' => 'impedance_readings.'.$key,
+                        'value' => $value,
+                        'reason' => 'Impedância fora da faixa técnica de integridade usada pelo sistema.',
+                    ]);
+                } else {
+                    $fieldStatuses['impedance_readings.'.$key] = 'recognized';
+                }
+
+                $readings[] = [
+                    'frequency_khz' => $frequency,
+                    'region' => $position['region'],
+                    'side' => $position['side'],
+                    'impedance_ohms' => $value,
+                    'raw_value' => $this->normalizeText($raw['raw_value'] ?? null),
+                    'reading_state' => $state,
+                    'device_version' => ImpedanceReading::deviceVersion(),
+                    'source_application' => $application,
+                    'source_layout' => $layout,
+                ];
+            }
+        }
+
+        collect($readings)->groupBy('frequency_khz')->each(function ($frequencyReadings, $frequency) use ($suspiciousValues): void {
+            $duplicates = $frequencyReadings
+                ->filter(fn (array $reading) => $reading['impedance_ohms'] !== null)
+                ->groupBy(fn (array $reading) => number_format((float) $reading['impedance_ohms'], 2, '.', ''))
+                ->filter(fn ($sameValues) => $sameValues->count() > 1);
+            foreach ($duplicates as $value => $sameValues) {
+                $suspiciousValues->push([
+                    'field' => 'impedance_readings.'.$frequency.'khz',
+                    'value' => $value,
+                    'reason' => 'O mesmo valor de impedância aparece em regiões diferentes na frequência de '.$frequency.' kHz; confira a tabela original.',
+                ]);
+            }
+        });
+
+        return $readings;
     }
 
     private function sideConsistency(mixed $raw, $suspiciousValues): array
@@ -626,6 +848,17 @@ class BodyscanProImageProcessor
         };
     }
 
+    private function normalizeBiologicalSex(mixed $value): ?string
+    {
+        $normalized = $this->normalizedLabel((string) $value);
+
+        return match (true) {
+            in_array($normalized, ['male', 'masculino', 'm'], true) => 'male',
+            in_array($normalized, ['female', 'feminino', 'f'], true) => 'female',
+            default => null,
+        };
+    }
+
     private function normalizeWeightUnit(mixed $value): ?string
     {
         $normalized = $this->normalizedLabel((string) $value);
@@ -663,9 +896,10 @@ class BodyscanProImageProcessor
     {
         $payload = collect([
             'type', 'name', 'size_bytes', 'mime_type', 'stored', 'sha256', 'processed_at',
-            'processor_model', 'reference_version', 'measured_at', 'metrics', 'segmental_measurements',
+            'processor_model', 'reference_version', 'measured_at', 'printed_measurement_profile', 'metrics', 'extended_metrics', 'impedance_readings', 'segmental_measurements',
             'raw_values', 'detected_sections', 'field_statuses', 'missing_fields', 'suspicious_values',
-            'quality_issues', 'side_consistency', 'source_application', 'weight_unit',
+            'quality_issues', 'side_consistency', 'source_application', 'report_layout',
+            'layout_profile_version', 'layout_evidence', 'available_metric_fields', 'weight_unit',
         ])->mapWithKeys(fn (string $key) => [$key => $metadata[$key] ?? null])->all();
 
         return hash_hmac('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), (string) config('app.key'));
@@ -673,23 +907,41 @@ class BodyscanProImageProcessor
 
     private function prompt(): string
     {
-        return <<<'PROMPT'
+        $commonInstructions = <<<'PROMPT'
 Analise exclusivamente a imagem anexada. Ela deve ser um relatório da balança Bodyscan Pro exibido pelo aplicativo RelaxFit ou Fitdays.
 Identifique source_application pela marca visível no relatório: relaxfit ou fitdays. Use null quando a origem não estiver legível; não deduza pela aparência.
+Identifique report_layout exclusivamente por textos realmente visíveis, sem usar posição, cores ou proporções da página:
+- fitdays_technical_report exige a marca Fitdays e os textos "Relatório de análise de composição corporal", "Impedância bioelétrica" e "Pontuação corporal";
+- fitdays_vertical_report exige a marca Fitdays, os cabeçalhos "Indicador", "Valor" e "Padrão", além dos textos "Limb Dados" e "Controle de peso";
+- relaxfit_vertical_report exige a marca RelaxFit, "Análise de gordura segmentar", "Equilíbrio muscular" e ao menos "Dados de membro" ou "Índice corporal".
+Em layout_evidence, copie separadamente e sem parafrasear cada marca, título ou cabeçalho usado para identificar o layout. Não inclua evidência que não esteja legível na imagem.
 Identifique weight_unit pela unidade impressa ao lado do peso: kg, lb ou stone. Use null se a unidade não estiver legível. Não converta valores entre unidades.
-Reconheça o modelo pelo conjunto de seções e não apenas pela aparência: "Dados de membro", "Análise de gordura segmentar", "Equilíbrio muscular" e "Índice corporal".
+No fitdays_technical_report, extraia de seu cabeçalho sexo, idade e altura em printed_measurement_profile. Normalize biological_sex como male ou female, preserve idade em anos, altura em cm e copie a linha completa em raw_value. Nos layouts verticais, use null nos quatro campos quando esses dados não estiverem impressos; não deduza pelo cadastro, nome ou aparência.
+Reconheça o modelo pelo conjunto de textos e seções do layout identificado, nunca apenas pela aparência.
 Extraia cada valor pelo rótulo textual e pelo marcador L/R correspondente. Nunca determine o lado apenas pela posição na tela.
 Para os segmentos, use somente estes identificadores: type fat ou muscle; region arm, trunk ou leg; side left, center ou right. O tronco deve usar side center.
 Devem existir cinco segmentos de gordura e cinco de músculo: braço esquerdo, braço direito, tronco, perna esquerda e perna direita.
 Em cada segmento extraia massa em kg, percentual relativo à referência, classificação, limites de referência impressos e o texto bruto visível.
 Classificação deve preservar o texto impresso, como Baixo, Padrão ou Alto. Não invente classificação ausente.
 Os percentuais segmentares são índices relativos à referência, não percentuais de gordura corporal.
-Extraia as métricas gerais do bloco "Índice corporal" pelos nomes dos rótulos.
+Extraia as métricas gerais pelos nomes dos rótulos: no RelaxFit use o bloco "Índice corporal"; no Fitdays vertical use a tabela "Indicador / Valor / Padrão"; no Fitdays técnico use "Análise da composição corporal" e "Outros indicadores".
+Use exclusivamente os aliases do perfil identificado. Para cada métrica, retorne em metric_source_labels o rótulo exato encontrado e em metric_raw_values o texto integral da linha ou célula que sustenta o valor.
+Para campos que o perfil não oferece, retorne null em metrics, metric_source_labels e metric_raw_values. Não marque esses campos como ilegíveis ou ausentes.
+Extraia em extended_metrics somente indicadores realmente impressos e permitidos no layout identificado. Preserve rótulo, valor bruto, unidade, classificação do aplicativo, limites impressos e proporção do peso. Não derive limites nem classificações.
+No Fitdays técnico podem existir WHR, Pontuação corporal, Peso-alvo recomendado, controles de peso/gordura/músculo, Obesidade (peso atual/Peso alvo), ASMI e Avaliação do equilíbrio corporal.
+No Fitdays vertical extraia WHR, Peso-alvo recomendado, controles de peso/gordura/músculo e o contexto das métricas gerais permitidas quando impressos.
+Use os códigos: waist_hip_ratio, body_score, recommended_target_weight, weight_control, fat_control, muscle_control, proprietary_obesity_index, asmi e body_balance_assessment.
+Para preservar classificações e faixas do aplicativo nas métricas gerais, também podem ser usados: weight, bmi, body_fat_percentage, fat_mass, bone_mass, protein_mass, body_water, muscle_mass, muscle_rate, skeletal_muscle, subcutaneous_fat e visceral_fat. Extraia somente os que estiverem impressos, mesmo que o valor também esteja em metrics.
+Para body_balance_assessment, use text_value para reunir fielmente os itens impressos; nos demais, use numeric_value. Não inclua a lista "Consumo comum de exercícios" nem calorias de atividades.
+Classificações como Alto, Muito alto e Excelente são textos proprietários do aplicativo: apenas copie, sem interpretação clínica. Pontuação corporal não é diagnóstico e peso-alvo é referência proprietária do Fitdays.
+No fitdays_technical_report, leia a tabela "Impedância bioelétrica" por cabeçalhos de frequência e região. Extraia exatamente dez impedance_readings: cinco em 20 kHz e cinco em 100 kHz. Use region arm, trunk ou leg e side left, right ou center; somente o tronco usa center.
+Determine left/right exclusivamente pelos cabeçalhos textuais "direito" e "esquerdo", nunca pela posição da coluna. Preserve o texto bruto, a impedância em ohms e reading_state clear, uncertain ou unreadable. Quando ilegível, use impedance_ohms null e mantenha o registro.
+Nos layouts fitdays_vertical_report e relaxfit_vertical_report, retorne impedance_readings vazio; a ausência da tabela nesses formatos é esperada. Impedância é dado técnico de integridade e não deve receber diagnóstico ou interpretação clínica.
 Preserve exatamente o valor decimal impresso. Não acrescente casas decimais nem alegue margem de erro ou precisão que não esteja escrita no relatório.
 Não calcule, estime, deduza ou complete valores ausentes. Use null quando algo não estiver legível.
 Converta a data e hora para YYYY-MM-DDTHH:MM:SS sem inventar fuso horário.
 Em detected_sections, copie os títulos realmente visíveis.
-Marque recognized=false para aplicativo diferente de RelaxFit/Fitdays, relatório sem análise segmentar ou imagem que não permita identificar o Bodyscan Pro.
+Marque recognized=false para aplicativo diferente de RelaxFit/Fitdays, relatório sem análise segmentar, evidências insuficientes para um dos três layouts ou imagem que não permita identificar o Bodyscan Pro.
 Marque is_complete=false quando houver corte, desfoque, valor ilegível, seção ausente ou lado não confirmável.
 Em side_consistency, confirme a visibilidade dos marcadores L e R e marque possible_swap=true diante de qualquer dúvida sobre os lados.
 Em legibility use clear, uncertain ou unreadable.
@@ -700,6 +952,8 @@ Não interprete vermelho, amarelo, verde ou azul. Não conclua risco, normalidad
 Não inclua em quality_issues ou suspicious_values valores legíveis apenas por estarem coloridos ou classificados pelo dispositivo.
 Liste em português somente problemas de leitura, sem realizar interpretação clínica.
 PROMPT;
+
+        return $commonInstructions."\n\nPERFIS OCR SUPORTADOS\n".$this->ocrProfiles->promptBlocks();
     }
 
     private function responseSchema(): array
@@ -714,20 +968,81 @@ PROMPT;
         return [
             'type' => 'object',
             'additionalProperties' => false,
-            'required' => ['recognized', 'is_complete', 'quality_issues', 'source_application', 'weight_unit', 'measured_at', 'detected_sections', 'metrics', 'segmental_measurements', 'side_consistency', 'suspicious_values'],
+            'required' => ['recognized', 'is_complete', 'quality_issues', 'source_application', 'report_layout', 'layout_evidence', 'weight_unit', 'measured_at', 'printed_measurement_profile', 'detected_sections', 'metrics', 'metric_source_labels', 'metric_raw_values', 'extended_metrics', 'impedance_readings', 'segmental_measurements', 'side_consistency', 'suspicious_values'],
             'properties' => [
                 'recognized' => ['type' => 'boolean'],
                 'is_complete' => ['type' => 'boolean'],
                 'quality_issues' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'source_application' => ['type' => ['string', 'null'], 'enum' => ['relaxfit', 'fitdays', null]],
+                'report_layout' => ['type' => ['string', 'null'], 'enum' => [...BodyscanReportLayout::LAYOUTS, null]],
+                'layout_evidence' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'weight_unit' => ['type' => ['string', 'null'], 'enum' => ['kg', 'lb', 'stone', null]],
                 'measured_at' => $nullableString,
+                'printed_measurement_profile' => [
+                    'type' => 'object',
+                    'additionalProperties' => false,
+                    'required' => ['biological_sex', 'age_years', 'height_cm', 'raw_value'],
+                    'properties' => [
+                        'biological_sex' => ['type' => ['string', 'null'], 'enum' => ['male', 'female', null]],
+                        'age_years' => $nullableNumber,
+                        'height_cm' => $nullableNumber,
+                        'raw_value' => $nullableString,
+                    ],
+                ],
                 'detected_sections' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'metrics' => [
                     'type' => 'object',
                     'additionalProperties' => false,
                     'required' => self::METRIC_FIELDS,
                     'properties' => $metricProperties,
+                ],
+                'metric_source_labels' => [
+                    'type' => 'object',
+                    'additionalProperties' => false,
+                    'required' => self::METRIC_FIELDS,
+                    'properties' => array_fill_keys(self::METRIC_FIELDS, $nullableString),
+                ],
+                'metric_raw_values' => [
+                    'type' => 'object',
+                    'additionalProperties' => false,
+                    'required' => self::METRIC_FIELDS,
+                    'properties' => array_fill_keys(self::METRIC_FIELDS, $nullableString),
+                ],
+                'extended_metrics' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'additionalProperties' => false,
+                        'required' => ['code', 'original_label', 'numeric_value', 'text_value', 'unit', 'classification', 'printed_minimum', 'printed_maximum', 'weight_proportion_percentage', 'raw_value'],
+                        'properties' => [
+                            'code' => ['type' => 'string', 'enum' => BodyscanExtendedMetricCatalog::CODES],
+                            'original_label' => ['type' => 'string'],
+                            'numeric_value' => $nullableNumber,
+                            'text_value' => $nullableString,
+                            'unit' => $nullableString,
+                            'classification' => $nullableString,
+                            'printed_minimum' => $nullableNumber,
+                            'printed_maximum' => $nullableNumber,
+                            'weight_proportion_percentage' => $nullableNumber,
+                            'raw_value' => ['type' => 'string'],
+                        ],
+                    ],
+                ],
+                'impedance_readings' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'additionalProperties' => false,
+                        'required' => ['frequency_khz', 'region', 'side', 'impedance_ohms', 'raw_value', 'reading_state'],
+                        'properties' => [
+                            'frequency_khz' => ['type' => 'integer', 'enum' => ImpedanceReading::FREQUENCIES_KHZ],
+                            'region' => ['type' => 'string', 'enum' => ImpedanceReading::REGIONS],
+                            'side' => ['type' => 'string', 'enum' => ImpedanceReading::SIDES],
+                            'impedance_ohms' => $nullableNumber,
+                            'raw_value' => $nullableString,
+                            'reading_state' => ['type' => 'string', 'enum' => ImpedanceReading::STATES],
+                        ],
+                    ],
                 ],
                 'segmental_measurements' => [
                     'type' => 'array',

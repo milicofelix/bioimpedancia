@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { formatDate, formatIssueDate, numberBr } from '../../../shared/formatters';
 import { cpfMask } from '../../../shared/inputMasks';
 import { assessmentAccess, canUseClinicalFeatures } from './clientAccess';
@@ -6,6 +6,9 @@ import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaIcon from '../../components/ui/PwaIcon';
 import ScreeningInvitationPanel from './ScreeningInvitationPanel';
+import ClientModuleSummary from '../../../shared/ClientModuleSummary';
+import ClientWorkspaceTabs from '../../../shared/ClientWorkspaceTabs';
+import ClientAssessmentHeader from '../../../shared/ClientAssessmentHeader';
 
 const sexLabels = { female: 'Feminino', male: 'Masculino' };
 
@@ -13,9 +16,23 @@ function initials(name) {
 	return String(name ?? '?').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 }
 
-export default function ClientDetails({ client, currentUser, scaleModel, onBack, onNewAssessment, onOpenAssistant, onOpenReport }) {
+export default function ClientDetails({ client, currentUser, scaleModel, enabledModules, onBack, onNewAssessment, onOpenAssistant, onOpenReport }) {
 	const access = assessmentAccess(client, currentUser, scaleModel);
 	const assessments = [...(client.assessments ?? [])].sort((left, right) => new Date(right.evaluated_at) - new Date(left.evaluated_at));
+	const latestActiveAssessment = assessments.find((assessment) => !assessment.is_canceled) ?? null;
+	const canAccessScreenings = ['admin', 'professional'].includes(currentUser?.role);
+	const firstActiveTab = enabledModules.assessment ? 'assessment' : enabledModules.screening ? 'screenings' : 'assessment';
+	const enabledModuleCount = [enabledModules.assessment, enabledModules.screening, enabledModules.reports].filter(Boolean).length;
+	const needsModuleChoice = enabledModuleCount > 1;
+	const opensSingleModuleDirectly = enabledModuleCount === 1 && (enabledModules.assessment || enabledModules.screening);
+	const [activeTab, setActiveTab] = useState(firstActiveTab);
+
+	useEffect(() => setActiveTab(firstActiveTab), [client.id, firstActiveTab]);
+
+	function openScreenings() {
+		setActiveTab('screenings');
+		window.setTimeout(() => document.getElementById('client-panel-screenings')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+	}
 
 	return (
 		<section aria-labelledby="client-details-title">
@@ -48,25 +65,36 @@ export default function ClientDetails({ client, currentUser, scaleModel, onBack,
 					<p><strong>Próxima avaliação:</strong> {formatIssueDate(client.next_assessment_at)}</p>
 				</div>
 
-				<div className="mt-5 rounded-2xl bg-gradient-to-br from-ricosty-50 to-ricosty-cream p-3 ring-1 ring-ricosty-100">
-					<div className="mb-3 flex items-center gap-2 px-1 text-xs text-ricosty-800"><PwaIcon name="clipboard" size={16} /><span><strong>Pronto para atender?</strong> Inicie o fluxo Relaxmedic.</span></div>
-					<PwaButton type="button" disabled={!access.allowed} onClick={() => onNewAssessment(client)} icon="plus" className="w-full text-base">Nova avaliação</PwaButton>
-				</div>
-				{access.reason ? <p className="mt-2 text-center text-xs font-semibold text-amber-700">{access.reason}</p> : null}
 			</PwaCard>
 
-			{client.is_active && !client.is_anonymized ? (
-				['admin', 'professional'].includes(currentUser?.role) ? <ScreeningInvitationPanel client={client} /> : (
-					<PwaCard className="mt-4 border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-						<strong>Questionário de triagem indisponível para este perfil.</strong>
-						<p className="mt-1">Somente contas de administrador ou profissional podem criar e acompanhar aplicações.</p>
-					</PwaCard>
-				)
-			) : null}
+			{!opensSingleModuleDirectly ? <div className="mt-4">
+				<ClientModuleSummary
+					client={client}
+					canStartAssessment={access.allowed}
+					canAccessScreenings={canAccessScreenings}
+					onStartAssessment={() => onNewAssessment(client)}
+					onOpenScreenings={openScreenings}
+					onOpenReports={() => latestActiveAssessment && onOpenReport(client, latestActiveAssessment)}
+					enabledModules={enabledModules}
+				/>
+				{access.reason ? <p className="mt-2 text-center text-xs font-semibold text-amber-700">{access.reason}</p> : null}
+			</div> : access.reason && enabledModules.assessment ? <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-xs font-semibold text-amber-800">{access.reason}</p> : null}
 
+			{needsModuleChoice ? <div className="mt-4"><ClientWorkspaceTabs activeTab={activeTab} onChange={setActiveTab} enabledModules={enabledModules} sticky /></div> : null}
+
+			<div id="client-panel-assessment" role="tabpanel" aria-labelledby="client-tab-assessment" className={enabledModules.assessment && activeTab === 'assessment' ? '' : 'hidden'}>
+			<div className="mt-4">
+				<ClientAssessmentHeader
+					assessmentCount={assessments.length}
+					canStartAssessment={access.allowed}
+					hasReport={enabledModules.reports && Boolean(latestActiveAssessment)}
+					onStartAssessment={() => onNewAssessment(client)}
+					onOpenReport={() => latestActiveAssessment && onOpenReport(client, latestActiveAssessment)}
+				/>
+			</div>
 			<PwaCard className="mt-4 p-5">
 				<div className="flex items-center justify-between gap-3">
-					<h3 className="flex items-center gap-2 font-extrabold text-ricosty-ink"><PwaIcon name="history" className="text-ricosty-600" />Histórico resumido</h3>
+					<h3 className="flex items-center gap-2 font-extrabold text-ricosty-ink"><PwaIcon name="history" className="text-ricosty-600" />Histórico de bioimpedância</h3>
 					<span className="text-xs text-slate-500">{assessments.length} avaliação(ões)</span>
 				</div>
 
@@ -81,7 +109,8 @@ export default function ClientDetails({ client, currentUser, scaleModel, onBack,
 								</div>
 								<div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-lg bg-white/80 px-3 py-2"><span className="block text-[11px] font-bold uppercase text-slate-600">Peso</span><strong className="text-sm text-slate-800">{numberBr(assessment.weight_kg, 1)} kg</strong></div><div className="rounded-lg bg-white/80 px-3 py-2"><span className="block text-[11px] font-bold uppercase text-slate-600">IMC</span><strong className="text-sm text-slate-800">{numberBr(assessment.calculated_bmi ?? assessment.scale_bmi, 1)}</strong></div></div>
 								<div className="mt-3 flex flex-wrap gap-2">
-									<PwaButton type="button" onClick={() => onOpenReport(client, assessment)} variant="secondary" icon="fileText" className="px-3 text-xs">Relatório</PwaButton>
+									<p className="w-full text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Ações da avaliação</p>
+									{enabledModules.reports ? <PwaButton type="button" onClick={() => onOpenReport(client, assessment)} variant="secondary" icon="fileText" className="px-3 text-xs">Relatório corporal</PwaButton> : null}
 									{canUseClinicalFeatures(currentUser) ? <PwaButton type="button" onClick={() => onOpenAssistant(client, assessment)} variant="ghost" icon="sparkles" className="px-3 text-xs">Assistente</PwaButton> : null}
 								</div>
 							</div>
@@ -90,6 +119,16 @@ export default function ClientDetails({ client, currentUser, scaleModel, onBack,
 					{!assessments.length ? <li className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500">Nenhuma avaliação registrada.</li> : null}
 				</ol>
 			</PwaCard>
+			</div>
+
+			<div id="client-panel-screenings" role="tabpanel" aria-labelledby="client-tab-screenings" className={enabledModules.screening && activeTab === 'screenings' ? '' : 'hidden'}>
+				{canAccessScreenings ? <ScreeningInvitationPanel client={client} canCreateInvitation={client.is_active && !client.is_anonymized} creationUnavailableReason={client.is_anonymized ? 'Cliente anonimizado não pode receber novas triagens. Os dados remanescentes seguem as regras de retenção e auditoria.' : 'Cliente inativo não pode receber novas triagens. O histórico permanece disponível para consulta.'} /> : (
+					<PwaCard className="mt-4 border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+						<strong>Triagens indisponíveis para este perfil.</strong>
+						<p className="mt-1">É necessário usar uma conta de administrador ou profissional para consultar e administrar triagens.</p>
+					</PwaCard>
+				)}
+			</div>
 		</section>
 	);
 }

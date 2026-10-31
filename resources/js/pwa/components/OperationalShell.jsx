@@ -19,10 +19,15 @@ function userInitial(name) {
 	return String(name ?? 'P').trim().charAt(0).toUpperCase();
 }
 
-export default function OperationalShell({ activeSection, currentUser, onLogout, onNavigate, children }) {
+export default function OperationalShell({ activeSection, currentUser, enabledModules, onLogout, onNavigate, children }) {
 	const isOnline = useOnlineStatus();
 	const update = useServiceWorkerUpdate();
 	const mainReference = useRef(null);
+	const availableNavigation = navigation.filter((item) => {
+		if (['avaliacao', 'assistente'].includes(item.section)) return enabledModules.assessment;
+		if (item.section === 'relatorio') return enabledModules.reports;
+		return true;
+	});
 
 	useEffect(() => {
 		mainReference.current?.focus({ preventScroll: true });
@@ -54,9 +59,9 @@ export default function OperationalShell({ activeSection, currentUser, onLogout,
 					<div className="relative flex items-center gap-4">
 						<div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/25 bg-white/15 text-lg font-black shadow-inner backdrop-blur">{userInitial(currentUser?.name)}</div>
 						<div className="min-w-0">
-							<p className="text-[11px] font-bold uppercase tracking-[0.2em] text-ricosty-100">Sua melhor versão, em cada detalhe</p>
+							<p className="text-[11px] font-bold uppercase tracking-[0.2em] text-ricosty-100">Atendimento Vita Scan</p>
 							<h1 className="mt-1 break-words text-xl font-bold">Olá, {currentUser?.name ?? 'profissional'}</h1>
-							<p className="mt-1 text-sm text-ricosty-100">Tudo que você precisa para conduzir o atendimento.</p>
+							<p className="mt-1 text-sm text-ricosty-100">Selecione um cliente para iniciar ou continuar o atendimento.</p>
 						</div>
 					</div>
 				</div>
@@ -68,8 +73,8 @@ export default function OperationalShell({ activeSection, currentUser, onLogout,
 			<PwaUpdateNotice visible={update.available} applying={update.applying} onApply={update.apply} onDismiss={update.dismiss} />
 
 			<nav aria-label="Navegação operacional" className="pwa-bottom-navigation fixed inset-x-0 bottom-0 z-30 pt-2">
-				<div className="mx-auto grid max-w-xl grid-cols-4 gap-1 rounded-[1.35rem] border border-ricosty-200/80 bg-white/95 p-1.5 shadow-[0_14px_40px_rgba(97,38,55,0.16)] backdrop-blur-xl">
-					{navigation.map((item) => {
+				<div className="mx-auto grid max-w-xl gap-1 rounded-[1.35rem] border border-ricosty-200/80 bg-white/95 p-1.5 shadow-[0_14px_40px_rgba(97,38,55,0.16)] backdrop-blur-xl" style={{ gridTemplateColumns: `repeat(${availableNavigation.length}, minmax(0, 1fr))` }}>
+					{availableNavigation.map((item) => {
 						const active = item.section === activeSection;
 						return <button type="button" key={item.section} onClick={() => onNavigate(item.section)} aria-current={active ? 'page' : undefined} aria-label={`${item.label}${active ? ', seção atual' : ''}`} className={`pwa-focus pwa-pressable relative flex min-h-14 touch-manipulation flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[11px] font-bold transition ${active ? 'bg-ricosty-50 text-ricosty-800' : 'text-slate-600 hover:bg-ricosty-50/60 hover:text-ricosty-800'}`}><span className={`flex h-7 w-7 items-center justify-center rounded-xl transition ${active ? 'bg-gradient-to-br from-ricosty-500 to-ricosty-700 text-white shadow-md shadow-ricosty-200' : 'text-slate-600'}`}><PwaIcon name={item.icon} size={18} /></span><span>{item.label}</span>{active ? <span aria-hidden="true" className="absolute -bottom-0.5 h-1 w-5 rounded-full bg-ricosty-500" /> : null}</button>;
 					})}

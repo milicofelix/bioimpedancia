@@ -17,14 +17,14 @@ use Illuminate\Support\Str;
 
 class BioimpedanceObservationAssistant
 {
-    public const PROMPT_VERSION = 'rag-client-1.2.0';
+    public const PROMPT_VERSION = 'rag-client-1.3.2';
 
     public const MODEL_NAME = 'local-validated-rag-agent';
 
     public function __construct(
         private readonly KnowledgeSourceSnapshot $sourceSnapshot,
         private readonly PublishedKnowledgeSourceRepository $publishedSources,
-        private readonly BioimpedanceSegmentalClinicalContext $segmentalContext,
+        private readonly BioimpedanceAssistantContext $assistantContext,
     ) {}
 
     private const DEFAULT_DOCUMENTS = [
@@ -111,7 +111,7 @@ class BioimpedanceObservationAssistant
 
     public function suggest(BioimpedanceAssessment $assessment, ?User $requestedBy = null): array
     {
-        $assessment->loadMissing(['client', 'professional']);
+        $assessment->loadMissing(['client', 'professional', 'segmentalMeasurements', 'extendedMetrics', 'impedanceReadings']);
         $this->ensureDefaultKnowledgeBase($requestedBy);
 
         $history = $this->historyBefore($assessment);
@@ -137,7 +137,7 @@ class BioimpedanceObservationAssistant
         }
 
         $response = $this->generateResponse($assessment, $context, $chunks);
-        $validationErrors = $this->validateResponse($response, $assessment, $chunks);
+        $validationErrors = $this->validateResponse($response, $assessment, $chunks, $context);
         if (count($validationErrors) && ($response['provider'] ?? null) === 'openai') {
             $openAiValidationErrors = $validationErrors;
             $localResponse = [
@@ -145,7 +145,7 @@ class BioimpedanceObservationAssistant
                 'provider' => 'local_reference_engine',
                 'fallback_reason' => 'Resposta da OpenAI bloqueada pelo validador; observação segura gerada pelo backend.',
             ];
-            $validationErrors = $this->validateResponse($localResponse, $assessment, $chunks);
+            $validationErrors = $this->validateResponse($localResponse, $assessment, $chunks, $context);
             $response = [
                 ...$localResponse,
                 'blocked_provider' => 'openai',
@@ -158,6 +158,13 @@ class BioimpedanceObservationAssistant
             'status' => $status,
             'validation_errors' => $validationErrors,
         ]);
+        $response['evidence_catalog'] = $context['evidence_catalog'] ?? [];
+        $response['guidance_evidence_map'] = collect(['positive_points', 'attention_points', 'general_guidance'])
+            ->flatMap(fn (string $section) => collect($response[$section] ?? [])->map(fn (array $point) => [
+                'section' => $section,
+                'text' => $point['text'] ?? null,
+                'source_ids' => $point['source_chunk_ids'] ?? [],
+            ]))->values()->all();
 
         $output = BioimpedanceAiAnalysisOutput::query()->create([
             'bioimpedance_ai_analysis_request_id' => $request->id,
@@ -302,6 +309,9 @@ Não gere diagnóstico, prescrição, dieta, medicação, suplemento ou tratamen
 Não afirme causalidade médica. Não substitua avaliação de profissional habilitado.
 Para dados Relaxmedic, trate composição corporal e idade corporal como estimativas proprietárias, gordura visceral como índice do dispositivo e TMB como estimativa que não equivale ao gasto energético total. Não aplique faixas Omron nem conclua que força ou função muscular estão preservadas.
 Para dados Bodyscan, não conclua perda muscular, assimetria clínica ou preservação funcional com base nos segmentos. Descreva somente valores e tendências, ressalvando condições de medição e necessidade de avaliação profissional.
+WHR e ASMI são índices estimados pelo equipamento: não diagnostique risco, sarcopenia ou qualquer condição a partir deles. Nunca trate idade corporal como idade biológica real, peso-alvo do aplicativo como peso ideal prescritivo ou pontuação corporal como nota clínica.
+Considere o aplicativo, o layout e o modo atleta registrados. Quando o histórico indicar mudança entre modo atleta e padrão ou perfis incompatíveis, informe a incompatibilidade e não descreva a diferença como melhora ou piora.
+Cada afirmação baseada na avaliação deve citar os IDs do catálogo de evidências fornecido.
 Evite linguagem interna, acadêmica ou excessivamente técnica.
 Não use expressões como "Sugestão ao profissional", "considerar a combinação", "pode indicar", "fatores clínicos associados" ou "acompanhamento longitudinal".
 Prefira frases curtas, humanas e compreensíveis para o cliente.
@@ -434,10 +444,12 @@ PROMPT;
         $variation = $this->variationText($assessment, $context['previous_assessment'] ?? null);
         $bodyAge = $this->bodyAgeText($assessment);
         $warnings = $context['warnings'] ?? [];
+        $profileWarning = collect(data_get($context, 'history_comparison.warnings', []))->first();
         $observationParts = [
             $this->classificationObservation($context),
             $bodyAge,
             $variation,
+            $profileWarning ? 'A comparação com a avaliação anterior exige cautela: '.$profileWarning : null,
             count($warnings) ? 'Há alerta de consistência registrado: '.$warnings[0] : null,
             'Recomenda-se acompanhar a evolução nas próximas avaliações, mantendo condições semelhantes de medição para comparar os resultados com mais segurança.',
         ];
@@ -457,21 +469,26 @@ PROMPT;
         ];
     }
 
-    private function validateResponse(array $response, BioimpedanceAssessment $assessment, Collection $chunks): array
+    private function validateResponse(array $response, BioimpedanceAssessment $assessment, Collection $chunks, array $context): array
     {
         $errors = [];
         $allowedChunkKeys = [
             ...$chunks->pluck('chunk_key')->all(),
-            'assessment:current',
-            'assessment:history',
-            ...($this->segmentalContext->for($assessment)['evidence_ids'] ?? []),
+            ...($context['evidence_ids'] ?? []),
         ];
-        $text = Str::lower(json_encode($response, JSON_UNESCAPED_UNICODE));
+        $text = $this->responseTextForValidation($response);
 
         foreach ([
-            'diagnóstico', 'diagnostico', 'prescrevo', 'prescrição', 'medicamento', 'suplemento obrigatório', 'dieta de',
+            'diagnóstico de', 'diagnostico de', 'diagnosticado com', 'diagnosticada com',
+            'confirma o diagnóstico', 'confirma o diagnostico', 'indica diagnóstico', 'indica diagnostico',
+            'prescrevo', 'prescrição de', 'prescricao de', 'tome ', 'dose de', 'mg por',
+            'medicamento indicado', 'medicamento recomendado', 'suplemento obrigatório', 'siga a dieta',
             'perda muscular confirmada', 'apresenta perda muscular', 'assimetria clínica identificada',
             'apresenta assimetria clínica', 'comprova função muscular preservada', 'confirma musculatura preservada',
+            'diagnóstico pelo whr', 'diagnóstico com base no whr', 'sarcopenia confirmada', 'apresenta sarcopenia',
+            'sua idade biológica real é', 'idade biológica real confirmada', 'peso ideal prescrito pelo aplicativo',
+            'seu peso ideal é', 'pontuação corporal indica', 'pontuação corporal demonstra',
+            'pontuação corporal confirma', 'whr indica', 'whr demonstra',
         ] as $forbidden) {
             if (str_contains($text, $forbidden)) {
                 $errors[] = 'Conteúdo proibido detectado: '.$forbidden;
@@ -534,6 +551,22 @@ PROMPT;
         return array_values(array_unique($errors));
     }
 
+    private function responseTextForValidation(array $response): string
+    {
+        $userFacingText = collect([
+            $response['summary'] ?? null,
+            $response['professional_observation'] ?? null,
+            ...collect(['positive_points', 'attention_points', 'general_guidance'])
+                ->flatMap(fn (string $section) => collect($response[$section] ?? [])
+                    ->pluck('text'))
+                ->all(),
+        ])
+            ->filter(fn ($value) => is_string($value) && filled($value))
+            ->implode("\n");
+
+        return Str::lower($userFacingText);
+    }
+
     private function retrieveApprovedChunks(array $context): Collection
     {
         $keys = collect(['ricosty-measurement-protocol', 'ricosty-assistant-safety-policy']);
@@ -546,12 +579,16 @@ PROMPT;
         $tags = collect(['measurement_protocol', 'safety_policy', 'prohibited_content']);
         foreach (array_keys(self::METRIC_CHUNKS) as $metric) {
             if (filled($context['metrics'][$metric]['classification'] ?? null)) {
-                $tags->push($metric, 'classification');
+                $tags->push($metric);
             }
         }
 
         return $this->publishedSources
-            ->matching($tags->unique()->values()->all(), $keys->unique()->values()->all())
+            ->matching(
+                $tags->unique()->values()->all(),
+                $keys->unique()->values()->all(),
+                $context['device_model'] ?? null,
+            )
             ->sortBy(fn (BioimpedanceKnowledgeChunk $chunk) => ($position = $keys->search($chunk->chunk_key)) === false ? 999 : $position)
             ->values();
     }
@@ -560,6 +597,9 @@ PROMPT;
     {
         $indicators = $assessment->analysis['indicators'] ?? [];
         $usesManufacturerOnlyReferences = in_array($assessment->device_model, ['Relaxmedic', 'Bodyscan Pro'], true);
+        $clinicalContext = $this->assistantContext->for($assessment);
+        $historyComparison = $clinicalContext['history_comparison'] ?? [];
+        $comparableMetrics = collect($historyComparison['comparable_metrics'] ?? [])->keyBy('field');
 
         return [
             'assessment_id' => $assessment->id,
@@ -576,15 +616,15 @@ PROMPT;
                 'resting_metabolism' => ['value' => $assessment->resting_metabolism_kcal, 'unit' => 'kcal/dia'],
                 'body_age' => ['value' => $assessment->body_age, 'unit' => 'anos'],
             ],
-            'previous_assessment' => $history->last() ? [
-                'weight_kg' => (float) $history->last()->weight_kg,
-                'body_fat_percentage' => $history->last()->body_fat_percentage === null ? null : (float) $history->last()->body_fat_percentage,
-                'skeletal_muscle_percentage' => $history->last()->skeletal_muscle_percentage === null ? null : (float) $history->last()->skeletal_muscle_percentage,
-                'visceral_fat_level' => $history->last()->visceral_fat_level === null ? null : (float) $history->last()->visceral_fat_level,
+            'previous_assessment' => ($historyComparison['automatic_interpretation_allowed'] ?? false) ? [
+                'weight_kg' => data_get($comparableMetrics->get('weight_kg'), 'previous'),
+                'body_fat_percentage' => data_get($comparableMetrics->get('body_fat_percentage'), 'previous'),
+                'skeletal_muscle_percentage' => data_get($comparableMetrics->get('skeletal_muscle_percentage'), 'previous'),
+                'visceral_fat_level' => data_get($comparableMetrics->get('visceral_fat_level'), 'previous'),
             ] : null,
             'warnings' => $assessment->analysis['warnings'] ?? [],
             'professional_notes' => $assessment->notes,
-            'segmental_analysis' => $this->segmentalContext->for($assessment),
+            ...$clinicalContext,
         ];
     }
 
@@ -611,7 +651,12 @@ PROMPT;
 
                 return [
                     'text' => $label.' classificado como '.mb_strtolower($item['classification']).'.',
-                    'source_chunk_ids' => [$chunkKey],
+                    'source_chunk_ids' => [$chunkKey, 'assessment:metric:'.match ($metric) {
+                        'bmi' => 'calculated_bmi',
+                        'body_fat' => 'body_fat_percentage',
+                        'skeletal_muscle' => 'skeletal_muscle_percentage',
+                        'visceral_fat' => 'visceral_fat_level',
+                    }],
                 ];
             })
             ->filter()
@@ -650,16 +695,7 @@ PROMPT;
             return null;
         }
 
-        if (in_array($assessment->device_model, ['Relaxmedic', 'Bodyscan Pro'], true)) {
-            return 'O aplicativo registrou idade corporal estimada de '.$assessment->body_age.' anos; esse índice proprietário não representa idade biológica real.';
-        }
-
-        $delta = $assessment->body_age - $assessment->age_at_assessment;
-        if ($delta === 0) {
-            return 'A idade corporal estimada ficou equivalente à idade cronológica.';
-        }
-
-        return 'A idade corporal estimada foi de '.$assessment->body_age.' anos, ficando '.abs($delta).' anos '.($delta > 0 ? 'acima' : 'abaixo').' da idade cronológica.';
+        return 'O equipamento apresentou idade corporal estimada de '.$assessment->body_age.' anos; esse índice proprietário não representa idade biológica real nem produz diagnóstico.';
     }
 
     private function variationText(BioimpedanceAssessment $assessment, ?array $previous): ?string

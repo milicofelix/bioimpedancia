@@ -8,7 +8,7 @@ const nextActions = {
 	approved: { action: 'publish', label: 'Publicar versão' },
 };
 
-const emptyForm = { title: '', document_type: 'clinical_reference', version: '', source_url: '', section: '', content: '', tags: '' };
+const emptyForm = { title: '', document_type: 'clinical_reference', manufacturer: '', device_model: '', version: '', source_url: '', section: '', content: '', tags: '' };
 
 export default function KnowledgeDocumentsPanel() {
 	const runAction = useActionLock();
@@ -38,6 +38,8 @@ export default function KnowledgeDocumentsPanel() {
 				const { data } = await window.axios.post('/bioimpedance/knowledge-documents', {
 					title: form.title,
 					document_type: form.document_type,
+					manufacturer: form.document_type === 'manufacturer_manual' ? form.manufacturer : null,
+					device_model: form.document_type === 'manufacturer_manual' ? form.device_model : null,
 					version: form.version,
 					source_url: form.source_url || null,
 					chunks: [{ section: form.section, content: form.content, language: 'pt-BR', tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean) }],
@@ -75,8 +77,9 @@ export default function KnowledgeDocumentsPanel() {
 			<form onSubmit={create} className="mt-4 grid gap-3 md:grid-cols-2">
 				<label className="text-sm font-semibold text-slate-700">Título<input required maxLength={255} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className={inputClass()} /></label>
 				<label className="text-sm font-semibold text-slate-700">Versão<input required maxLength={64} value={form.version} onChange={(event) => setForm({ ...form, version: event.target.value })} className={inputClass()} /></label>
-				<label className="text-sm font-semibold text-slate-700">Tipo<select value={form.document_type} onChange={(event) => setForm({ ...form, document_type: event.target.value })} className={inputClass()}><option value="clinical_reference">Referência clínica</option><option value="manufacturer_manual">Manual do fabricante</option><option value="clinic_protocol">Protocolo da clínica</option></select></label>
+				<label className="text-sm font-semibold text-slate-700">Tipo<select value={form.document_type} onChange={(event) => setForm({ ...form, document_type: event.target.value, manufacturer: '', device_model: '' })} className={inputClass()}><option value="clinical_reference">Referência clínica</option><option value="manufacturer_manual">Manual do fabricante</option><option value="clinic_protocol">Protocolo da clínica</option></select></label>
 				<label className="text-sm font-semibold text-slate-700">URL da fonte<input type="url" value={form.source_url} onChange={(event) => setForm({ ...form, source_url: event.target.value })} className={inputClass()} /></label>
+				{form.document_type === 'manufacturer_manual' ? <><label className="text-sm font-semibold text-slate-700">Fabricante<input required maxLength={100} value={form.manufacturer} onChange={(event) => setForm({ ...form, manufacturer: event.target.value })} className={inputClass()} /></label><label className="text-sm font-semibold text-slate-700">Equipamento<select required value={form.device_model} onChange={(event) => setForm({ ...form, device_model: event.target.value })} className={inputClass()}><option value="">Selecione</option><option value="HBF-514C">Omron HBF-514C</option><option value="Relaxmedic">Relaxmedic</option><option value="Bodyscan Pro">Bodyscan Pro</option></select></label></> : null}
 				<label className="text-sm font-semibold text-slate-700 md:col-span-2">Seção<input required maxLength={255} value={form.section} onChange={(event) => setForm({ ...form, section: event.target.value })} className={inputClass()} /></label>
 				<label className="text-sm font-semibold text-slate-700 md:col-span-2">Conteúdo da referência<textarea required minLength={30} maxLength={10000} rows="5" value={form.content} onChange={(event) => setForm({ ...form, content: event.target.value })} className={inputClass()} /></label>
 				<label className="text-sm font-semibold text-slate-700 md:col-span-2">Tags, separadas por vírgula<input value={form.tags} onChange={(event) => setForm({ ...form, tags: event.target.value })} className={inputClass()} /></label>

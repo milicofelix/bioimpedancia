@@ -20,10 +20,15 @@ import useActionLock from '../hooks/useActionLock';
 import CareGuidanceAssistant from '../pwa/features/assistant/CareGuidanceAssistant';
 import KnowledgeDocumentsPanel from '../components/bioimpedance/KnowledgeDocumentsPanel';
 import BodyscanReview from '../pwa/features/assessment/BodyscanReview';
-import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocolComplete, emptyBodyscanProtocol, updateBodyscanSegment } from '../pwa/features/assessment/bodyscanAssessmentForm';
+import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocolComplete, emptyBodyscanProtocol, updateBodyscanImpedance, updateBodyscanSegment } from '../pwa/features/assessment/bodyscanAssessmentForm';
 import BodyscanProtocolChecklist from '../pwa/features/assessment/BodyscanProtocolChecklist';
+import BodyscanReportFormatGuide from '../pwa/features/assessment/BodyscanReportFormatGuide';
 import VitaScanBrand from '../components/brand/VitaScanBrand';
 import ScreeningInvitationPanel from '../pwa/features/clients/ScreeningInvitationPanel';
+import ClientModuleSummary from '../shared/ClientModuleSummary';
+import ClientWorkspaceTabs from '../shared/ClientWorkspaceTabs';
+import ClientAssessmentHeader from '../shared/ClientAssessmentHeader';
+import { clinicModules } from '../shared/clinicModules';
 
 const emptyClient = {
 	full_name: '',
@@ -83,6 +88,9 @@ const defaultClinic = {
 	footer_text: 'Vita Scan Análise clínica Biológica - Avaliação corporal e acompanhamento estético',
 	technical_notice: 'Os resultados de bioimpedância são estimativas e podem variar conforme hidratação, alimentação, ciclo hormonal, medicamentos e condições de medição. Este documento não substitui avaliação médica ou nutricional.',
 	scale_model: 'relaxmedic_bodyscan_pro',
+	assessment_module_enabled: true,
+	screening_module_enabled: true,
+	reports_module_enabled: true,
 };
 
 const emptyUserForm = {
@@ -118,29 +126,6 @@ const evolutionPeriods = [
 	{ key: '90', label: '90 dias', days: 90 },
 	{ key: '180', label: '180 dias', days: 180 },
 	{ key: 'all', label: 'Tudo', days: null },
-];
-
-const observationLoadingSteps = [
-	{
-		title: 'Preparando avaliação',
-		description: 'Organizando dados do cliente, snapshot de idade, sexo e resultados da Omron.',
-	},
-	{
-		title: 'Buscando referências',
-		description: 'Selecionando manual, protocolo e fontes aprovadas para esta avaliação.',
-	},
-	{
-		title: 'Gerando sugestão',
-		description: 'Consultando o assistente configurado e preservando as classificações oficiais.',
-	},
-	{
-		title: 'Validando segurança',
-		description: 'Conferindo fontes, linguagem permitida e possíveis inconsistências.',
-	},
-	{
-		title: 'Montando observação',
-		description: 'Preparando o texto para revisão e aprovação do profissional.',
-	},
 ];
 
 function Field({ label, children }) {
@@ -487,9 +472,11 @@ function clinicFormFromClinic(clinic) {
 export default function DashboardPage({ userName }) {
 	const runAction = useActionLock();
 	const assessmentSectionRef = useRef(null);
+	const clientModulesRef = useRef(null);
 	const relaxmedicImageInputRef = useRef(null);
 	const imagePreviewUrlRef = useRef('');
 	const [clients, setClients] = useState([]);
+	const [clientWorkspaceTab, setClientWorkspaceTab] = useState('assessment');
 	const [clinic, setClinic] = useState(defaultClinic);
 	const [clinicForm, setClinicForm] = useState(defaultClinic);
 	const [currentUser, setCurrentUser] = useState(null);
@@ -518,7 +505,6 @@ export default function DashboardPage({ userName }) {
 	const [generatingObservation, setGeneratingObservation] = useState(false);
 	const [approvingObservation, setApprovingObservation] = useState(false);
 	const [revokingShareId, setRevokingShareId] = useState(null);
-	const [observationLoadingStep, setObservationLoadingStep] = useState(0);
 	const [observationAssistant, setObservationAssistant] = useState(null);
 	const [observationDraft, setObservationDraft] = useState('');
 	const [refreshingDashboard, setRefreshingDashboard] = useState(false);
@@ -549,19 +535,6 @@ export default function DashboardPage({ userName }) {
 			setSelectedAssessmentId(data.clients[0]?.assessments?.[0]?.id ?? null);
 		}).finally(() => setLoading(false));
 	}, []);
-
-	useEffect(() => {
-		if (!generatingObservation) {
-			setObservationLoadingStep(0);
-			return undefined;
-		}
-
-		const interval = window.setInterval(() => {
-			setObservationLoadingStep((current) => Math.min(current + 1, observationLoadingSteps.length - 1));
-		}, 1400);
-
-		return () => window.clearInterval(interval);
-	}, [generatingObservation]);
 
 	useEffect(() => {
 		const updateConnectionStatus = () => setIsOnline(navigator.onLine);
@@ -691,6 +664,19 @@ export default function DashboardPage({ userName }) {
 	const canCreateClinicalRecords = ['admin', 'professional', 'reception'].includes(currentUser?.role);
 	const canClinicalProfessional = ['admin', 'professional'].includes(currentUser?.role);
 	const canCreateCurrentAssessment = isImageAssessment ? canClinicalProfessional : canCreateClinicalRecords;
+	const enabledModules = clinicModules(clinic);
+
+	useEffect(() => {
+		if (clientWorkspaceTab === 'assessment' && !enabledModules.assessment) {
+			setClientWorkspaceTab(enabledModules.reports ? 'reports' : enabledModules.screening ? 'screenings' : 'assessment');
+		}
+		if (clientWorkspaceTab === 'screenings' && !enabledModules.screening) {
+			setClientWorkspaceTab(enabledModules.assessment ? 'assessment' : enabledModules.reports ? 'reports' : 'screenings');
+		}
+		if (clientWorkspaceTab === 'reports' && !enabledModules.reports) {
+			setClientWorkspaceTab(enabledModules.assessment ? 'assessment' : enabledModules.screening ? 'screenings' : 'reports');
+		}
+	}, [clientWorkspaceTab, enabledModules.assessment, enabledModules.screening, enabledModules.reports]);
 
 	async function handleLogout() {
 		await logout();
@@ -738,6 +724,7 @@ export default function DashboardPage({ userName }) {
 	}
 
 	function selectClient(client) {
+		setClientWorkspaceTab('assessment');
 		setSelectedClientId(client.id);
 		setSelectedAssessmentId(client.assessments?.[0]?.id ?? null);
 		setShareResult(null);
@@ -748,7 +735,7 @@ export default function DashboardPage({ userName }) {
 		setAssessmentForm({ ...emptyAssessment, evaluated_at: localDatetimeNow() });
 		setAssessmentChangeReason('');
 		clearRelaxmedicImage();
-		window.setTimeout(() => assessmentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+		window.setTimeout(() => clientModulesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
 	}
 
 	function selectClientById(clientId) {
@@ -766,6 +753,7 @@ export default function DashboardPage({ userName }) {
 	}
 
 	function startNewAssessment() {
+		setClientWorkspaceTab('assessment');
 		setAssessmentMode('create');
 		setEditingAssessmentId(null);
 		setShareResult(null);
@@ -776,6 +764,28 @@ export default function DashboardPage({ userName }) {
 		setAssessmentDraftSavedAt(null);
 		setErrors({});
 		clearRelaxmedicImage();
+		window.setTimeout(() => assessmentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+	}
+
+	function openLatestClientReport() {
+		const latestAssessment = [...(selectedClient?.assessments ?? [])]
+			.filter((assessment) => !assessment.is_canceled)
+			.sort((left, right) => new Date(right.evaluated_at) - new Date(left.evaluated_at))[0];
+		if (!latestAssessment) return;
+
+		setClientWorkspaceTab('reports');
+		selectAssessment(latestAssessment.id);
+		window.setTimeout(() => document.getElementById('relatorio')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+	}
+
+	function openClientScreenings() {
+		setClientWorkspaceTab('screenings');
+		window.setTimeout(() => document.getElementById('client-panel-screenings')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+	}
+
+	function openClientEvolution() {
+		setClientWorkspaceTab('assessment');
+		window.setTimeout(() => document.getElementById('client-assessment-evolution')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
 	}
 
 	function clearRelaxmedicImage() {
@@ -869,6 +879,12 @@ export default function DashboardPage({ userName }) {
 		setBodyscanForm((current) => ({ ...current, segments: updateBodyscanSegment(current.segments, index, field, value) }));
 		setRelaxmedicReviewConfirmed(false);
 		setErrors({});
+	}
+
+	function updateBodyscanImpedanceField(index, field, value) {
+		setRelaxmedicReviewConfirmed(false);
+		setErrors({});
+		setBodyscanForm((current) => ({ ...current, impedanceReadings: updateBodyscanImpedance(current.impedanceReadings ?? [], index, field, value) }));
 	}
 
 	function updateBodyscanProfile(field, value) {
@@ -1129,6 +1145,7 @@ export default function DashboardPage({ userName }) {
 			}
 			setAssessmentDraftSavedAt(null);
 			startNewAssessment();
+			if (enabledModules.reports) setClientWorkspaceTab('reports');
 			window.setTimeout(() => document.getElementById('relatorio')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
 		} catch (error) {
 			setErrors(error.response?.data?.errors ?? {});
@@ -1183,11 +1200,9 @@ export default function DashboardPage({ userName }) {
 	async function generateObservationSuggestion() {
 		if (!selectedAssessment || !canClinicalProfessional || generatingObservation) return;
 
-		setObservationLoadingStep(0);
 		setGeneratingObservation(true);
 		try {
 			const { data } = await window.axios.get(`/bioimpedance/assessments/${selectedAssessment.id}/observation-suggestion`);
-			setObservationLoadingStep(observationLoadingSteps.length - 1);
 			setObservationAssistant(data.assistant);
 			setObservationDraft(data.assistant?.suggestion ?? '');
 		} finally {
@@ -1266,10 +1281,10 @@ export default function DashboardPage({ userName }) {
 			</header>
 
 			<nav className="no-print sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur lg:hidden">
-				<div className="grid grid-cols-3 gap-2">
+				<div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${1 + Number(enabledModules.assessment) + Number(enabledModules.reports)}, minmax(0, 1fr))` }}>
 					<a href="#clientes" className="rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-bold text-slate-700">Clientes</a>
-					<a href="#avaliacao" className="rounded-xl border border-emerald-200 px-3 py-2 text-center text-xs font-bold text-emerald-700">Avaliação</a>
-					<a href="#relatorio" className="rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-bold text-slate-700">Relatório</a>
+					{enabledModules.assessment ? <a href="#avaliacao" onClick={() => setClientWorkspaceTab('assessment')} className="rounded-xl border border-emerald-200 px-3 py-2 text-center text-xs font-bold text-emerald-700">Avaliação</a> : null}
+					{enabledModules.reports ? <a href="#relatorio" onClick={() => setClientWorkspaceTab('reports')} className="rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-bold text-slate-700">Relatório</a> : null}
 				</div>
 			</nav>
 
@@ -1400,6 +1415,22 @@ export default function DashboardPage({ userName }) {
 							</div>
 						</div>
 						<form onSubmit={(event) => runAction('save-clinic', () => submitClinic(event))} className="mt-4 space-y-3">
+							<fieldset className="rounded-xl border border-teal-200 bg-teal-50/60 p-3">
+								<legend className="px-1 text-xs font-bold uppercase tracking-wide text-teal-800">Módulos disponíveis</legend>
+								<p className="mb-3 text-xs leading-5 text-slate-600">A seleção controla o painel e a área operacional/PWA. A configuração permanece disponível somente aqui para administradores.</p>
+								<div className="space-y-2">
+									{[
+										['assessment_module_enabled', 'Avaliação corporal'],
+										['screening_module_enabled', 'Triagens'],
+										['reports_module_enabled', 'Relatórios corporais'],
+									].map(([field, label]) => (
+										<label key={field} className="flex min-h-11 items-center gap-3 rounded-lg bg-white px-3 text-sm font-semibold text-slate-800 ring-1 ring-slate-200">
+											<input type="checkbox" checked={Boolean(clinicForm[field])} onChange={(event) => updateClinic(field, event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500" />
+											<span>{label}</span>
+										</label>
+									))}
+								</div>
+							</fieldset>
 							<Field label="Modelo da balança">
 								<select value={clinicForm.scale_model} onChange={(event) => updateClinic('scale_model', event.target.value)} className={inputClass()}>
 									<option value="relaxmedic_bodyscan_pro">Bodyscan Pro (padrão)</option>
@@ -1463,7 +1494,7 @@ export default function DashboardPage({ userName }) {
 							</Field>
 							{Object.keys(clinicErrors).length ? (
 								<div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-									Confira os dados da clínica antes de salvar.
+									{clinicErrors.modules?.[0] ?? 'Confira os dados da clínica antes de salvar.'}
 								</div>
 							) : null}
 							<button type="submit" disabled={savingClinic} aria-busy={savingClinic} className="w-full rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
@@ -1561,10 +1592,31 @@ export default function DashboardPage({ userName }) {
 
 					{selectedClient ? (
 						<>
+						<div ref={clientModulesRef} className="scroll-mt-20">
+							<ClientModuleSummary
+								client={selectedClient}
+								canStartAssessment={canCreateCurrentAssessment}
+								canAccessScreenings={canClinicalProfessional}
+								enabledModules={enabledModules}
+								onStartAssessment={startNewAssessment}
+								onOpenScreenings={openClientScreenings}
+								onOpenReports={openLatestClientReport}
+							/>
+						</div>
+						<ClientWorkspaceTabs activeTab={clientWorkspaceTab} onChange={setClientWorkspaceTab} enabledModules={enabledModules} includeReports />
+						<div id="client-panel-assessment" role="tabpanel" aria-labelledby="client-tab-assessment" className={enabledModules.assessment && clientWorkspaceTab === 'assessment' ? 'contents' : 'hidden'}>
+						<ClientAssessmentHeader
+							assessmentCount={selectedClient.assessments?.length ?? 0}
+							canStartAssessment={canCreateCurrentAssessment}
+							hasReport={enabledModules.reports && Boolean(selectedClient.assessments?.some((assessment) => !assessment.is_canceled))}
+							onStartAssessment={startNewAssessment}
+							onOpenEvolution={openClientEvolution}
+							onOpenReport={openLatestClientReport}
+						/>
 						<div className="no-print rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
 							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 								<div>
-									<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Histórico de avaliações</p>
+									<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Histórico de bioimpedância</p>
 									<h2 className="mt-1 text-lg font-semibold text-slate-950">{selectedClient.assessments?.length ?? 0} registro(s)</h2>
 								</div>
 								<button type="button" disabled={!canCreateCurrentAssessment} onClick={startNewAssessment} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
@@ -1590,26 +1642,33 @@ export default function DashboardPage({ userName }) {
 								))}
 							</div>
 							{selectedAssessment ? (
-								<div className="mt-4 flex flex-wrap gap-2">
-									<button type="button" disabled={!canCreateClinicalRecords} onClick={() => duplicateAssessment(selectedAssessment)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50">
+								<div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+									<p className="text-xs font-bold uppercase tracking-wide text-slate-500">Ações da avaliação selecionada</p>
+									<div className="mt-2 flex flex-wrap gap-2">
+									<button type="button" disabled={!canCreateClinicalRecords} onClick={() => duplicateAssessment(selectedAssessment)} className="min-h-11 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
 										Duplicar como base
 									</button>
-									<button type="button" disabled={!canClinicalProfessional || selectedAssessment.is_canceled} onClick={() => startEditAssessment(selectedAssessment)} className="rounded-xl border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50">
+									<button type="button" disabled={!canClinicalProfessional || selectedAssessment.is_canceled} onClick={() => startEditAssessment(selectedAssessment)} className="min-h-11 w-full rounded-xl border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
 										Corrigir avaliação
 									</button>
-									<button type="button" disabled={!canClinicalProfessional || selectedAssessment.is_canceled} onClick={() => runAction(`cancel-assessment-${selectedAssessment.id}`, () => cancelAssessment(selectedAssessment))} className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
+									<button type="button" disabled={!canClinicalProfessional || selectedAssessment.is_canceled} onClick={() => runAction(`cancel-assessment-${selectedAssessment.id}`, () => cancelAssessment(selectedAssessment))} className="min-h-11 w-full rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
 										Cancelar avaliação
 									</button>
-									{canAdmin ? (
-										<>
-											<button type="button" onClick={() => exportClientPrivacyData(selectedClient)} className="rounded-xl border border-sky-200 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50">
-												Exportar dados LGPD
-											</button>
-											<button type="button" disabled={selectedClient.is_anonymized} onClick={() => runAction(`anonymize-client-${selectedClient.id}`, () => anonymizeClient(selectedClient))} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50">
-												Anonimizar cliente
-											</button>
-										</>
-									) : null}
+									</div>
+								</div>
+							) : null}
+							{canAdmin ? (
+								<div className="mt-4 rounded-xl border border-sky-100 bg-sky-50/60 p-3">
+									<p className="text-xs font-bold uppercase tracking-wide text-sky-700">Privacidade e dados do cliente</p>
+									<p className="mt-1 text-xs text-slate-600">Estas ações pertencem ao cadastro do cliente e não alteram a avaliação selecionada.</p>
+									<div className="mt-2 flex flex-wrap gap-2">
+										<button type="button" onClick={() => exportClientPrivacyData(selectedClient)} className="min-h-11 w-full rounded-xl border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50 sm:w-auto">
+											Exportar dados LGPD
+										</button>
+										<button type="button" disabled={selectedClient.is_anonymized} onClick={() => runAction(`anonymize-client-${selectedClient.id}`, () => anonymizeClient(selectedClient))} className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
+											Anonimizar cliente
+										</button>
+									</div>
 								</div>
 							) : null}
 							<AssessmentDetails assessment={selectedAssessment} previousAssessment={previousSegmentalAssessment} />
@@ -1720,22 +1779,23 @@ export default function DashboardPage({ userName }) {
 								</div>
 							) : null}
 						</div>
-						{selectedClient.is_active && !selectedClient.is_anonymized ? (
-							['admin', 'professional'].includes(currentUser?.role) ? (
-								<ScreeningInvitationPanel client={selectedClient} />
+						</div>
+						<div id="client-panel-screenings" role="tabpanel" aria-labelledby="client-tab-screenings" className={enabledModules.screening && clientWorkspaceTab === 'screenings' ? '' : 'hidden'}>
+							{['admin', 'professional'].includes(currentUser?.role) ? (
+								<ScreeningInvitationPanel client={selectedClient} canCreateInvitation={selectedClient.is_active && !selectedClient.is_anonymized} creationUnavailableReason={selectedClient.is_anonymized ? 'Cliente anonimizado não pode receber novas triagens. Os dados remanescentes seguem as regras de retenção e auditoria.' : 'Cliente inativo não pode receber novas triagens. O histórico permanece disponível para consulta.'} />
 							) : (
 								<div className="no-print rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-									<strong>Questionário de triagem indisponível para este perfil.</strong>
-									<p className="mt-1">Somente contas de administrador ou profissional podem criar e acompanhar aplicações.</p>
+									<strong>Triagens indisponíveis para este perfil.</strong>
+									<p className="mt-1">É necessário usar uma conta de administrador ou profissional para consultar e administrar triagens.</p>
 								</div>
-							)
-						) : null}
+							)}
+						</div>
 						</>
 					) : null}
 
-					<EvolutionPanel client={selectedClient} selectedAssessment={selectedAssessment} />
+					{enabledModules.assessment && clientWorkspaceTab === 'assessment' ? <div id="client-assessment-evolution" className="scroll-mt-20"><EvolutionPanel client={selectedClient} selectedAssessment={selectedAssessment} /></div> : null}
 
-						<div id="avaliacao" ref={assessmentSectionRef} className="no-print scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+						<div id="avaliacao" ref={assessmentSectionRef} className={`no-print scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${enabledModules.assessment && clientWorkspaceTab === 'assessment' ? '' : 'hidden'}`}>
 							<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 								<div>
 									<p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">{assessmentMode === 'edit' ? 'Corrigir avaliação' : 'Registrar nova avaliação'}</p>
@@ -1744,7 +1804,7 @@ export default function DashboardPage({ userName }) {
 										{assessmentMode === 'edit'
 											? 'A correção exige justificativa e gera auditoria.'
 											: isImageAssessment
-												? `Envie o relatório completo gerado pelo aplicativo ${isBodyscanAssessment ? 'Bodyscan Pro/RelaxFit' : 'Relaxmedic'}.`
+												? `Envie o relatório gerado pelo aplicativo ${isBodyscanAssessment ? 'Fitdays ou RelaxFit' : 'Relaxmedic'}.`
 												: 'Digite os valores exibidos na balança Omron antiga após a pesagem.'}
 									</p>
 								</div>
@@ -1763,6 +1823,7 @@ export default function DashboardPage({ userName }) {
 
 						{isImageAssessment ? (
 							<div className="mt-5 space-y-4">
+				{isBodyscanAssessment && !relaxmedicExtraction ? <BodyscanReportFormatGuide /> : null}
 				{isBodyscanAssessment && !relaxmedicExtraction ? <BodyscanProtocolChecklist value={bodyscanForm.protocol} onChange={updateBodyscanProtocol} disabled={processingRelaxmedicImage} /> : null}
 				{isBodyscanAssessment ? <BodyscanDesktopProgress current={relaxmedicExtraction ? 4 : bodyscanProgressStep} /> : null}
 				<div className={`block rounded-2xl border-2 border-dashed p-5 transition ${relaxmedicImageError ? 'border-rose-300 bg-rose-50' : 'border-sky-200 bg-sky-50/60 hover:border-sky-300'}`}>
@@ -1821,6 +1882,7 @@ export default function DashboardPage({ userName }) {
 										onGeneralUpdate={updateBodyscanGeneral}
 										onProfileUpdate={updateBodyscanProfile}
 										onSegmentUpdate={updateBodyscanSegmentField}
+										onImpedanceUpdate={updateBodyscanImpedanceField}
 										onConfirm={setRelaxmedicReviewConfirmed}
 										onSubmit={(event) => runAction('save-assessment', () => submitAssessment(event))}
 										onRestart={clearRelaxmedicImage}
@@ -1904,7 +1966,7 @@ export default function DashboardPage({ userName }) {
 						)}
 					</div>
 
-					<div id="relatorio" className="scroll-mt-20">
+					<div id="relatorio" role="tabpanel" aria-labelledby="client-tab-reports" className={`scroll-mt-20 ${enabledModules.reports && clientWorkspaceTab === 'reports' ? '' : 'hidden'}`}>
 						<Report clinic={clinic} client={selectedClient} assessment={selectedAssessment} professional={userName} />
 					</div>
 				</section>
@@ -1918,31 +1980,14 @@ export default function DashboardPage({ userName }) {
 							</div>
 							<div>
 								<p className="text-xs font-bold uppercase tracking-wide text-violet-700">Assistente inteligente</p>
-								<h2 id="assistant-loading-title" className="mt-1 text-lg font-bold text-slate-950">{observationLoadingSteps[observationLoadingStep]?.title}</h2>
-								<p className="mt-2 text-sm leading-6 text-slate-600">{observationLoadingSteps[observationLoadingStep]?.description}</p>
+								<h2 id="assistant-loading-title" className="mt-1 text-lg font-bold text-slate-950">Gerando observação para revisão</h2>
+								<p className="mt-2 text-sm leading-6 text-slate-600">O servidor está consultando as fontes, gerando o texto e validando a segurança da resposta.</p>
 							</div>
 						</div>
 
-						<div className="mt-5 space-y-3">
-							{observationLoadingSteps.map((step, index) => {
-								const isDone = index < observationLoadingStep;
-								const isCurrent = index === observationLoadingStep;
-
-								return (
-									<div key={step.title} className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isCurrent ? 'border-violet-200 bg-violet-50' : 'border-slate-100 bg-slate-50'}`}>
-										<span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${isDone ? 'bg-emerald-500 text-white' : isCurrent ? 'bg-violet-600 text-white' : 'bg-white text-slate-400'}`}>
-											{isDone ? '✓' : index + 1}
-										</span>
-										<div>
-											<p className={`text-sm font-semibold ${isCurrent ? 'text-violet-900' : 'text-slate-700'}`}>{step.title}</p>
-											<p className="text-xs text-slate-500">{step.description}</p>
-										</div>
-									</div>
-								);
-							})}
-						</div>
-
-						<p className="mt-5 text-xs leading-5 text-slate-500">A sugestão será entregue para revisão. As classificações oficiais da HBF-514C continuam sendo calculadas somente pelo backend.</p>
+						<div className="mt-5 h-2 overflow-hidden rounded-full bg-violet-100" aria-hidden="true"><div className="h-full w-2/5 animate-pulse rounded-full bg-gradient-to-r from-violet-500 to-ricosty-500" /></div>
+						<p className="mt-3 text-xs font-semibold leading-5 text-violet-700">A conclusão será exibida somente quando o servidor responder. O tempo pode variar conforme o serviço de IA.</p>
+						<p className="mt-3 text-xs leading-5 text-slate-500">A sugestão será entregue para revisão. As classificações oficiais continuam sendo calculadas somente pelo backend.</p>
 					</div>
 				</div>
 			) : null}

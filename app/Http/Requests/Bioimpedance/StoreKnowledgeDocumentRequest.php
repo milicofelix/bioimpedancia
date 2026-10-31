@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Bioimpedance;
 
+use App\Domain\Bioimpedance\ScaleModel;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreKnowledgeDocumentRequest extends FormRequest
 {
@@ -15,9 +17,13 @@ class StoreKnowledgeDocumentRequest extends FormRequest
     {
         return [
             'title' => ['required', 'string', 'max:255'],
-            'document_type' => ['required', 'string', 'max:64'],
-            'manufacturer' => ['nullable', 'string', 'max:100'],
-            'device_model' => ['nullable', 'string', 'max:100'],
+            'document_type' => ['required', Rule::in(['clinical_reference', 'manufacturer_manual', 'clinic_protocol'])],
+            'manufacturer' => ['nullable', 'required_if:document_type,manufacturer_manual', 'string', 'max:100'],
+            'device_model' => ['nullable', 'required_if:document_type,manufacturer_manual', Rule::in([
+                ScaleModel::OMRON_NAME,
+                ScaleModel::RELAXMEDIC_NAME,
+                ScaleModel::BODYSCAN_PRO_NAME,
+            ])],
             'version' => ['required', 'string', 'max:64'],
             'source_url' => ['nullable', 'url', 'max:255'],
             'chunks' => ['required', 'array', 'min:1', 'max:50'],

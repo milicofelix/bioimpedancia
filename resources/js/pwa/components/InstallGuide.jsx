@@ -83,7 +83,7 @@ export default function InstallGuide() {
 				<button type="button" onClick={dismiss} aria-label="Fechar orientação de instalação" className="pwa-focus pwa-pressable flex h-11 w-11 items-center justify-center rounded-xl text-xl leading-none text-slate-500 hover:bg-ricosty-50">×</button>
 			</div>
 			<div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
-				<strong>Atenção:</strong> não instale a PWA em celular compartilhado. A instalação mantém acesso rápido à tela de login e pode expor a sessão se você permanecer conectado.
+				<strong>Atenção:</strong> não instale o aplicativo em celular compartilhado. A instalação mantém acesso rápido à tela de login e pode expor a sessão se você permanecer conectado.
 			</div>
 			<label className="mt-3 flex items-start gap-2 text-xs font-semibold leading-5 text-slate-700">
 				<input type="checkbox" checked={personalDeviceConfirmed} onChange={(event) => setPersonalDeviceConfirmed(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-rose-300 text-[#b96f7d]" />
