@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 360 640"
+     role="img"
+     aria-labelledby="vita-scan-body-title vita-scan-body-description">
+  <title id="vita-scan-body-title">Silhueta corporal frontal Vita Scan</title>
+  <desc id="vita-scan-body-description">Representação vetorial neutra com braços, tronco e pernas independentes para visualização segmentar.</desc>
+
+  <metadata>
+    {
+      "asset": "vita-scan-segmental-body-front",
+      "version": "1.0.0",
+      "viewBox": "0 0 360 640",
+      "orientation": "front",
+      "purpose": "non-diagnostic-segmental-visualization",
+      "anchors": {
+        "arm-left": { "x": 98, "y": 245 },
+        "arm-right": { "x": 262, "y": 245 },
+        "trunk-center": { "x": 180, "y": 270 },
+        "leg-left": { "x": 145, "y": 465 },
+        "leg-right": { "x": 215, "y": 465 }
+      }
+    }
+  </metadata>
+
+  <style>
+    .body-region {
+      fill: var(--vita-body-fill, #f4e4e8);
+      stroke: var(--vita-body-stroke, #934c60);
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+    }
+    .body-detail {
+      fill: none;
+      stroke: var(--vita-body-detail, #c98d9b);
+      stroke-width: 1.25;
+      stroke-linecap: round;
+      vector-effect: non-scaling-stroke;
+    }
+    .body-separator {
+      fill: none;
+      stroke: var(--vita-body-separator, #ffffff);
+      stroke-width: 3;
+      vector-effect: non-scaling-stroke;
+    }
+    .annotation-anchor {
+      fill: #000000;
+      opacity: 0;
+      pointer-events: none;
+    }
+    @media print {
+      .body-region {
+        fill: var(--vita-body-print-fill, #eeeeee);
+        stroke: var(--vita-body-print-stroke, #333333);
+      }
+      .body-detail {
+        stroke: var(--vita-body-print-detail, #777777);
+      }
+      .body-separator {
+        stroke: #ffffff;
+      }
+    }
+  </style>
+
+  <!-- Elementos neutros de contexto; não representam uma região mensurada. -->
+  <g id="body-context" aria-hidden="true">
+    <path class="body-region" d="M180 31 C148 31 130 54 132 82 C134 108 153 127 180 127 C207 127 226 108 228 82 C230 54 212 31 180 31 Z"/>
+    <path class="body-region" d="M160 119 C162 139 157 148 145 157 L215 157 C203 148 198 139 200 119 C188 128 172 128 160 119 Z"/>
+    <path class="body-detail" d="M151 78 C156 93 166 101 180 101 C194 101 204 93 209 78" opacity=".35"/>
+  </g>
+
+  <!-- Regiões independentes. Os IDs são o contrato visual para a integração. -->
+  <g id="segmental-regions">
+    <path id="region-trunk-center"
+          class="body-region"
+          data-region="trunk"
+          data-side="center"
+          d="M143 151 C154 143 166 141 180 141 C194 141 206 143 217 151 C225 180 231 211 230 245 C229 282 219 317 211 349 C201 358 191 362 180 362 C169 362 159 358 149 349 C141 317 131 282 130 245 C129 211 135 180 143 151 Z"/>
+
+    <path id="region-arm-left"
+          class="body-region"
+          data-region="arm"
+          data-side="left"
+          d="M141 154 C127 156 115 166 106 181 C94 201 88 225 83 252 L64 365 C61 385 66 402 77 405 C88 408 98 393 101 376 L119 278 C123 256 130 235 142 216 L153 182 C154 167 150 157 141 154 Z"/>
+
+    <path id="region-arm-right"
+          class="body-region"
+          data-region="arm"
+          data-side="right"
+          d="M219 154 C233 156 245 166 254 181 C266 201 272 225 277 252 L296 365 C299 385 294 402 283 405 C272 408 262 393 259 376 L241 278 C237 256 230 235 218 216 L207 182 C206 167 210 157 219 154 Z"/>
+
+    <path id="region-leg-left"
+          class="body-region"
+          data-region="leg"
+          data-side="left"
+          d="M149 345 C158 354 168 359 180 360 L177 409 C174 448 169 489 165 529 L161 592 C160 608 151 618 139 616 C127 614 124 602 127 586 L132 524 C132 486 128 448 129 412 C130 382 136 360 149 345 Z"/>
+
+    <path id="region-leg-right"
+          class="body-region"
+          data-region="leg"
+          data-side="right"
+          d="M211 345 C202 354 192 359 180 360 L183 409 C186 448 191 489 195 529 L199 592 C200 608 209 618 221 616 C233 614 236 602 233 586 L228 524 C228 486 232 448 231 412 C230 382 224 360 211 345 Z"/>
+  </g>
+
+  <!-- Separadores mantêm a leitura das regiões mesmo sem cor. -->
+  <g id="region-separators" aria-hidden="true">
+    <path class="body-separator" d="M143 153 C147 164 150 174 153 182"/>
+    <path class="body-separator" d="M217 153 C213 164 210 174 207 182"/>
+    <path class="body-separator" d="M149 349 C160 357 170 361 180 361 C190 361 200 357 211 349"/>
+    <path class="body-separator" d="M180 361 L180 410"/>
+  </g>
+
+  <!-- Detalhes anatômicos discretos, sem pretensão diagnóstica. -->
+  <g id="body-details" aria-hidden="true">
+    <path class="body-detail" d="M151 181 C160 188 170 192 180 192 C190 192 200 188 209 181"/>
+    <path class="body-detail" d="M142 251 C152 257 165 260 180 260 C195 260 208 257 218 251"/>
+    <path class="body-detail" d="M151 326 C161 330 170 332 180 332 C190 332 199 330 209 326"/>
+    <path class="body-detail" d="M82 251 C89 255 96 257 104 257"/>
+    <path class="body-detail" d="M256 257 C264 257 271 255 278 251"/>
+    <path class="body-detail" d="M130 484 C141 488 151 489 167 487"/>
+    <path class="body-detail" d="M193 487 C209 489 219 488 230 484"/>
+  </g>
+
+  <!-- Pontos invisíveis para linhas e rótulos da camada de apresentação. -->
+  <g id="annotation-anchors" aria-hidden="true">
+    <circle id="anchor-arm-left" class="annotation-anchor" data-region="arm" data-side="left" cx="98" cy="245" r="5"/>
+    <circle id="anchor-arm-right" class="annotation-anchor" data-region="arm" data-side="right" cx="262" cy="245" r="5"/>
+    <circle id="anchor-trunk-center" class="annotation-anchor" data-region="trunk" data-side="center" cx="180" cy="270" r="5"/>
+    <circle id="anchor-leg-left" class="annotation-anchor" data-region="leg" data-side="left" cx="145" cy="465" r="5"/>
+    <circle id="anchor-leg-right" class="annotation-anchor" data-region="leg" data-side="right" cx="215" cy="465" r="5"/>
+  </g>
+</svg>
