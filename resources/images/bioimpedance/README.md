@@ -35,6 +35,8 @@ O grupo `annotation-anchors` contém pontos invisíveis para conectar linhas e t
 
 As mesmas coordenadas estão registradas no bloco `metadata` do SVG.
 
+Na interface React, o contrato de regiões, coordenadas, estados, paleta e marcadores laterais fica centralizado em `resources/js/components/bioimpedance/segmentalBodyVisual.js`. O componente `SegmentalBodyFigure.jsx` referencia os caminhos deste SVG; ele não mantém uma segunda cópia da geometria corporal.
+
 ### Personalização
 
 O ativo aceita as seguintes propriedades CSS, todas com valores de fallback:
