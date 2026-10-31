@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
 
 class BioimpedanceObservationAssistant
 {
-    public const PROMPT_VERSION = 'rag-client-1.3.0';
+    public const PROMPT_VERSION = 'rag-client-1.3.1';
 
     public const MODEL_NAME = 'local-validated-rag-agent';
 
@@ -476,15 +476,19 @@ PROMPT;
             ...$chunks->pluck('chunk_key')->all(),
             ...($context['evidence_ids'] ?? []),
         ];
-        $text = Str::lower(json_encode($response, JSON_UNESCAPED_UNICODE));
+        $text = $this->responseTextForValidation($response);
 
         foreach ([
-            'diagnóstico', 'diagnostico', 'prescrevo', 'prescrição', 'medicamento', 'suplemento obrigatório', 'dieta de',
+            'diagnóstico de', 'diagnostico de', 'diagnosticado com', 'diagnosticada com',
+            'confirma o diagnóstico', 'confirma o diagnostico', 'indica diagnóstico', 'indica diagnostico',
+            'prescrevo', 'prescrição de', 'prescricao de', 'tome ', 'dose de', 'mg por',
+            'medicamento indicado', 'medicamento recomendado', 'suplemento obrigatório', 'siga a dieta',
             'perda muscular confirmada', 'apresenta perda muscular', 'assimetria clínica identificada',
             'apresenta assimetria clínica', 'comprova função muscular preservada', 'confirma musculatura preservada',
             'diagnóstico pelo whr', 'diagnóstico com base no whr', 'sarcopenia confirmada', 'apresenta sarcopenia',
             'sua idade biológica real é', 'idade biológica real confirmada', 'peso ideal prescrito pelo aplicativo',
-            'seu peso ideal é', 'pontuação corporal', 'whr indica', 'whr demonstra',
+            'seu peso ideal é', 'pontuação corporal indica', 'pontuação corporal demonstra',
+            'pontuação corporal confirma', 'whr indica', 'whr demonstra',
         ] as $forbidden) {
             if (str_contains($text, $forbidden)) {
                 $errors[] = 'Conteúdo proibido detectado: '.$forbidden;
@@ -545,6 +549,22 @@ PROMPT;
         }
 
         return array_values(array_unique($errors));
+    }
+
+    private function responseTextForValidation(array $response): string
+    {
+        $userFacingText = collect([
+            $response['summary'] ?? null,
+            $response['professional_observation'] ?? null,
+            ...collect(['positive_points', 'attention_points', 'general_guidance'])
+                ->flatMap(fn (string $section) => collect($response[$section] ?? [])
+                    ->pluck('text'))
+                ->all(),
+        ])
+            ->filter(fn ($value) => is_string($value) && filled($value))
+            ->implode("\n");
+
+        return Str::lower($userFacingText);
     }
 
     private function retrieveApprovedChunks(array $context): Collection
