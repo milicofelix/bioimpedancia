@@ -1,7 +1,7 @@
 <section class="report-section">
     @include('bioimpedance.partials.report-header', ['pageTitle' => 'Impedância bioelétrica', 'pageNumber' => $pageNumber, 'totalSections' => $totalSections])
     <div class="content">
-        <div class="notice"><strong>Tabela técnica do equipamento.</strong> Valores em ohms preservados conforme o relatório Fitdays. Servem para rastreabilidade e comparação técnica e não geram diagnóstico.</div>
+        <div class="notice"><strong>Tabela técnica do equipamento.</strong> Valores em ohms preservados conforme a medição de origem. Servem para comparação técnica e não geram diagnóstico.</div>
         <table class="segmental-comparison">
             <caption>Leituras segmentares por frequência e região. Lados seguem a identificação impressa no relatório de origem.</caption>
             <thead><tr><th>Frequência</th><th>Braço direito</th><th>Braço esquerdo</th><th>Tronco</th><th>Perna direita</th><th>Perna esquerda</th></tr></thead>

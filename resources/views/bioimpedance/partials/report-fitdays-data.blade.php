@@ -1,13 +1,13 @@
 <section class="report-section">
-    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Dados apresentados pelo Fitdays', 'pageNumber' => $pageNumber, 'totalSections' => $totalSections])
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Indicadores complementares', 'pageNumber' => $pageNumber, 'totalSections' => $totalSections])
     <div class="content">
-        <div class="notice"><strong>Origem dos dados.</strong> Os valores, faixas e classificações desta página foram apresentados pelo Fitdays e são preservados como referências proprietárias do aplicativo. A interpretação profissional Vita Scan considera histórico, condições da medição e contexto individual e pode não coincidir com a avaliação automática do aplicativo.</div>
+        <div class="notice"><strong>Como interpretar.</strong> Os valores, faixas e classificações desta página são estimativas apresentadas pelo equipamento. A interpretação profissional considera histórico, condições da medição e contexto individual.</div>
 
         @if($extendedMetricsByCode->has('waist_hip_ratio') || $extendedMetricsByCode->has('asmi'))
             <div class="section-title" style="color: {{ $secondaryColor }};">Índices do equipamento</div>
             <table class="grid"><tr>
                 @if($extendedMetricsByCode->has('waist_hip_ratio'))
-                    <td class="box" style="width: 50%;"><div class="label">WHR · relação cintura-quadril</div><div class="metric-small">{{ $extendedMetricDisplayValue($extendedMetricsByCode->get('waist_hip_ratio')) }}</div><div class="muted">Índice apresentado pelo Fitdays; não constitui diagnóstico isolado.</div></td>
+                    <td class="box" style="width: 50%;"><div class="label">WHR · relação cintura-quadril</div><div class="metric-small">{{ $extendedMetricDisplayValue($extendedMetricsByCode->get('waist_hip_ratio')) }}</div><div class="muted">Índice estimado pelo equipamento; não constitui diagnóstico isolado.</div></td>
                 @endif
                 @if($extendedMetricsByCode->has('asmi'))
                     <td class="box" style="width: 50%;"><div class="label">ASMI</div><div class="metric-small">{{ $extendedMetricDisplayValue($extendedMetricsByCode->get('asmi')) }}</div><div class="muted">Índice estimado pelo equipamento; não substitui avaliação clínica ou funcional.</div></td>
@@ -16,10 +16,10 @@
         @endif
 
         @if($fitdaysReferenceMetrics->isNotEmpty())
-            <div class="section-title" style="color: {{ $secondaryColor }};">Referências apresentadas pelo Fitdays</div>
+            <div class="section-title" style="color: {{ $secondaryColor }};">Referências apresentadas pelo equipamento</div>
             <table class="segmental-comparison">
                 <caption>Classificações e limites reproduzem os dados extraídos, sem conversão em diagnóstico clínico.</caption>
-                <thead><tr><th>Indicador</th><th>Valor apresentado</th><th>Classificação do aplicativo</th><th>Referência impressa</th></tr></thead>
+                <thead><tr><th>Indicador</th><th>Valor apresentado</th><th>Classificação apresentada</th><th>Referência informada</th></tr></thead>
                 <tbody>
                 @foreach($fitdaysReferenceMetrics as $metric)
                     @php
@@ -39,16 +39,16 @@
         @endif
 
         @if($fitdaysControlMetrics->isNotEmpty())
-            <div class="section-title" style="color: {{ $secondaryColor }};">Controle de peso informado pelo aplicativo</div>
+            <div class="section-title" style="color: {{ $secondaryColor }};">Referências de controle de peso</div>
             <table class="segmental-comparison">
                 <thead><tr><th>Item</th><th>Valor apresentado</th><th>Natureza</th></tr></thead>
                 <tbody>
                 @foreach($fitdaysControlMetrics as $metric)
-                    <tr><td><strong>{{ $metric['original_label'] }}</strong></td><td>{{ $extendedMetricDisplayValue($metric, 1) }}</td><td>Referência proprietária do Fitdays</td></tr>
+                    <tr><td><strong>{{ $metric['original_label'] }}</strong></td><td>{{ $extendedMetricDisplayValue($metric, 1) }}</td><td>Estimativa proprietária do equipamento</td></tr>
                 @endforeach
                 </tbody>
             </table>
-            <div class="notice"><strong>Ressalva importante.</strong> Peso-alvo e controles de peso, gordura ou músculo são sugestões proprietárias do aplicativo. Não equivalem a prescrição, meta terapêutica ou recomendação nutricional e devem ser avaliados pelo profissional responsável.</div>
+            <div class="notice"><strong>Ressalva importante.</strong> Peso-alvo e controles de peso, gordura ou músculo são estimativas do equipamento. Não equivalem a prescrição, meta terapêutica ou recomendação nutricional.</div>
         @endif
     </div>
 </section>
