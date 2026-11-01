@@ -26,8 +26,11 @@ export default function ClientDetails({ client, currentUser, scaleModel, enabled
 	const needsModuleChoice = enabledModuleCount > 1;
 	const opensSingleModuleDirectly = enabledModuleCount === 1 && (enabledModules.assessment || enabledModules.screening);
 	const [activeTab, setActiveTab] = useState(firstActiveTab);
+	const [showClientDetails, setShowClientDetails] = useState(false);
+	const clientDetailsId = `client-profile-details-${client.id}`;
 
 	useEffect(() => setActiveTab(firstActiveTab), [client.id, firstActiveTab]);
+	useEffect(() => setShowClientDetails(false), [client.id]);
 
 	function openScreenings() {
 		setActiveTab('screenings');
@@ -45,25 +48,40 @@ export default function ClientDetails({ client, currentUser, scaleModel, enabled
 						<div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[0.14em] text-ricosty-600">Cliente</p>
 						<h2 id="client-details-title" className="mt-1 break-words text-xl font-extrabold text-ricosty-ink">{client.full_name}</h2></div>
 					</div>
-					{client.is_anonymized ? (
-						<span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-bold uppercase text-amber-900">Anonimizado</span>
-					) : !client.is_active ? (
-						<span className="rounded-full bg-slate-200 px-2 py-1 text-[11px] font-bold uppercase text-slate-800">Inativo</span>
-					) : (
-						<span className="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-bold uppercase text-emerald-900">Ativo</span>
-					)}
+					<div className="flex shrink-0 flex-col items-end gap-1">
+						{client.is_anonymized ? (
+							<span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-bold uppercase text-amber-900">Anonimizado</span>
+						) : !client.is_active ? (
+							<span className="rounded-full bg-slate-200 px-2 py-1 text-[11px] font-bold uppercase text-slate-800">Inativo</span>
+						) : (
+							<span className="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-bold uppercase text-emerald-900">Ativo</span>
+						)}
+						<PwaButton
+							type="button"
+							variant="ghost"
+							aria-expanded={showClientDetails}
+							aria-controls={clientDetailsId}
+							onClick={() => setShowClientDetails((current) => !current)}
+							className="min-h-9 px-2 text-xs"
+						>
+							{showClientDetails ? 'Ocultar detalhes' : 'Ver detalhes'}
+							<PwaIcon name="chevronRight" size={15} className={`transition-transform ${showClientDetails ? 'rotate-90' : ''}`} />
+						</PwaButton>
+					</div>
 				</div>
 
-				<dl className="mt-5 grid gap-2 sm:grid-cols-2 text-sm">
-					{[['Idade', `${client.age ?? '-'} anos`], ['Sexo', sexLabels[client.biological_sex] ?? '-'], ['Altura', `${numberBr(client.height_cm, 0)} cm`], ['Nascimento', formatIssueDate(client.birth_date)]].map(([label, value]) => <div key={label} className="rounded-xl bg-ricosty-cream/70 p-3"><dt className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{label}</dt><dd className="mt-1 font-bold text-ricosty-ink">{value}</dd></div>)}
-				</dl>
+				{showClientDetails ? <div id={clientDetailsId} className="animate-[pwa-screen-enter_180ms_ease-out]">
+					<dl className="mt-5 grid gap-2 text-sm sm:grid-cols-2">
+						{[['Idade', `${client.age ?? '-'} anos`], ['Sexo', sexLabels[client.biological_sex] ?? '-'], ['Altura', `${numberBr(client.height_cm, 0)} cm`], ['Nascimento', formatIssueDate(client.birth_date)]].map(([label, value]) => <div key={label} className="rounded-xl bg-ricosty-cream/70 p-3"><dt className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{label}</dt><dd className="mt-1 font-bold text-ricosty-ink">{value}</dd></div>)}
+					</dl>
 
-				<div className="mt-4 space-y-2 border-t border-ricosty-100 pt-4 text-sm text-slate-600">
-					<p className="flex items-center gap-2"><PwaIcon name="phone" size={16} className="text-ricosty-500" /><strong className="sr-only">Telefone:</strong> {client.phone || '-'}</p>
-					<p className="flex items-center gap-2"><PwaIcon name="mail" size={16} className="text-ricosty-500" /><strong className="sr-only">E-mail:</strong> {client.email || '-'}</p>
-					{client.cpf ? <p><strong>CPF:</strong> {cpfMask(client.cpf)}</p> : null}
-					<p><strong>Próxima avaliação:</strong> {formatIssueDate(client.next_assessment_at)}</p>
-				</div>
+					<div className="mt-4 space-y-2 border-t border-ricosty-100 pt-4 text-sm text-slate-600">
+						<p className="flex items-center gap-2"><PwaIcon name="phone" size={16} className="text-ricosty-500" /><strong className="sr-only">Telefone:</strong> {client.phone || '-'}</p>
+						<p className="flex items-center gap-2"><PwaIcon name="mail" size={16} className="text-ricosty-500" /><strong className="sr-only">E-mail:</strong> {client.email || '-'}</p>
+						{client.cpf ? <p><strong>CPF:</strong> {cpfMask(client.cpf)}</p> : null}
+						<p><strong>Próxima avaliação:</strong> {formatIssueDate(client.next_assessment_at)}</p>
+					</div>
+				</div> : null}
 
 			</PwaCard>
 

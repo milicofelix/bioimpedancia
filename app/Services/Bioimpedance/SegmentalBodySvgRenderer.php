@@ -22,10 +22,10 @@ class SegmentalBodySvgRenderer
     ];
 
     private const STATES = [
-        'low' => ['color' => '#2563eb', 'fill' => '#dbeafe', 'muscle_fill' => '#93c5fd', 'dash' => '7 4'],
-        'standard' => ['color' => '#047857', 'fill' => '#d1fae5', 'muscle_fill' => '#6ee7b7', 'dash' => 'none'],
-        'high' => ['color' => '#be123c', 'fill' => '#ffe4e6', 'muscle_fill' => '#fda4af', 'dash' => '2 2'],
-        'unknown' => ['color' => '#475569', 'fill' => '#e2e8f0', 'muscle_fill' => '#cbd5e1', 'dash' => '10 4 2 4'],
+        'low' => ['dash' => '7 4'],
+        'standard' => ['dash' => 'none'],
+        'high' => ['dash' => '2 2'],
+        'unknown' => ['dash' => '10 4 2 4'],
     ];
 
     public function renderPair(array $measurements): array
@@ -43,24 +43,27 @@ class SegmentalBodySvgRenderer
             ->where('type', $type)
             ->keyBy(fn (array $measurement): string => ($measurement['region'] ?? '').'|'.($measurement['side'] ?? ''));
 
-        $styles = [];
+        $svg = preg_replace('/<style>.*?<\/style>/s', '', $svg) ?? $svg;
+        $svg = str_replace('class="body-region"', 'class="body-region" fill="#ffffff" stroke="#111827" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"', $svg);
+        $svg = str_replace('class="body-detail"', 'class="body-detail" fill="none" stroke="#6b7280" stroke-width="1.25" stroke-linecap="round"', $svg);
+        $svg = str_replace('class="body-separator"', 'class="body-separator" fill="none" stroke="#6b7280" stroke-width="1.2"', $svg);
+        $svg = str_replace('class="annotation-anchor"', 'class="annotation-anchor" fill="none" opacity="0"', $svg);
+
         foreach (self::REGIONS as $key => $pathId) {
             $measurement = $measurementsByRegion->get($key, []);
             $classification = $measurement['classification'] ?? 'unknown';
             $stateKey = array_key_exists($classification, self::STATES) ? $classification : 'unknown';
             $state = self::STATES[$stateKey];
-            $fill = $type === 'muscle' ? $state['muscle_fill'] : $state['fill'];
-            $dash = $state['dash'] === 'none' ? '' : "stroke-dasharray:{$state['dash']};";
-
-            $styles[] = "#{$pathId}{fill:{$fill}!important;stroke:{$state['color']}!important;{$dash}}";
+            if ($state['dash'] !== 'none') {
+                $svg = str_replace('id="'.$pathId.'"', 'id="'.$pathId.'" stroke-dasharray="'.$state['dash'].'"', $svg);
+            }
         }
 
         $presentation = '<g id="pdf-side-markers" aria-hidden="true">'
-            .'<text x="111" y="397" fill="#7f1d3f" font-family="DejaVu Sans, sans-serif" font-size="18" font-weight="700">L</text>'
-            .'<text x="241" y="397" fill="#7f1d3f" font-family="DejaVu Sans, sans-serif" font-size="18" font-weight="700">R</text>'
+            .'<text x="111" y="397" fill="#111827" font-family="DejaVu Sans, sans-serif" font-size="18" font-weight="700">L</text>'
+            .'<text x="241" y="397" fill="#111827" font-family="DejaVu Sans, sans-serif" font-size="18" font-weight="700">R</text>'
             .'</g>';
 
-        $svg = str_replace('</style>', implode('', $styles).'</style>', $svg);
         $svg = str_replace('</svg>', $presentation.'</svg>', $svg);
 
         return 'data:image/svg+xml;base64,'.base64_encode($svg);

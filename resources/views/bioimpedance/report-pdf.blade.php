@@ -47,7 +47,6 @@
         .guidance { border: 1px solid #b7e3dc; background: #f1fbf8; }
         .guidance-section { margin-top: 5px; padding: 7px 10px; border: 1px solid #b7e3dc; border-radius: 7px; background: #f7fcfa; page-break-inside: auto; }
         .guidance-section-title { margin-bottom: 3px; color: #176b5b; font-size: 8px; font-weight: 700; page-break-after: avoid; }
-        .origin-note { margin-top: 5px; padding: 5px 7px; border-left: 3px solid #d88b9a; background: #fff7f8; color: #475467; font-size: 7px; }
         .canceled { margin-bottom: 8px; padding: 8px; border: 1px solid #fecdd3; border-radius: 8px; background: #fff1f2; color: #9f1239; }
         .scale { width: 100%; height: 7px; margin-top: 7px; border-radius: 3px; overflow: hidden; background: #e5e7eb; }
         .segment { height: 7px; float: left; }
@@ -64,8 +63,6 @@
         .trend-chart { display: block; width: 100%; height: 62px; margin-top: 3px; }
         .trend-dates { width: 100%; color: #667085; font-size: 6px; }
         .trend-dates td:last-child { text-align: right; }
-        .source-list { margin: 5px 0 0; padding-left: 16px; }
-        .source-list li { margin-bottom: 4px; page-break-inside: avoid; }
         .validation { width: 100%; border-collapse: collapse; margin-top: 8px; }
         .validation tr { page-break-inside: avoid; }
         .validation td { padding: 7px 8px; border: 1px solid #e5e7eb; background: #fff; vertical-align: top; }
@@ -76,29 +73,31 @@
         .page-guidance .summary p, .page-guidance .notice p, .page-guidance .guidance p { margin-top: 3px; margin-bottom: 3px; }
         .page-guidance .validation { margin-top: 5px; }
         .page-guidance .validation td { padding: 5px 7px; }
-        .segmental-grid { width: 100%; border-collapse: separate; border-spacing: 7px; table-layout: fixed; page-break-inside: avoid; }
-        .segmental-grid > tbody > tr > td { width: 50%; padding: 8px; border: 1px solid #f2d6dc; border-radius: 8px; background: #fff; vertical-align: top; }
-        .segmental-page, .segmental-page .content, .segmental-grid, .segmental-grid tr, .segmental-grid td, .segmental-map, .segmental-visual, .segmental-table { page-break-inside: avoid; }
-        .segmental-title { color: #7f1d3f; font-size: 11px; font-weight: 700; text-align: center; }
+        .segmental-page .content { padding: 8px 12px; }
+        .segmental-page .notice { margin-top: 4px; padding: 6px 8px; }
+        .segmental-grid { width: 100%; border-collapse: separate; border-spacing: 5px; table-layout: fixed; page-break-inside: avoid; }
+        .segmental-grid > tbody > tr > td { width: 50%; padding: 5px; border: 1px solid #f2d6dc; border-radius: 8px; background: #fff; vertical-align: top; }
+        .segmental-grid, .segmental-grid tr, .segmental-grid td, .segmental-map, .segmental-visual, .segmental-table { page-break-inside: avoid; }
+        .segmental-title { color: #7f1d3f; font-size: 10px; font-weight: 700; text-align: center; }
         .segmental-subtitle { margin-top: 2px; color: #667085; font-size: 6px; text-align: center; }
-        .segmental-visual { width: 100%; height: 255px; border-collapse: collapse; table-layout: fixed; }
+        .segmental-visual { width: 100%; height: 190px; border-collapse: collapse; table-layout: fixed; }
         .segmental-visual td { padding: 2px; border: 0; vertical-align: middle; }
         .segmental-visual .body-column { width: 42%; text-align: center; }
-        .segmental-silhouette { display: block; width: 100%; height: 238px; object-fit: contain; }
+        .segmental-silhouette { display: block; width: 100%; height: 178px; object-fit: contain; }
         .segmental-value { color: #334155; font-size: 6px; line-height: 1.35; }
         .segmental-value strong { color: #172033; font-size: 7px; }
         .segmental-value-right { text-align: right; }
         .segmental-table { width: 100%; border-collapse: collapse; font-size: 6px; }
         .segmental-table caption { padding: 4px 0 3px; color: #475467; font-size: 6px; font-weight: 700; text-align: left; text-transform: uppercase; }
-        .segmental-table th, .segmental-table td { padding: 3px 4px; border: 1px solid #e5e7eb; text-align: left; }
+        .segmental-table th, .segmental-table td { padding: 2px 3px; border: 1px solid #e5e7eb; text-align: left; }
         .segmental-table thead th { background: #fbf2f4; color: #475467; text-transform: uppercase; }
         .segmental-comparison { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 7px; }
         .segmental-comparison th, .segmental-comparison td { padding: 6px; border: 1px solid #e5e7eb; text-align: left; }
         .segmental-comparison th { background: #fbf2f4; color: #475467; text-transform: uppercase; }
         .segmental-comparison tr { page-break-inside: avoid; }
         .segmental-comparison caption { padding: 0 0 5px; color: #475467; font-size: 7px; text-align: left; }
-        .segmental-legend { width: 100%; border-collapse: separate; border-spacing: 5px; margin-top: 6px; }
-        .segmental-legend td { padding: 5px 7px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; font-size: 7px; text-align: center; }
+        .segmental-legend { width: 100%; border-collapse: separate; border-spacing: 4px; margin-top: 3px; }
+        .segmental-legend td { padding: 3px 5px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; font-size: 6px; text-align: center; }
     </style>
 </head>
 <body>
@@ -123,9 +122,6 @@
     $extendedMetricsByCode = $extendedMetrics->keyBy('metric_code');
     $impedanceReadings = collect($assessment['impedance_readings'] ?? []);
     $impedanceByKey = $impedanceReadings->keyBy(fn (array $reading) => ($reading['frequency_khz'] ?? '').'|'.($reading['region'] ?? '').'|'.($reading['side'] ?? ''));
-    $reportLayoutCode = data_get($assessment, 'source_metadata.report_layout')
-        ?? data_get($extendedMetrics->first(), 'source_layout')
-        ?? data_get($impedanceReadings->first(), 'source_layout');
     $isFitdays = ($assessment['measurement_application'] ?? null) === 'fitdays';
     $fitdaysControlCodes = ['recommended_target_weight', 'weight_control', 'fat_control', 'muscle_control'];
     $fitdaysControlMetrics = $extendedMetrics->whereIn('metric_code', $fitdaysControlCodes)->values();
@@ -159,29 +155,6 @@
     $hasSpecificDeviceModel = $deviceModel !== ''
         && mb_strtolower($deviceModel) !== mb_strtolower($manufacturer)
         && ! in_array(mb_strtolower($deviceModel), $genericDeviceModels, true);
-    $measurementApplicationLabels = ['relaxfit' => 'RelaxFit', 'fitdays' => 'Fitdays'];
-    $reportLayoutLabels = [
-        'fitdays_technical_report' => 'relatório técnico',
-        'fitdays_vertical_report' => 'relatório vertical',
-        'relaxfit_vertical_report' => 'relatório vertical',
-    ];
-    $comparisonProfileLabel = function (?array $profile) use ($measurementApplicationLabels, $reportLayoutLabels): string {
-        if (! $profile) {
-            return 'Não informado';
-        }
-
-        $parts = array_filter([
-            $measurementApplicationLabels[$profile['application'] ?? ''] ?? ($profile['application'] ?? null),
-            $reportLayoutLabels[$profile['layout'] ?? ''] ?? ($profile['layout'] ?? null),
-            array_key_exists('athlete_mode', $profile) && $profile['athlete_mode'] !== null
-                ? ($profile['athlete_mode'] ? 'modo atleta' : 'modo padrão')
-                : null,
-        ]);
-
-        return $parts ? implode(' · ', $parts) : 'Origem não informada';
-    };
-    $measurementApplication = $measurementApplicationLabels[$assessment['measurement_application'] ?? ''] ?? null;
-    $reportLayout = $reportLayoutLabels[$reportLayoutCode] ?? $reportLayoutCode;
     $athleteModeLabel = match ($assessment['athlete_mode_at_assessment'] ?? null) {
         true => 'Ativado',
         false => 'Desativado',
@@ -197,20 +170,12 @@
 
         return (string) ($metric['text_value'] ?? $metric['raw_extracted_value'] ?? '-');
     };
-    $deviceSpecifications = $assessment['device_technical_specifications'] ?? [];
-    $informationalReferences = $reference['informational_references'] ?? [];
     $displayClassification = fn ($indicator, $fallback = '-') => $indicator['classification'] ?? $fallback;
     $executiveSummary = str_replace(
         'a referência de classificação Relaxmedic não está cadastrada',
         'o equipamento não forneceu uma classificação textual para este indicador',
         $assessment['analysis']['summary'] ?? 'Síntese indisponível.',
     );
-    $observationOriginLabels = [
-        'professional' => 'Interpretação redigida pelo profissional responsável.',
-        'ai_approved' => 'Sugestão gerada pela IA e aprovada pelo profissional sem alterações.',
-        'ai_edited_and_approved' => 'Sugestão gerada pela IA, editada e aprovada pelo profissional.',
-        'none' => 'Nenhuma interpretação profissional registrada.',
-    ];
     $guidanceTitles = [
         'Contexto da avaliação',
         'Alimentação',
@@ -262,8 +227,8 @@
         'Proteína' => 'Não identifica ingestão ou deficiência nutricional.',
         'Massa de proteína' => 'Não identifica deficiência nutricional.',
         'Peso corporal ideal' => 'Referência do fabricante, não uma meta prescrita.',
-        'Nível de obesidade' => 'Origem: RelaxFit. Classificação importada, normalizada e revisada.',
-        'Tipo de corpo' => 'Origem: RelaxFit. Classificação proprietária importada da imagem.',
+        'Nível de obesidade' => 'Classificação apresentada pelo equipamento; não equivale ao IMC.',
+        'Tipo de corpo' => 'Classificação proprietária do equipamento; não equivale ao IMC.',
     ];
 @endphp
 
@@ -289,7 +254,7 @@
         </tr></table>
         <div class="summary"><div class="section-title" style="margin-top: 0; color: {{ $primaryColor }};">Síntese da avaliação</div><p>{{ $executiveSummary }}</p></div>
         @if($isRelaxmedic)
-            <div class="notice"><strong>Como interpretar este relatório.</strong> Os resultados Relaxmedic são estimativas e índices proprietários do equipamento. A coerência matemática entre medidas não comprova precisão fisiológica e não substitui avaliação clínica ou funcional.</div>
+            <div class="notice"><strong>Como interpretar este relatório.</strong> Os resultados da bioimpedância são estimativas e índices próprios do equipamento. A coerência matemática entre medidas não comprova precisão fisiológica e não substitui avaliação clínica ou funcional.</div>
             @if($assessmentAge >= 60)<div class="notice"><strong>Atenção à pessoa idosa.</strong> Objetivos devem priorizar preservação de massa, força, equilíbrio, mobilidade e autonomia, sem usar isoladamente IMC ou peso de referência do fabricante.</div>@endif
         @endif
         <table class="grid"><tr>
@@ -299,18 +264,7 @@
                 <div class="label">Equipamento</div>
                 <div class="metric-small">{{ $manufacturer }}@if($assessment['device_model_code'] ?? null) · {{ $assessment['device_model_code'] }}@elseif($hasSpecificDeviceModel) · {{ $deviceModel }}@endif</div>
                 <div class="muted">
-                    Referência {{ $assessment['reference_version'] ?? ($reference['classification_version'] ?? '1.0.0') }}
-                    @if($assessment['device_manual_version'] ?? null)
-                        · Manual {{ $assessment['device_manual_version'] }}
-                    @endif
-                    @if($measurementApplication)
-                        <br>Aplicativo: {{ $measurementApplication }}
-                        @if($reportLayout) · Layout: {{ $reportLayout }}@endif
-                        · Modo atleta: {{ $athleteModeLabel }}
-                    @endif
-                    @if($isBodyscan && $deviceSpecifications)
-                        <br>{{ $deviceSpecifications['electrodes'] }} eletrodos · Dupla frequência: {{ implode(' kHz + ', $deviceSpecifications['frequencies_khz']) }} kHz · Operação: {{ $deviceSpecifications['minimum_temperature_c'] }} °C a {{ $deviceSpecifications['maximum_temperature_c'] }} °C
-                    @endif
+                    @if($isBodyscan)Perfil da medição: {{ $athleteModeLabel === 'Ativado' ? 'Atleta' : ($athleteModeLabel === 'Desativado' ? 'Padrão' : 'Não informado') }}@else Referência {{ $assessment['reference_version'] ?? ($reference['classification_version'] ?? '1.0.0') }}@endif
                 </div>
             </td>
         </tr></table>
@@ -323,43 +277,29 @@
         <div class="section-title" style="color: {{ $secondaryColor }};">Composição corporal detalhada</div>
         <table class="grid">
             <tr><td class="box" style="width: 50%;">@include('bioimpedance.partials.pdf-scale', ['title' => 'Gordura corporal', 'value' => $br($assessment['body_fat_percentage']).' %', 'indicator' => $bodyFat])</td><td class="box">@include('bioimpedance.partials.pdf-scale', ['title' => 'Músculo esquelético', 'value' => $br($assessment['skeletal_muscle_percentage']).' %', 'indicator' => $muscle])</td></tr>
-            <tr><td class="box">@include('bioimpedance.partials.pdf-scale', ['title' => 'Gordura visceral', 'value' => $br($assessment['visceral_fat_level'], $isRelaxmedic ? 1 : 0).' nível', 'indicator' => $visceral])<div class="muted" style="margin-top: 5px;">Índice do dispositivo; não representa quantidade em kg.</div></td><td class="box"><div class="label">IMC calculado</div><div class="metric-value">{{ $br($assessment['calculated_bmi']) }}</div><span class="badge {{ $tone($bmi) }}">{{ $displayClassification($bmi) }}</span><div class="muted" style="margin-top: 5px;">Origem: cálculo do sistema com peso e altura. Deve ser interpretado com composição corporal, histórico e contexto individual.</div></td></tr>
+            <tr><td class="box">@include('bioimpedance.partials.pdf-scale', ['title' => 'Gordura visceral', 'value' => $br($assessment['visceral_fat_level'], $isRelaxmedic ? 1 : 0).' nível', 'indicator' => $visceral])<div class="muted" style="margin-top: 5px;">Índice do dispositivo; não representa quantidade em kg.</div></td><td class="box"><div class="label">IMC calculado</div><div class="metric-value">{{ $br($assessment['calculated_bmi']) }}</div><span class="badge {{ $tone($bmi) }}">{{ $displayClassification($bmi) }}</span><div class="muted" style="margin-top: 5px;">Calculado com peso e altura. Deve ser interpretado com composição corporal, histórico e contexto individual.</div></td></tr>
         </table>
         @if($isRelaxmedic && count($compositionDetailMetrics))
-            <div class="section-title" style="color: {{ $secondaryColor }};">{{ $isFitdays ? 'Composição corporal importada' : 'Indicadores Relaxmedic' }}</div>
+            <div class="section-title" style="color: {{ $secondaryColor }};">Indicadores adicionais</div>
             <table class="grid">
                 @foreach(array_chunk($compositionDetailMetrics, 3, true) as $row)
                     <tr>@foreach($row as $label => $value)<td class="box" style="width: 33.33%;"><div class="label">{{ $label }}</div><div class="metric-small">{{ $value }}</div>@if(isset($metricNotes[$label]))<div class="muted" style="margin-top: 3px; font-size: 7px;">{{ $metricNotes[$label] }}</div>@else<div class="muted" style="margin-top: 3px; font-size: 7px;">Estimativa do equipamento.</div>@endif</td>@endforeach @for($i = count($row); $i < 3; $i++)<td></td>@endfor</tr>
                 @endforeach
             </table>
             @if($isFitdays)
-                <div class="notice"><strong>Avaliação do aplicativo × interpretação profissional.</strong> Classificações como “alto”, “muito alto” ou “excelente” são preservadas como saídas do Fitdays. A interpretação profissional não é determinada automaticamente por esses rótulos e considera o contexto completo da avaliação.</div>
+                <div class="notice"><strong>Classificações apresentadas.</strong> Rótulos como “alto”, “muito alto” ou “excelente” são referências do equipamento e não determinam automaticamente a interpretação profissional.</div>
             @else
-                <div class="notice"><strong>Por que as classificações podem ser diferentes?</strong> O IMC é calculado pelo sistema usando peso e altura. “Nível de obesidade” e “Tipo de corpo” são classificações distintas importadas do RelaxFit; o tipo corporal é proprietário do aplicativo e não equivale à classificação do IMC.</div>
+                <div class="notice"><strong>Por que as classificações podem ser diferentes?</strong> O IMC é calculado usando peso e altura. “Nível de obesidade” e “Tipo de corpo” são referências distintas fornecidas pelo equipamento e não equivalem à classificação do IMC.</div>
             @endif
-        @endif
-        @if($isBodyscan && count($informationalReferences))
-            <div class="section-title" style="color: {{ $secondaryColor }};">Referências informativas do manual</div>
-            <div class="notice"><strong>Uso documental.</strong> Estas faixas são genéricas, não são separadas por sexo ou idade e não geram classificação clínica. O manual descreve uso doméstico e não apresenta validação clínica; o IMC é o único item desta seção classificado automaticamente pelo sistema.</div>
-            <table class="grid">
-                @foreach(array_chunk($informationalReferences, 2) as $referenceRow)
-                    <tr>@foreach($referenceRow as $manualReference)<td class="box" style="width: 50%;"><div class="label">{{ $manualReference['label'] }}</div><div class="metric-small">{{ $manualReference['manual_range'] }}</div><div class="muted" style="margin-top: 3px; font-size: 7px;">{{ $manualReference['note'] }}</div></td>@endforeach @if(count($referenceRow) === 1)<td></td>@endif</tr>
-                @endforeach
-            </table>
         @endif
         <div class="section-title" style="color: {{ $secondaryColor }};">Evolução</div>
         @if($comparability)
             <div class="notice">
-                <strong>{{ $comparability['label'] }}.</strong> {{ $comparability['message'] }}
-                @if($comparability['previous_profile'] ?? null)
-                    <br><strong>Anterior:</strong> {{ $comparisonProfileLabel($comparability['previous_profile']) }}
-                    <br><strong>Atual:</strong> {{ $comparisonProfileLabel($comparability['current_profile'] ?? null) }}
-                @endif
-                @foreach($comparability['warnings'] ?? [] as $comparisonWarning)<br>{{ $comparisonWarning }}@endforeach
+                <strong>Comparação descritiva.</strong> Somente valores tecnicamente compatíveis são apresentados. Quando o contexto de medição for diferente, os números devem ser comparados com cautela.
             </div>
         @endif
         @if(($comparison['history_count'] ?? 0) >= 2 && count($comparison['trends'] ?? []))
-            <p class="muted">Até seis avaliações não canceladas com o mesmo equipamento, aplicativo e perfil de cálculo. Layouts Fitdays diferentes usam somente campos comuns.</p>
+            <p class="muted">Até seis avaliações não canceladas com contexto técnico comparável. Somente indicadores presentes nas avaliações relacionadas são exibidos.</p>
             <table class="trend-grid"><tr>
                 @foreach($comparison['trends'] as $trend)
                     @php
@@ -443,7 +383,7 @@
 <section class="report-section segmental-page">
     @include('bioimpedance.partials.report-header', ['pageTitle' => 'Análise segmentar', 'pageNumber' => 3 + ($hasFitdaysDataPage ? 1 : 0) + ($hasImpedancePage ? 1 : 0) + ($hasDetailedComparison ? 1 : 0), 'totalSections' => $totalSections])
     <div class="content">
-        <div class="notice"><strong>Bodyscan Pro · referência {{ $assessment['reference_version'] ?? ($reference['classification_version'] ?? 'não informada') }}.</strong> L representa o lado esquerdo e R o lado direito. Massa, percentual de referência e classificação são apresentados ao redor do corpo e repetidos nas tabelas textuais.</div>
+        <div class="notice"><strong>Leitura segmentar.</strong> L representa o lado esquerdo e R o lado direito. Massa, percentual de referência e classificação também são apresentados nas tabelas textuais.</div>
         <table class="segmental-grid"><tr>
             <td>@include('bioimpedance.partials.segmental-body-map', ['measurements' => $segmentalMeasurements, 'type' => 'fat', 'title' => 'Gordura segmentar'])</td>
             <td>@include('bioimpedance.partials.segmental-body-map', ['measurements' => $segmentalMeasurements, 'type' => 'muscle', 'title' => 'Equilíbrio muscular'])</td>
@@ -454,7 +394,6 @@
             <td><strong style="color:#be123c;">↑ Alto</strong><br><span class="muted">Acima da faixa do equipamento</span></td>
             <td><strong style="color:#475569;">? Não identificado</strong><br><span class="muted">Sem classificação reconhecida</span></td>
         </tr></table>
-        @if(! $hasSegmentalComparison)<div class="summary muted"><strong>Linha de base segmentar.</strong> Estes valores serão usados como referência quando houver outra avaliação Bodyscan Pro.</div>@endif
     </div>
 </section>
 @endif
@@ -463,7 +402,7 @@
 <section class="report-section">
     @include('bioimpedance.partials.report-header', ['pageTitle' => 'Evolução segmentar', 'pageNumber' => 3 + ($hasFitdaysDataPage ? 1 : 0) + ($hasImpedancePage ? 1 : 0) + ($hasDetailedComparison ? 1 : 0) + ($hasSegmentalPage ? 1 : 0), 'totalSections' => $totalSections])
     <div class="content">
-        <div class="notice"><strong>{{ $comparability['label'] ?? 'Comparação do mesmo equipamento' }}.</strong> Os valores mostram mudanças numéricas e não classificam melhora, piora ou problema clínico.@if($segmentalComparison['reference_warning'] ?? null)<br>{{ $segmentalComparison['reference_warning'] }}@endif</div>
+        <div class="notice"><strong>Comparação segmentar.</strong> Os valores mostram mudanças numéricas e não classificam melhora, piora ou problema clínico.</div>
         @foreach(['fat' => 'Gordura segmentar', 'muscle' => 'Equilíbrio muscular'] as $segmentType => $segmentTitle)
             <div class="section-title" style="color: {{ $secondaryColor }};">{{ $segmentTitle }}</div>
             <table class="segmental-comparison">
@@ -502,7 +441,7 @@
 @endif
 
 <section class="report-section page-guidance">
-    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Orientações e validação', 'pageNumber' => $totalSections, 'totalSections' => $totalSections])
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Orientações', 'pageNumber' => $totalSections, 'totalSections' => $totalSections])
     <div class="content">
         <div class="section-title" style="color: {{ $secondaryColor }};">Interpretação profissional</div>
         <div class="summary">
@@ -511,44 +450,20 @@
             @else
                 <p class="muted">Nenhuma observação profissional foi registrada.</p>
             @endif
-            <div class="origin-note">{{ $observationOriginLabels[$assessment['observation_origin'] ?? 'professional'] }}</div>
         </div>
-        <div class="section-title" style="color: {{ $secondaryColor }};">Orientações aprovadas</div>
+        <div class="section-title" style="color: {{ $secondaryColor }};">Orientações</div>
         @if($assessment['care_guidance'] ?? null)
             @foreach($guidanceSections as $section)
                 <div class="guidance-section"><div class="guidance-section-title">{{ $section['title'] }}</div><div>{{ $section['text'] }}</div></div>
             @endforeach
-            <p class="muted" style="margin: 5px 2px 0;">Conteúdo educativo revisado pelo profissional; não substitui avaliação médica, nutricional ou de educação física.</p>
-            @if(count($assessment['care_guidance_sources'] ?? []))
-                <div class="summary">
-                    <div class="label">Referências utilizadas</div>
-                    <ul class="source-list">
-                        @foreach($assessment['care_guidance_sources'] as $source)
-                            <li>
-                                {{ $source['document'] ?? 'Documento de referência' }}
-                                @if($source['version'] ?? null)
-                                    · versão {{ $source['version'] }}
-                                @endif
-                                · {{ $source['section'] ?? 'Seção não informada' }}
-                            </li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
+            <p class="muted" style="margin: 5px 2px 0;">Conteúdo educativo; não substitui avaliação médica, nutricional ou de educação física.</p>
         @else
-            <div class="summary muted">Nenhuma orientação educativa foi aprovada para esta avaliação.</div>
+            <div class="summary muted">Nenhuma orientação educativa foi registrada para esta avaliação.</div>
         @endif
-        <div class="section-title" style="color: {{ $secondaryColor }};">Validação e rastreabilidade</div>
+        <div class="section-title" style="color: {{ $secondaryColor }};">Responsável pelo relatório</div>
         <table class="validation">
             <tr><td style="width: 50%;"><div class="label">Profissional responsável</div><strong>{{ $assessment['professional_name'] ?? 'Não informado' }}</strong></td><td><div class="label">Data da avaliação</div><strong>{{ \Illuminate\Support\Carbon::parse($assessment['evaluated_at'])->format('d/m/Y H:i') }}</strong></td></tr>
-            <tr><td><div class="label">Orientação aprovada por</div><strong>{{ $assessment['care_guidance_approved_by_name'] ?? 'Não aplicável' }}</strong></td><td><div class="label">Aprovação</div><strong>{{ ($assessment['care_guidance_approved_at'] ?? null) ? \Illuminate\Support\Carbon::parse($assessment['care_guidance_approved_at'])->format('d/m/Y H:i') : 'Não aplicável' }}</strong></td></tr>
-            <tr><td><div class="label">Origem dos dados</div><strong>{{ $isRelaxmedic ? 'Imagem processada com conferência humana' : 'Entrada manual pelo profissional' }}</strong></td><td><div class="label">Correções registradas</div><strong>{{ $assessment['correction_count'] ?? 0 }}</strong></td></tr>
         </table>
-        @if($isRelaxmedic)
-            <div class="notice">
-                <strong>Origem auditável preservada.</strong> Os identificadores técnicos da imagem permanecem no registro interno de auditoria e não são exibidos no relatório entregue ao cliente. A imagem original não foi armazenada.
-            </div>
-        @endif
         <div class="keep-together">
             <div class="section-title" style="color: {{ $secondaryColor }};">Limites do relatório</div>
             <div class="summary"><p>{{ $clinic['technical_notice'] }}</p></div>
