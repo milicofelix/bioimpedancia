@@ -89,13 +89,14 @@ export default function ClientSearchList({ clients, canCreate, onCreate, onSelec
 			<div className="mt-3 space-y-2">
 				{visibleClients.map((client) => {
 					const status = clientStatus(client);
+					const contact = client.phone || client.email;
 					return <PwaCard as="button" type="button" key={client.id} onClick={() => onSelect(client)} aria-label={`Abrir cliente ${client.full_name}, ${status.label}`} className={`pwa-focus pwa-pressable block w-full touch-manipulation border-l-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-ricosty-300 hover:shadow-[0_16px_36px_rgba(97,38,55,0.11)] ${status.border}`}>
 						<span className="flex items-center gap-3">
 							<span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-sm font-black ring-1 ${status.avatar}`}>{initials(client.full_name)}</span>
-							<span className="min-w-0 flex-1"><span className="block break-words font-bold text-ricosty-950">{client.full_name}</span><span className="mt-0.5 block break-all text-sm text-slate-600">{client.phone || client.email || 'Sem contato cadastrado'}</span></span>
+							<span className="min-w-0 flex-1"><span className="block break-words font-bold text-ricosty-950">{client.full_name}</span><span className="mt-1 flex items-center gap-1.5 break-all text-sm text-slate-600"><PwaIcon name={client.phone ? 'phone' : client.email ? 'mail' : 'alertTriangle'} size={14} className="shrink-0 text-ricosty-500" />{contact || 'Sem contato cadastrado'}</span></span>
 							<span className={`rounded-full px-2 py-1 text-[11px] font-bold uppercase ${status.badge}`}>{status.label}</span>
 						</span>
-						<span className="mt-3 flex items-center justify-between border-t border-ricosty-100 pt-2 text-xs text-slate-600"><span>Última avaliação: <strong className="font-semibold text-slate-700">{formatIssueDate(client.last_assessment_at)}</strong></span><PwaIcon name="chevronRight" size={17} className="text-ricosty-600" /></span>
+						<span className="mt-3 flex items-center justify-between border-t border-ricosty-100 pt-2 text-xs text-slate-600"><span className="flex items-center gap-1.5"><PwaIcon name="calendar" size={14} className="text-ricosty-500" /><span>Última avaliação: <strong className="font-semibold text-slate-700">{formatIssueDate(client.last_assessment_at)}</strong></span></span><span className="flex h-8 w-8 items-center justify-center rounded-full bg-ricosty-50"><PwaIcon name="chevronRight" size={17} className="text-ricosty-600" /></span></span>
 					</PwaCard>;
 				})}
 			</div>

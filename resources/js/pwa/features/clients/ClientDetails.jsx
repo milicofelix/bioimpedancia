@@ -9,6 +9,7 @@ import PwaIcon from '../../components/ui/PwaIcon';
 import PwaAlert from '../../components/ui/PwaAlert';
 import PwaClientIdentity from '../../components/ui/PwaClientIdentity';
 import PwaState from '../../components/ui/PwaState';
+import PwaSectionHeader from '../../components/ui/PwaSectionHeader';
 import ScreeningInvitationPanel from './ScreeningInvitationPanel';
 import ClientModuleSummary from '../../../shared/ClientModuleSummary';
 import ClientWorkspaceTabs from '../../../shared/ClientWorkspaceTabs';
@@ -101,15 +102,15 @@ export default function ClientDetails({ client, currentUser, scaleModel, enabled
 				/>
 
 				{showClientDetails ? <div id={clientDetailsId} className="animate-[pwa-screen-enter_180ms_ease-out]">
-					<div className="mt-5 flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-600">Dados biométricos básicos</p>{canEditProfile && !editingProfile ? <button type="button" onClick={() => setEditingProfile(true)} className="pwa-focus min-h-9 rounded-lg px-3 text-xs font-bold text-ricosty-700 hover:bg-ricosty-cream">Editar dados</button> : null}</div>
-					{editingProfile ? <form onSubmit={saveProfile} className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+					<PwaSectionHeader className="mt-5" icon={editingProfile ? 'clipboard' : 'eye'} title={editingProfile ? 'Editando dados pessoais' : 'Dados pessoais'} description={editingProfile ? 'Revise as alterações antes de salvar. A idade continuará sendo calculada automaticamente.' : 'Modo de consulta. Use Editar dados somente quando precisar corrigir o cadastro.'} headingLevel="h3" action={canEditProfile && !editingProfile ? <PwaButton type="button" variant="secondary" icon="clipboard" onClick={() => setEditingProfile(true)} className="min-h-10 px-3 text-xs">Editar dados</PwaButton> : null} />
+					{editingProfile ? <form onSubmit={saveProfile} className="mt-3 grid gap-2 rounded-2xl border border-ricosty-200 bg-ricosty-50/50 p-3 text-sm sm:grid-cols-2">
 						<div className="rounded-xl bg-ricosty-cream/70 p-3"><span className="text-[11px] font-bold uppercase tracking-wide text-slate-600">Idade</span><strong className="mt-2 block text-ricosty-ink">{client.age ?? '-'} anos</strong><span className="mt-1 block text-[11px] text-slate-500">Calculada automaticamente</span></div>
 						<label className="rounded-xl bg-ricosty-cream/70 p-3 text-[11px] font-bold uppercase tracking-wide text-slate-600">Sexo biológico<select required value={profile.biological_sex} onChange={(event) => updateProfileField('biological_sex', event.target.value)} className="pwa-focus mt-2 min-h-11 w-full rounded-lg border border-ricosty-200 bg-white px-2 text-sm font-normal normal-case tracking-normal text-slate-900"><option value="female">Feminino</option><option value="male">Masculino</option></select>{profileErrors.biological_sex?.[0] ? <span className="mt-1 block text-xs normal-case tracking-normal text-rose-700">{profileErrors.biological_sex[0]}</span> : null}</label>
 						<label className="rounded-xl bg-ricosty-cream/70 p-3 text-[11px] font-bold uppercase tracking-wide text-slate-600">Altura<input required inputMode="decimal" placeholder="1,74 ou 174" value={profile.height_cm} onChange={(event) => updateProfileField('height_cm', event.target.value)} className="pwa-focus mt-2 min-h-11 w-full rounded-lg border border-ricosty-200 bg-white px-2 text-sm font-normal normal-case tracking-normal text-slate-900" />{profileErrors.height_cm?.[0] ? <span className="mt-1 block text-xs normal-case tracking-normal text-rose-700">{profileErrors.height_cm[0]}</span> : null}</label>
 						<label className="rounded-xl bg-ricosty-cream/70 p-3 text-[11px] font-bold uppercase tracking-wide text-slate-600">Nascimento<input type="date" required max={localDatetimeNow().slice(0, 10)} value={profile.birth_date} onChange={(event) => updateProfileField('birth_date', event.target.value)} className="pwa-focus mt-2 min-h-11 w-full rounded-lg border border-ricosty-200 bg-white px-2 text-sm font-normal normal-case tracking-normal text-slate-900" />{profileErrors.birth_date?.[0] ? <span className="mt-1 block text-xs normal-case tracking-normal text-rose-700">{profileErrors.birth_date[0]}</span> : null}</label>
-						<div className="flex flex-wrap gap-2 sm:col-span-2"><button type="submit" disabled={savingProfile} className="pwa-focus min-h-10 rounded-lg bg-ricosty-700 px-4 text-xs font-bold text-white disabled:opacity-60">{savingProfile ? 'Salvando...' : 'Salvar dados'}</button><button type="button" disabled={savingProfile} onClick={() => { setEditingProfile(false); setProfile(clientProfile(client)); setProfileErrors({}); }} className="pwa-focus min-h-10 rounded-lg border border-slate-300 bg-white px-4 text-xs font-bold text-slate-700 disabled:opacity-60">Cancelar</button></div>
+						<div className="flex flex-wrap gap-2 sm:col-span-2"><PwaButton type="submit" disabled={savingProfile} busy={savingProfile} icon="check" className="flex-1 sm:flex-none">{savingProfile ? 'Salvando...' : 'Salvar alterações'}</PwaButton><PwaButton type="button" disabled={savingProfile} variant="ghost" onClick={() => { setEditingProfile(false); setProfile(clientProfile(client)); setProfileErrors({}); }}>Cancelar edição</PwaButton></div>
 						{profileErrors.form && !profileErrors.birth_date && !profileErrors.biological_sex && !profileErrors.height_cm ? <p role="alert" className="text-xs font-semibold leading-5 text-rose-700 sm:col-span-2">{profileErrors.form}</p> : null}
-					</form> : <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-2">{[['Idade', `${client.age ?? '-'} anos`], ['Sexo', sexLabels[client.biological_sex] ?? '-'], ['Altura', `${numberBr(client.height_cm, 0)} cm`], ['Nascimento', formatIssueDate(client.birth_date)]].map(([label, value]) => <div key={label} className="rounded-xl bg-ricosty-cream/70 p-3"><dt className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{label}</dt><dd className="mt-1 font-bold text-ricosty-ink">{value}</dd></div>)}</dl>}
+					</form> : <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">{[['Idade', `${client.age ?? '-'} anos`, 'clock'], ['Sexo', sexLabels[client.biological_sex] ?? '-', 'user'], ['Altura', `${numberBr(client.height_cm, 0)} cm`, 'activity'], ['Nascimento', formatIssueDate(client.birth_date), 'calendar']].map(([label, value, icon]) => <div key={label} className="flex items-start gap-2 rounded-xl border border-slate-100 bg-slate-50 p-3"><PwaIcon name={icon} size={17} className="mt-0.5 shrink-0 text-ricosty-500" /><div><dt className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{label}</dt><dd className="mt-1 font-bold text-ricosty-ink">{value}</dd></div></div>)}</dl>}
 
 					<div className="mt-4 space-y-2 border-t border-ricosty-100 pt-4 text-sm text-slate-600">
 						<p className="flex items-center gap-2"><PwaIcon name="phone" size={16} className="text-ricosty-500" /><strong className="sr-only">Telefone:</strong> {client.phone || '-'}</p>
@@ -147,10 +148,7 @@ export default function ClientDetails({ client, currentUser, scaleModel, enabled
 				/>
 			</div>
 			<PwaCard className="mt-4 p-5">
-				<div className="flex items-center justify-between gap-3">
-					<h3 className="flex items-center gap-2 font-extrabold text-ricosty-ink"><PwaIcon name="history" className="text-ricosty-600" />Histórico de bioimpedância</h3>
-					<span className="text-xs text-slate-500">{assessments.length} avaliação(ões)</span>
-				</div>
+				<PwaSectionHeader icon="history" title="Histórico de bioimpedância" description="Consulte resultados anteriores ou abra as ações de cada avaliação." headingLevel="h3" action={<span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">{assessments.length}</span>} />
 
 				<ol className="relative mt-4 space-y-3 before:absolute before:bottom-4 before:left-[9px] before:top-4 before:w-px before:bg-ricosty-200">
 					{assessments.slice(0, 5).map((assessment, index) => (
@@ -161,11 +159,11 @@ export default function ClientDetails({ client, currentUser, scaleModel, enabled
 									<span className="flex items-center gap-1.5 text-sm font-bold text-slate-900"><PwaIcon name="calendar" size={15} className="text-ricosty-500" />{formatDate(assessment.evaluated_at)}</span>
 									<span className="text-[10px] font-bold uppercase text-slate-500">{assessment.is_canceled ? 'Cancelada' : assessment.device_model}</span>
 								</div>
-								<div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-lg bg-white/80 px-3 py-2"><span className="block text-[11px] font-bold uppercase text-slate-600">Peso</span><strong className="text-sm text-slate-800">{numberBr(assessment.weight_kg, 1)} kg</strong></div><div className="rounded-lg bg-white/80 px-3 py-2"><span className="block text-[11px] font-bold uppercase text-slate-600">IMC</span><strong className="text-sm text-slate-800">{numberBr(assessment.calculated_bmi ?? assessment.scale_bmi, 1)}</strong></div></div>
+								<div className="mt-3 grid grid-cols-2 gap-2"><div className="flex items-center gap-2 rounded-lg bg-white/80 px-3 py-2"><PwaIcon name="scale" size={17} className="text-ricosty-500" /><span><span className="block text-[10px] font-bold uppercase text-slate-600">Peso</span><strong className="text-sm text-slate-800">{numberBr(assessment.weight_kg, 1)} kg</strong></span></div><div className="flex items-center gap-2 rounded-lg bg-white/80 px-3 py-2"><PwaIcon name="gauge" size={17} className="text-sky-600" /><span><span className="block text-[10px] font-bold uppercase text-slate-600">IMC</span><strong className="text-sm text-slate-800">{numberBr(assessment.calculated_bmi ?? assessment.scale_bmi, 1)}</strong></span></div></div>
 								<div className="mt-3 flex flex-wrap gap-2">
 									<p className="w-full text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Ações da avaliação</p>
-									{enabledModules.reports ? <PwaButton type="button" onClick={() => onOpenReport(client, assessment)} variant="secondary" icon="fileText" className="px-3 text-xs">Relatório corporal</PwaButton> : null}
-									{canUseClinicalFeatures(currentUser) ? <PwaButton type="button" onClick={() => onOpenAssistant(client, assessment)} variant="ghost" icon="sparkles" className="px-3 text-xs">Assistente</PwaButton> : null}
+									{enabledModules.reports ? <PwaButton type="button" onClick={() => onOpenReport(client, assessment)} variant="secondary" icon="fileText" className="px-3 text-xs">Abrir relatório</PwaButton> : null}
+									{canUseClinicalFeatures(currentUser) ? <PwaButton type="button" onClick={() => onOpenAssistant(client, assessment)} variant="ghost" icon="sparkles" className="px-2 text-xs text-slate-600">Assistente</PwaButton> : null}
 								</div>
 							</div>
 						</li>

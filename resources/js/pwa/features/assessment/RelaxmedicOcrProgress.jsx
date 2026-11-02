@@ -22,7 +22,8 @@ export default function RelaxmedicOcrProgress({ previewUrl }) {
 					<span className="pwa-skeleton block h-4 w-2/3 rounded" />
 				</div>
 			</div>
-			<div className="mt-5 flex items-center gap-2 rounded-xl bg-ricosty-50 px-3 py-2 text-xs font-semibold text-ricosty-900"><span className="h-2 w-2 animate-pulse rounded-full bg-ricosty-500" aria-hidden="true" />Processamento em andamento. Não feche esta tela durante a leitura.</div>
+			<div className="mt-5 grid gap-2 sm:grid-cols-3" aria-label="Etapas da leitura"><span className="flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800"><PwaIcon name="check" size={14} />Imagem recebida</span><span className="flex items-center gap-2 rounded-xl bg-ricosty-50 px-3 py-2 text-xs font-semibold text-ricosty-900"><PwaIcon name="refresh" size={14} className="animate-spin" />Extraindo dados</span><span className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500"><PwaIcon name="clipboard" size={14} />Conferência</span></div>
+			<p className="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-600"><PwaIcon name="info" size={15} />O tempo depende da qualidade da imagem. A tela avançará quando o processamento real terminar.</p>
 		</section>
 	);
 }

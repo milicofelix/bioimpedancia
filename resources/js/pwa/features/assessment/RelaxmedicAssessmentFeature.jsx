@@ -16,6 +16,9 @@ import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocol
 import BodyscanOcrProgress from './BodyscanOcrProgress';
 import BodyscanProtocolChecklist from './BodyscanProtocolChecklist';
 import BodyscanReportFormatGuide from './BodyscanReportFormatGuide';
+import PwaAlert from '../../components/ui/PwaAlert';
+import PwaIcon from '../../components/ui/PwaIcon';
+import PwaState from '../../components/ui/PwaState';
 
 export default function RelaxmedicAssessmentFeature({ client, currentUser, scaleModel, onBackToClients, onCreated, onOpenAssistant, onOpenReport, canOpenReport = false }) {
 	const runAction = useActionLock();
@@ -194,12 +197,12 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 		return (
 			<PwaCard className="p-6 text-center">
 				<PwaStepIndicator steps={journeySteps} current={journeySteps.length} />
-				<div className="mx-auto mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-ricosty-100 text-2xl font-black text-ricosty-700">✓</div>
+				<div className="mx-auto mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><PwaIcon name="check" size={28} /></div>
 				<h2 className="mt-3 text-xl font-bold text-slate-950">Avaliação criada com segurança</h2>
 				<p className="mt-2 text-sm leading-6 text-slate-600">Os dados de {client.full_name} foram salvos após a confirmação. A imagem temporária foi removida do aplicativo.</p>
-				{!canOpenReport ? <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900">O relatório corporal não aparece porque esse módulo está desativado nas configurações da clínica.</p> : null}
+				{!canOpenReport ? <PwaAlert tone="attention" className="mt-3 text-left" title="Relatório corporal desativado">Esse módulo está desativado nas configurações da clínica.</PwaAlert> : null}
 				<div className={`mt-5 grid gap-3 ${canOpenReport ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-					<PwaButton type="button" onClick={onBackToClients} variant="secondary" icon="arrowLeft">Voltar para clientes</PwaButton>
+					<PwaButton type="button" onClick={onBackToClients} variant="ghost" icon="arrowLeft">Voltar para clientes</PwaButton>
 					<PwaButton type="button" onClick={onOpenAssistant} icon="sparkles">Abrir assistente</PwaButton>
 					{canOpenReport ? <PwaButton type="button" onClick={onOpenReport} variant="secondary" icon="fileText">Abrir relatório</PwaButton> : null}
 				</div>
@@ -224,19 +227,11 @@ export default function RelaxmedicAssessmentFeature({ client, currentUser, scale
 					? <BodyscanReview previewUrl={previewUrl} form={bodyscanForm} extraction={extraction} client={client} confirmed={confirmed} errors={errors} saving={saving} online={isOnline} onGeneralUpdate={updateBodyscanGeneral} onProfileUpdate={updateBodyscanProfile} onSegmentUpdate={updateSegment} onImpedanceUpdate={updateImpedance} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />
 					: <RelaxmedicReview previewUrl={previewUrl} form={form} extraction={extraction} confirmed={confirmed} errors={errors} saving={saving} online={isOnline} onUpdate={update} onConfirm={setConfirmed} onSubmit={submit} onRestart={restart} />
 			)}
-			{generalError ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{generalError}</p> : null}
+			{generalError ? <PwaAlert tone="error" title="Não foi possível concluir a avaliação">{generalError}</PwaAlert> : null}
 		</div>
 	);
 }
 
 function BlockedState({ title, description, onBack }) {
-	return (
-		<PwaCard className="p-6 text-center">
-			<div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700"><span aria-hidden="true">!</span></div>
-			<p className="text-xs font-bold uppercase tracking-wide text-amber-700">Nova avaliação</p>
-			<h2 className="mt-2 text-xl font-bold text-slate-950">{title}</h2>
-			<p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
-			<PwaButton type="button" onClick={onBack} icon="arrowLeft" className="mt-5">Ir para clientes</PwaButton>
-		</PwaCard>
-	);
+	return <PwaState type="error" icon="alertTriangle" title={title} description={description} action={<PwaButton type="button" onClick={onBack} icon="arrowLeft">Ir para clientes</PwaButton>} />;
 }

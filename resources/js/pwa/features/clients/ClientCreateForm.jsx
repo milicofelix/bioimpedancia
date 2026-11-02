@@ -4,6 +4,9 @@ import { cpfMask, heightMask, phoneMask } from '../../../shared/inputMasks';
 import { localDatetimeNow } from '../../../shared/formatters';
 import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
+import PwaAlert from '../../components/ui/PwaAlert';
+import PwaFormSection from '../../components/ui/PwaFormSection';
+import PwaSectionHeader from '../../components/ui/PwaSectionHeader';
 import useActionLock from '../../../hooks/useActionLock';
 import ContactImportButton from './ContactImportButton';
 
@@ -89,66 +92,27 @@ export default function ClientCreateForm({ onCancel, onCreated }) {
 		<section aria-labelledby="new-client-title">
 			<PwaButton type="button" onClick={onCancel} variant="ghost" icon="arrowLeft" className="-ml-3">Voltar para clientes</PwaButton>
 			<PwaCard className="mt-3 p-5 sm:p-6">
-				<p className="text-xs font-bold uppercase tracking-[0.14em] text-ricosty-600">Cadastro simplificado</p>
-				<h2 id="new-client-title" className="mt-1 text-xl font-extrabold text-ricosty-ink">Novo cliente</h2>
-				<p className="mt-2 text-sm leading-5 text-slate-500">Informe os dados essenciais para iniciar o acompanhamento.</p>
+				<PwaSectionHeader icon="user" eyebrow="Cadastro simplificado" title="Novo cliente" headingId="new-client-title" description="Informe os dados essenciais para iniciar o acompanhamento." />
 				<div className="mt-4"><ContactImportButton onImport={importContact} /></div>
 
 				<form onSubmit={submit} className="mt-5 space-y-4">
-					<label className="block text-sm font-semibold text-slate-700">
-						Nome completo
-						<input autoComplete="name" value={form.full_name} onChange={(event) => update('full_name', event.target.value)} className={fieldClass(errors.full_name)} />
-						<FieldError errors={errors} field="full_name" />
-					</label>
+					<PwaFormSection icon="user" title="Dados pessoais" description="Informações usadas na identificação e nas referências da avaliação." tone="brand">
+						<label className="block text-sm font-semibold">Nome completo<input autoComplete="name" value={form.full_name} onChange={(event) => update('full_name', event.target.value)} className={fieldClass(errors.full_name)} /><FieldError errors={errors} field="full_name" /></label>
+						<div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-semibold">Nascimento<input type="date" max={localDatetimeNow().slice(0, 10)} value={form.birth_date} onChange={(event) => update('birth_date', event.target.value)} className={fieldClass(errors.birth_date)} /><FieldError errors={errors} field="birth_date" /></label><label className="block text-sm font-semibold">Sexo biológico<select value={form.biological_sex} onChange={(event) => update('biological_sex', event.target.value)} className={fieldClass(errors.biological_sex)}><option value="female">Feminino</option><option value="male">Masculino</option></select><FieldError errors={errors} field="biological_sex" /></label></div>
+						<label className="block text-sm font-semibold">Altura<input inputMode="decimal" placeholder="1,65 ou 165" value={form.height_cm} onChange={(event) => update('height_cm', event.target.value)} className={fieldClass(errors.height_cm)} /><FieldError errors={errors} field="height_cm" /></label>
+					</PwaFormSection>
 
-					<div className="grid gap-3 sm:grid-cols-2">
-						<label className="block text-sm font-semibold text-slate-700">
-							Nascimento
-							<input type="date" max={localDatetimeNow().slice(0, 10)} value={form.birth_date} onChange={(event) => update('birth_date', event.target.value)} className={fieldClass(errors.birth_date)} />
-							<FieldError errors={errors} field="birth_date" />
-						</label>
-						<label className="block text-sm font-semibold text-slate-700">
-							Sexo biológico
-							<select value={form.biological_sex} onChange={(event) => update('biological_sex', event.target.value)} className={fieldClass(errors.biological_sex)}>
-								<option value="female">Feminino</option>
-								<option value="male">Masculino</option>
-							</select>
-							<FieldError errors={errors} field="biological_sex" />
-						</label>
-					</div>
+					<PwaFormSection icon="phone" title="Contato" description="Use ao menos um canal válido para facilitar o acompanhamento.">
+						<label className="block text-sm font-semibold">Telefone<input type="tel" inputMode="tel" autoComplete="tel" placeholder="(00) 00000-0000" value={form.phone} onChange={(event) => update('phone', event.target.value)} className={fieldClass(errors.phone)} /><FieldError errors={errors} field="phone" /></label>
+						<label className="block text-sm font-semibold">E-mail<input type="email" inputMode="email" autoComplete="email" value={form.email} onChange={(event) => update('email', event.target.value)} className={fieldClass(errors.email)} /><FieldError errors={errors} field="email" /></label>
+						<label className="block text-sm font-semibold">CPF opcional<input inputMode="numeric" autoComplete="off" placeholder="000.000.000-00" value={form.cpf} onChange={(event) => update('cpf', event.target.value)} className={fieldClass(errors.cpf)} /><FieldError errors={errors} field="cpf" /></label>
+					</PwaFormSection>
 
-					<label className="block text-sm font-semibold text-slate-700">
-						Altura
-						<input inputMode="decimal" placeholder="1,65 ou 165" value={form.height_cm} onChange={(event) => update('height_cm', event.target.value)} className={fieldClass(errors.height_cm)} />
-						<FieldError errors={errors} field="height_cm" />
-					</label>
+					<PwaFormSection icon="shield" title="Consentimento" tone="teal"><label className="flex items-start gap-3 rounded-xl border border-teal-200 bg-white p-3 text-sm text-slate-700"><input type="checkbox" checked={form.consent_accepted} onChange={(event) => update('consent_accepted', event.target.checked)} className="mt-0.5 h-5 w-5 rounded border-teal-300 text-emerald-600" /><span>O cliente autorizou o registro dos dados para acompanhamento corporal.</span></label><FieldError errors={errors} field="consent_accepted" /></PwaFormSection>
 
-					<label className="block text-sm font-semibold text-slate-700">
-						Telefone
-						<input type="tel" inputMode="tel" autoComplete="tel" placeholder="(00) 00000-0000" value={form.phone} onChange={(event) => update('phone', event.target.value)} className={fieldClass(errors.phone)} />
-						<FieldError errors={errors} field="phone" />
-					</label>
+					{message ? <PwaAlert tone="error" title="Não foi possível cadastrar">{message}</PwaAlert> : null}
 
-					<label className="block text-sm font-semibold text-slate-700">
-						E-mail
-						<input type="email" inputMode="email" autoComplete="email" value={form.email} onChange={(event) => update('email', event.target.value)} className={fieldClass(errors.email)} />
-						<FieldError errors={errors} field="email" />
-					</label>
-
-					<label className="block text-sm font-semibold text-slate-700">
-						CPF opcional
-						<input inputMode="numeric" autoComplete="off" placeholder="000.000.000-00" value={form.cpf} onChange={(event) => update('cpf', event.target.value)} className={fieldClass(errors.cpf)} />
-						<FieldError errors={errors} field="cpf" />
-					</label>
-
-					<label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-						<input type="checkbox" checked={form.consent_accepted} onChange={(event) => update('consent_accepted', event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600" />
-						<span>O cliente autorizou o registro dos dados para acompanhamento corporal.</span>
-					</label>
-
-					{message ? <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{message}</div> : null}
-
-					<PwaButton type="submit" disabled={saving} loading={saving} icon="check" className="w-full">{saving ? 'Cadastrando...' : 'Cadastrar cliente'}</PwaButton>
+					<PwaButton type="submit" disabled={saving} busy={saving} icon="check" className="w-full">{saving ? 'Cadastrando...' : 'Cadastrar cliente'}</PwaButton>
 				</form>
 			</PwaCard>
 		</section>
