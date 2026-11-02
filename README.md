@@ -79,6 +79,20 @@ ou, no container:
 docker compose exec -T app php artisan test
 ```
 
+Testes de componentes React/PWA:
+
+```bash
+npm run test:frontend
+```
+
+Para desenvolvimento interativo:
+
+```bash
+npm run test:frontend:watch
+```
+
+A cobertura e as convenções da suíte estão documentadas em [`docs/frontend-tests.md`](docs/frontend-tests.md).
+
 ## Preparação Para Deploy
 
 Antes de publicar:
