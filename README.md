@@ -93,6 +93,14 @@ npm run test:frontend:watch
 
 A cobertura e as convenções da suíte estão documentadas em [`docs/frontend-tests.md`](docs/frontend-tests.md).
 
+Jornadas completas no navegador:
+
+```bash
+npm run test:e2e
+```
+
+A preparação segura do ambiente e os cenários estão em [`docs/e2e-tests.md`](docs/e2e-tests.md).
+
 ## Preparação Para Deploy
 
 Antes de publicar:

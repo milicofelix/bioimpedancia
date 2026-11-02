@@ -34,6 +34,7 @@ php artisan test
 run_composer audit
 run_npm audit
 run_npm run test:frontend
+run_npm run test:e2e
 run_npm run build
 
 php artisan config:cache
