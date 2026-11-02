@@ -3,11 +3,12 @@ import PwaIcon from './ui/PwaIcon';
 import PwaButton from './ui/PwaButton';
 import useActionLock from '../../hooks/useActionLock';
 
-const DISMISSED_KEY = 'ricosty:pwa-install-guide-security-v2-dismissed';
+const DISMISSED_KEY = 'vita-scan:pwa-install-guide-security-v2-dismissed';
+const LEGACY_DISMISSED_KEY = 'ricosty:pwa-install-guide-security-v2-dismissed';
 
 function wasDismissed() {
 	try {
-		return window.localStorage.getItem(DISMISSED_KEY) === 'true';
+		return window.localStorage.getItem(DISMISSED_KEY) === 'true' || window.localStorage.getItem(LEGACY_DISMISSED_KEY) === 'true';
 	} catch {
 		return false;
 	}

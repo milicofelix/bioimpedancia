@@ -49,8 +49,8 @@ export default function OperationalAppPage() {
 
 	useEffect(() => {
 		if (!workspace) return;
-		if (['avaliacao', 'assistente'].includes(section) && !enabledModules.assessment) navigate('clientes');
-		if (section === 'relatorio' && !enabledModules.reports) navigate('clientes');
+		if (['avaliacao', 'assistente'].includes(section) && !enabledModules.assessment) navigate('clientes', { replace: true });
+		if (section === 'relatorio' && !enabledModules.reports) navigate('clientes', { replace: true });
 	}, [workspace, section, enabledModules.assessment, enabledModules.reports]);
 
 	async function handleLogout() {

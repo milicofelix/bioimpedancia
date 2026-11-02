@@ -1,4 +1,4 @@
-const PWA_CACHE_PREFIX = 'ricosty-pwa-';
+const PWA_CACHE_PREFIXES = ['vita-scan-pwa-', 'ricosty-pwa-'];
 let redirectingToLogin = false;
 
 export async function clearOperationalCaches() {
@@ -9,7 +9,7 @@ export async function clearOperationalCaches() {
 
 	if ('caches' in window) {
 		const keys = await window.caches.keys();
-		await Promise.all(keys.filter((key) => key.startsWith(PWA_CACHE_PREFIX)).map((key) => window.caches.delete(key)));
+		await Promise.all(keys.filter((key) => PWA_CACHE_PREFIXES.some((prefix) => key.startsWith(prefix))).map((key) => window.caches.delete(key)));
 	}
 }
 
