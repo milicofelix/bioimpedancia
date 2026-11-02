@@ -1,6 +1,8 @@
 import React from 'react';
 import PwaButton from '../../components/ui/PwaButton';
 import PwaIcon from '../../components/ui/PwaIcon';
+import PwaAlert from '../../components/ui/PwaAlert';
+import PwaSectionHeader from '../../components/ui/PwaSectionHeader';
 
 function groupSourcesByDocument(sources) {
 	return [...sources.reduce((groups, source) => {
@@ -26,13 +28,10 @@ export default function ObservationSuggestion({ assistant, draft, saving, online
 	const sourceDocuments = groupSourcesByDocument(assistant.sources ?? []);
 
 	return (
-		<section className="pwa-card p-5" aria-busy={saving}>
+		<section className="pwa-card border-violet-200 p-5" aria-busy={saving}>
 			<div className="flex flex-wrap items-center justify-between gap-2">
-				<div>
-					<p className="text-xs font-bold uppercase tracking-wide text-violet-700">Sugestão para revisão</p>
-					<h2 className="mt-1 text-lg font-bold text-slate-950">Revise antes de aprovar</h2>
-				</div>
-				<div className="flex flex-wrap gap-2"><span className={`rounded-full px-3 py-1 text-xs font-bold ${generated ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}`}>{generated ? 'Validada' : 'Indisponível'}</span>{edited ? <span role="status" className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-800">Texto editado pelo profissional</span> : null}</div>
+				<PwaSectionHeader icon="eye" eyebrow="Observação" title="Revise antes de aprovar" description="Confira o texto e as fontes que sustentam a sugestão." />
+				<div className="flex flex-wrap gap-2"><span className={`rounded-full px-3 py-1 text-xs font-bold ${generated ? 'bg-amber-100 text-amber-900' : 'bg-rose-100 text-rose-800'}`}>{generated ? 'Pendente de aprovação' : 'Bloqueada'}</span>{edited ? <span role="status" className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-800">Texto editado pelo profissional</span> : null}</div>
 			</div>
 
 			{generated ? (
@@ -57,21 +56,19 @@ export default function ObservationSuggestion({ assistant, draft, saving, online
 									<div className="border-t border-slate-100 px-4 py-3 text-xs leading-5 text-slate-600">{source.version ? <p><strong className="text-slate-700">Versão:</strong> {source.version}</p> : null}{source.deviceModel ? <p><strong className="text-slate-700">Equipamento:</strong> {source.deviceModel}</p> : null}<ul className="mt-2 space-y-2">{source.sections.map((section) => <li key={section.id} className="rounded-lg bg-slate-50 p-2"><strong className="text-slate-700">Seção:</strong> {section.section || 'Não informada'}{section.page ? ` · página ${section.page}` : ''}{section.excerpt ? <p className="mt-1 border-l-2 border-violet-200 pl-2 italic">{section.excerpt}</p> : null}</li>)}</ul></div>
 								</details>
 							))}
-							{!sourceDocuments.length ? <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-700">Nenhuma fonte recuperada foi informada.</p> : null}
+							{!sourceDocuments.length ? <PwaAlert tone="info" title="Fontes não exibidas">Não há documentos disponíveis para consulta nesta sugestão.</PwaAlert> : null}
 						</div>
 					</div>
 				</>
 			) : (
-				<div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-					<p className="font-bold">Não foi possível liberar uma sugestão.</p>
-					<p className="mt-1">{assistant.summary ?? 'A IA ou as referências necessárias estão indisponíveis no momento.'}</p>
+				<PwaAlert tone="error" title="Sugestão bloqueada pela validação" className="mt-4">
+					<p>{assistant.summary ?? 'O conteúdo não atendeu aos critérios necessários para revisão.'}</p>
 					{assistant.validation_errors?.length ? <ul className="mt-2 list-disc pl-5">{assistant.validation_errors.map((item) => <li key={item}>{item}</li>)}</ul> : null}
-				</div>
+				</PwaAlert>
 			)}
 
-			{assistant.blocked_provider_errors?.length ? <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">A resposta externa foi bloqueada pela validação e substituída por uma alternativa segura.</p> : null}
-			{assistant.notice ? <p className="mt-3 text-xs leading-5 text-slate-500">{assistant.notice}</p> : null}
-			{error ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p> : null}
+			{assistant.blocked_provider_errors?.length ? <PwaAlert tone="attention" title="Conteúdo descartado por segurança" className="mt-3">Nenhum trecho bloqueado será incluído na observação.</PwaAlert> : null}
+			{error ? <PwaAlert tone="error" title="Não foi possível concluir a aprovação" className="mt-3">{error}</PwaAlert> : null}
 
 			<div className="mt-5 grid gap-3 sm:grid-cols-2">
 				<PwaButton type="button" onClick={onDiscard} disabled={saving} variant="secondary">Descartar</PwaButton>

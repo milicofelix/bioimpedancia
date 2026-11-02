@@ -9,6 +9,9 @@ import PwaToast from '../../components/ui/PwaToast';
 import PwaConfirmSheet from '../../components/ui/PwaConfirmSheet';
 import ShareLinkSkeleton from './ShareLinkSkeleton';
 import useActionLock from '../../../hooks/useActionLock';
+import PwaAlert from '../../components/ui/PwaAlert';
+import PwaSectionHeader from '../../components/ui/PwaSectionHeader';
+import PwaState from '../../components/ui/PwaState';
 
 function shareStatus(share) {
 	if (share.revoked_at) return { label: 'Revogado', icon: 'minus', badge: 'bg-slate-200 text-slate-700', card: 'border-slate-200 bg-slate-50' };
@@ -125,24 +128,23 @@ export default function ReportSharing({ assessment, canCreate, canRevoke, onAsse
 	return (
 		<PwaCard className="p-5">
 			<PwaToast message={error || feedback} tone={error ? 'error' : 'success'} onDismiss={() => { setError(''); setFeedback(''); }} />
-			<div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-				<div className="flex items-start gap-3"><PwaIcon name="shield" className="mt-0.5 shrink-0" /><p><strong>Dados sensíveis:</strong> o link dá acesso ao relatório clínico do cliente. Compartilhe somente com a pessoa correta e revogue quando não for mais necessário.</p></div>
-			</div>
+			<PwaSectionHeader icon="share" eyebrow="Compartilhamento" title="Acesso temporário ao relatório" description="Crie um link com prazo definido para enviar ao cliente." tone="blue" />
+			<PwaAlert tone="attention" title="Proteja os dados do cliente" className="mt-4">Confirme o destinatário antes de enviar e revogue o link quando ele não for mais necessário.</PwaAlert>
+			{!isOnline ? <PwaAlert tone="info" title="Sem conexão" className="mt-3">A criação e a revogação de links estarão disponíveis quando a conexão for restabelecida.</PwaAlert> : null}
 
-			<h2 className="mt-5 text-lg font-bold text-slate-950">Compartilhamento temporário</h2>
 			<div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
 				<label className="text-sm font-semibold text-slate-700">Validade do link<select value={expiresInDays} onChange={(event) => setExpiresInDays(event.target.value)} disabled={!canCreate || creating || !isOnline} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-3"><option value="1">1 dia</option><option value="3">3 dias</option><option value="7">7 dias</option><option value="15">15 dias</option><option value="30">30 dias</option></select></label>
 				<PwaButton type="button" onClick={createLink} disabled={!canCreate || creating || !isOnline} loading={creating} icon="share" className="self-end">{creating ? 'Criando...' : 'Criar link temporário'}</PwaButton>
 			</div>
-			{!canCreate ? <p className="mt-2 text-xs font-semibold text-amber-700">Seu perfil não pode criar links de compartilhamento.</p> : null}
+			{!canCreate ? <PwaAlert tone="info" title="Criação indisponível para este perfil" className="mt-3">Você ainda pode consultar a situação dos links já criados.</PwaAlert> : null}
 			{creating ? <ShareLinkSkeleton /> : null}
 
 			{shareResult ? <div className={`mt-4 rounded-2xl border p-4 transition ${copied ? 'border-emerald-300 bg-emerald-50 ring-2 ring-emerald-100' : 'border-ricosty-200 bg-ricosty-50'}`}><div className="flex flex-wrap items-center justify-between gap-2"><span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-bold uppercase text-emerald-900"><PwaIcon name="check" size={12} />Ativo</span><p className="flex items-center gap-1 text-xs font-bold text-ricosty-900"><PwaIcon name="clock" size={14} />Expira em {formatDate(shareResult.expires_at)}</p></div><p className="mt-3 break-all rounded-lg bg-white/80 p-2 text-sm text-ricosty-950">{shareResult.url}</p><div className="mt-3 grid gap-2 sm:grid-cols-2"><PwaButton type="button" onClick={() => setPendingShareAction('native')} icon="share" className="text-xs">Compartilhar no dispositivo</PwaButton><PwaButton type="button" onClick={() => setPendingShareAction('copy')} icon={copied ? 'check' : 'copy'} variant="secondary" className={`text-xs ${copied ? 'border-emerald-300 text-emerald-800' : ''}`}>{copied ? 'Link copiado!' : 'Copiar link'}</PwaButton></div></div> : null}
 
-			{assessment.shares?.length ? <div className="mt-5"><div className="flex items-center justify-between"><h3 className="text-sm font-bold text-slate-900">Links criados</h3><span className="text-xs text-slate-600">{assessment.shares.length} no total</span></div><div className="mt-2 space-y-2">{assessment.shares.map((share) => {
+			{assessment.shares?.length ? <div className="mt-5"><div className="flex items-center justify-between"><h3 className="flex items-center gap-2 text-sm font-bold text-slate-900"><PwaIcon name="history" size={16} />Histórico de links</h3><span className="text-xs text-slate-600">{assessment.shares.length} no total</span></div><div className="mt-2 space-y-2">{assessment.shares.map((share) => {
 				const status = shareStatus(share);
 				return <div key={share.id} className={`rounded-xl border p-3 ${status.card}`}><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold uppercase ${status.badge}`}><PwaIcon name={status.icon} size={12} />{status.label}</span><p className="mt-2 text-xs font-bold text-slate-800">Expira em {formatDate(share.expires_at)}</p><p className="mt-1 text-xs text-slate-600">{share.view_count} visualização(ões){share.revoked_at ? ` · revogado em ${formatDate(share.revoked_at)}` : ''}</p></div>{status.label === 'Ativo' && canRevoke ? <button type="button" aria-label={`Revogar link que expira em ${formatDate(share.expires_at)}`} onClick={() => setPendingRevoke(share)} disabled={revokingId === share.id || !isOnline} className="pwa-focus min-h-11 min-w-11 rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-bold text-rose-800 disabled:opacity-50">{revokingId === share.id ? 'Revogando...' : 'Revogar'}</button> : null}</div></div>;
-			})}</div></div> : null}
+			})}</div></div> : !creating && !shareResult ? <PwaState icon="share" title="Nenhum link criado" description="Quando um link for criado, seu prazo e estado aparecerão aqui." className="mt-5 p-4" /> : null}
 
 			<PwaConfirmSheet open={Boolean(pendingShareAction)} title="Confirmar compartilhamento" description="Este link contém dados clínicos sensíveis. Confirme a identidade do destinatário e evite enviar para grupos ou aparelhos compartilhados." detail={<><strong>Validade:</strong> até {formatDate(shareResult?.expires_at)}</>} confirmIcon={pendingShareAction === 'copy' ? 'copy' : 'share'} onCancel={() => setPendingShareAction(null)} onConfirm={confirmShare} />
 			<PwaConfirmSheet open={Boolean(pendingRevoke)} title="Revogar este link?" description="O cliente perderá o acesso imediatamente. Esta ação não pode ser desfeita; se necessário, será preciso criar um novo link." icon="alertTriangle" tone="danger" confirmLabel="Revogar link" confirmVariant="danger" onCancel={() => setPendingRevoke(null)} onConfirm={confirmRevoke} />

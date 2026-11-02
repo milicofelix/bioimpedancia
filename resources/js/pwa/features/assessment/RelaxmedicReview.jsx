@@ -1,9 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { relaxmedicMetricLabels } from '../../../domain/bioimpedance/relaxmedic';
 import { localDatetimeNow } from '../../../shared/formatters';
 import { relaxmedicIntegerFields, relaxmedicTextFields } from './relaxmedicAssessmentForm';
 import PwaButton from '../../components/ui/PwaButton';
 import PwaIcon from '../../components/ui/PwaIcon';
+import PwaAlert from '../../components/ui/PwaAlert';
+import PwaSectionHeader from '../../components/ui/PwaSectionHeader';
+import PwaConfirmSheet from '../../components/ui/PwaConfirmSheet';
 
 function fieldError(errors, field) {
 	const value = errors[field];
@@ -13,7 +16,6 @@ function fieldError(errors, field) {
 export default function RelaxmedicReview({ previewUrl, form, extraction, confirmed, errors, saving, online, onUpdate, onConfirm, onSubmit, onRestart }) {
 	const [panel, setPanel] = useState('image');
 	const [confirmRestart, setConfirmRestart] = useState(false);
-	const cancelRestartReference = useRef(null);
 	const flaggedFields = useMemo(() => new Set([
 		...(extraction?.missing_fields ?? []),
 		...(extraction?.suspicious_values ?? []).map((item) => (typeof item === 'string' ? item : item.field)).filter(Boolean),
@@ -27,28 +29,10 @@ export default function RelaxmedicReview({ previewUrl, form, extraction, confirm
 		...(extraction?.suspicious_values ?? []).map((item) => item?.reason).filter(Boolean),
 	])], [extraction]);
 
-	useEffect(() => {
-		if (!confirmRestart) return undefined;
-		cancelRestartReference.current?.focus();
-		const closeOnEscape = (event) => {
-			if (event.key === 'Escape') setConfirmRestart(false);
-		};
-		window.addEventListener('keydown', closeOnEscape);
-		return () => window.removeEventListener('keydown', closeOnEscape);
-	}, [confirmRestart]);
-
 	return (
 		<form onSubmit={onSubmit} aria-busy={saving} className="pwa-card p-4 sm:p-5">
-			<div className="flex items-start justify-between gap-3">
-				<div>
-					<p className="text-xs font-bold uppercase tracking-wide text-emerald-700">2. Conferência humana</p>
-					<h2 className="mt-1 text-lg font-bold text-slate-950">Compare e corrija os valores</h2>
-				</div>
-				<PwaButton type="button" onClick={() => setConfirmRestart(true)} variant="ghost" icon="refresh" className="shrink-0 px-2 text-xs">Trocar imagem</PwaButton>
-			</div>
-
-			<p className="mt-2 text-sm leading-6 text-slate-600">Confira os campos sinalizados e corrija qualquer valor antes de salvar.</p>
-			{unresolvedFields.length ? <p role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">A leitura encontrou uma classificação desconhecida. Compare com a imagem e selecione um valor reconhecido para continuar.</p> : null}
+			<PwaSectionHeader icon="eye" eyebrow="2. Conferência humana" title="Compare e corrija os valores" description="Confira os campos sinalizados e corrija qualquer valor antes de salvar." action={<PwaButton type="button" onClick={() => setConfirmRestart(true)} variant="ghost" icon="refresh" className="shrink-0 px-2 text-xs">Trocar imagem</PwaButton>} />
+			{unresolvedFields.length ? <PwaAlert tone="error" className="mt-3" title="Classificação não reconhecida">Compare com a imagem e selecione um valor reconhecido para continuar.</PwaAlert> : null}
 			{warnings.length ? (
 				<details className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-2 text-sm text-amber-950">
 					<summary className="pwa-focus flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-lg py-1 font-bold"><PwaIcon name="alertTriangle" size={17} />{warnings.length} {warnings.length === 1 ? 'ponto precisa' : 'pontos precisam'} de atenção</summary>
@@ -68,6 +52,7 @@ export default function RelaxmedicReview({ previewUrl, form, extraction, confirm
 				</div>
 
 				<div className={`${panel === 'values' ? 'block' : 'hidden'} space-y-4 lg:block`}>
+					<PwaSectionHeader icon="clipboard" title="Valores extraídos" description="Campos amarelos exigem conferência com a imagem original." headingLevel="h3" />
 					<label className={`block rounded-xl border border-l-4 p-3 text-sm font-semibold text-slate-700 ${fieldError(errors, 'evaluated_at') ? 'border-rose-400 bg-rose-50' : measuredAtSuspicious ? 'border-amber-300 border-l-amber-400 bg-amber-50/30' : 'border-slate-200 border-l-transparent bg-white'}`}>
 						Data e hora da medição
 						{measuredAtSuspicious ? <span className="ml-2 rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900">Conferir</span> : null}
@@ -100,22 +85,10 @@ export default function RelaxmedicReview({ previewUrl, form, extraction, confirm
 					<span>Conferi a imagem e confirmo que os valores acima estão corretos.</span>
 				</label>
 			</div>
-			{generalError ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{generalError}</p> : null}
-			<PwaButton type="submit" disabled={unresolvedFields.length > 0 || !confirmed || saving || !online} loading={saving} icon="check" className="mt-4 w-full">{saving ? 'Criando avaliação...' : 'Confirmar e criar avaliação'}</PwaButton>
+			{generalError ? <PwaAlert tone="error" className="mt-3" title="Não foi possível confirmar">{generalError}</PwaAlert> : null}
+			<PwaButton type="submit" disabled={unresolvedFields.length > 0 || !confirmed || saving || !online} loading={saving} icon="check" className="mt-4 w-full shadow-lg shadow-ricosty-200">{saving ? 'Criando avaliação...' : 'Confirmar e criar avaliação'}</PwaButton>
 
-			{confirmRestart ? (
-				<div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-4 backdrop-blur-sm sm:items-center" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmRestart(false); }}>
-					<div role="dialog" aria-modal="true" aria-labelledby="discard-image-title" aria-describedby="discard-image-description" className="pwa-screen-enter w-full max-w-sm rounded-[1.5rem] bg-white p-5 shadow-2xl">
-						<div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700"><PwaIcon name="alertTriangle" /></div>
-						<h2 id="discard-image-title" className="mt-4 text-lg font-bold text-slate-950">Trocar a imagem processada?</h2>
-						<p id="discard-image-description" className="mt-2 text-sm leading-6 text-slate-600">A imagem, os valores extraídos e todas as correções ainda não salvas serão descartados.</p>
-						<div className="mt-5 grid grid-cols-2 gap-3">
-							<PwaButton ref={cancelRestartReference} type="button" variant="secondary" onClick={() => setConfirmRestart(false)}>Continuar conferindo</PwaButton>
-							<PwaButton type="button" variant="danger" icon="refresh" onClick={onRestart}>Descartar e trocar</PwaButton>
-						</div>
-					</div>
-				</div>
-			) : null}
+			<PwaConfirmSheet open={confirmRestart} title="Trocar a imagem processada?" description="A imagem, os valores extraídos e todas as correções ainda não salvas serão descartados." icon="alertTriangle" tone="danger" confirmLabel="Descartar e trocar" confirmIcon="refresh" confirmVariant="danger" onCancel={() => setConfirmRestart(false)} onConfirm={onRestart} />
 		</form>
 	);
 }

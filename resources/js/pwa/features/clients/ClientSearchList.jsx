@@ -3,6 +3,8 @@ import { formatIssueDate } from '../../../shared/formatters';
 import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaIcon from '../../components/ui/PwaIcon';
+import PwaSectionHeader from '../../components/ui/PwaSectionHeader';
+import PwaState from '../../components/ui/PwaState';
 
 function searchable(value) {
 	return String(value ?? '')
@@ -58,24 +60,24 @@ export default function ClientSearchList({ clients, canCreate, onCreate, onSelec
 
 	return (
 		<section aria-labelledby="clients-title">
-			<div className="flex items-start justify-between gap-3">
-				<div>
-					<p className="text-xs font-bold uppercase tracking-[0.16em] text-ricosty-600">Atendimento</p>
-					<h2 id="clients-title" className="mt-1 text-2xl font-bold text-ricosty-950">Clientes</h2>
-					<p className="mt-1 text-sm text-slate-500">Localize rapidamente quem será atendido.</p>
-				</div>
-				{canCreate ? <PwaButton type="button" icon="plus" onClick={onCreate} className="min-h-11 px-3">Cadastrar</PwaButton> : null}
-			</div>
+			<PwaSectionHeader
+				icon="users"
+				eyebrow="Atendimento"
+				title="Clientes"
+				headingId="clients-title"
+				description="Localize rapidamente quem será atendido."
+				action={canCreate ? <PwaButton type="button" icon="plus" onClick={onCreate} className="min-h-11 px-3">Cadastrar</PwaButton> : null}
+			/>
 
 			<PwaCard className="mt-5 p-3">
 				<label className="relative block">
 					<span className="sr-only">Buscar clientes</span>
 					<PwaIcon name="search" size={20} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ricosty-500" />
 					<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nome, telefone, e-mail ou CPF" className="pwa-focus min-h-13 w-full rounded-xl border border-ricosty-100 bg-ricosty-cream/50 py-3 pl-12 pr-12 text-base transition placeholder:text-slate-500 focus:border-ricosty-400 focus:bg-white" />
-					{query ? <button type="button" onClick={() => setQuery('')} aria-label="Limpar busca de clientes" className="pwa-focus absolute right-1.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-xl text-slate-600 hover:bg-ricosty-50">×</button> : null}
+					{query ? <button type="button" onClick={() => setQuery('')} aria-label="Limpar busca de clientes" className="pwa-focus absolute right-1.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-slate-600 hover:bg-ricosty-50"><PwaIcon name="x" size={18} /></button> : null}
 				</label>
 				<div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1" role="group" aria-label="Filtrar clientes por situação">
-					{[{ key: 'active', label: 'Ativos' }, { key: 'unavailable', label: 'Indisponíveis' }, { key: 'all', label: 'Todos' }].map((filter) => <button type="button" key={filter.key} onClick={() => setStatusFilter(filter.key)} aria-pressed={statusFilter === filter.key} aria-label={`${filter.label}: ${counts[filter.key]} clientes`} className={`pwa-focus min-h-11 rounded-lg px-1 text-xs font-bold transition ${statusFilter === filter.key ? 'bg-white text-ricosty-800 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}>{filter.label}<span className="ml-1" aria-hidden="true">{counts[filter.key]}</span></button>)}
+					{[{ key: 'active', label: 'Ativos' }, { key: 'unavailable', label: 'Indisponíveis' }, { key: 'all', label: 'Todos' }].map((filter) => <button type="button" key={filter.key} onClick={() => setStatusFilter(filter.key)} aria-pressed={statusFilter === filter.key} aria-label={`${filter.label}: ${counts[filter.key]} clientes`} className={`pwa-focus flex min-h-11 min-w-0 flex-col items-center justify-center rounded-lg px-1 text-[11px] font-bold leading-tight transition min-[380px]:flex-row min-[380px]:text-xs ${statusFilter === filter.key ? 'bg-white text-ricosty-800 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}><span className="max-w-full break-words">{filter.label}</span><span className="mt-0.5 min-[380px]:ml-1 min-[380px]:mt-0" aria-hidden="true">{counts[filter.key]}</span></button>)}
 				</div>
 			</PwaCard>
 
@@ -87,23 +89,19 @@ export default function ClientSearchList({ clients, canCreate, onCreate, onSelec
 			<div className="mt-3 space-y-2">
 				{visibleClients.map((client) => {
 					const status = clientStatus(client);
+					const contact = client.phone || client.email;
 					return <PwaCard as="button" type="button" key={client.id} onClick={() => onSelect(client)} aria-label={`Abrir cliente ${client.full_name}, ${status.label}`} className={`pwa-focus pwa-pressable block w-full touch-manipulation border-l-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-ricosty-300 hover:shadow-[0_16px_36px_rgba(97,38,55,0.11)] ${status.border}`}>
-						<span className="flex items-center gap-3">
+						<span className="flex flex-wrap items-center gap-3">
 							<span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-sm font-black ring-1 ${status.avatar}`}>{initials(client.full_name)}</span>
-							<span className="min-w-0 flex-1"><span className="block break-words font-bold text-ricosty-950">{client.full_name}</span><span className="mt-0.5 block break-all text-sm text-slate-600">{client.phone || client.email || 'Sem contato cadastrado'}</span></span>
-							<span className={`rounded-full px-2 py-1 text-[11px] font-bold uppercase ${status.badge}`}>{status.label}</span>
+							<span className="min-w-0 flex-1"><span className="block break-words font-bold text-ricosty-950">{client.full_name}</span><span className="mt-1 flex items-center gap-1.5 break-all text-sm text-slate-600"><PwaIcon name={client.phone ? 'phone' : client.email ? 'mail' : 'alertTriangle'} size={14} className="shrink-0 text-ricosty-500" />{contact || 'Sem contato cadastrado'}</span></span>
+							<span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold uppercase ${status.badge}`}>{status.label}</span>
 						</span>
-						<span className="mt-3 flex items-center justify-between border-t border-ricosty-100 pt-2 text-xs text-slate-600"><span>Última avaliação: <strong className="font-semibold text-slate-700">{formatIssueDate(client.last_assessment_at)}</strong></span><PwaIcon name="chevronRight" size={17} className="text-ricosty-600" /></span>
+						<span className="mt-3 flex items-center justify-between border-t border-ricosty-100 pt-2 text-xs text-slate-600"><span className="flex items-center gap-1.5"><PwaIcon name="calendar" size={14} className="text-ricosty-500" /><span>Última avaliação: <strong className="font-semibold text-slate-700">{formatIssueDate(client.last_assessment_at)}</strong></span></span><span className="flex h-8 w-8 items-center justify-center rounded-full bg-ricosty-50"><PwaIcon name="chevronRight" size={17} className="text-ricosty-600" /></span></span>
 					</PwaCard>;
 				})}
 			</div>
 
-			{!visibleClients.length ? (
-				<div className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center">
-					<p className="font-semibold text-slate-800">{clients.length ? 'Nenhum cliente encontrado.' : 'Nenhum cliente cadastrado.'}</p>
-					<p className="mt-1 text-sm text-slate-500">{canCreate ? 'Use o botão Cadastrar para iniciar o primeiro atendimento.' : 'Seu perfil possui acesso somente aos registros existentes.'}</p>
-				</div>
-			) : null}
+			{!visibleClients.length ? <PwaState className="mt-3" icon={clients.length ? 'search' : 'users'} title={clients.length ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'} description={canCreate ? 'Use o botão Cadastrar para iniciar o primeiro atendimento.' : 'Seu perfil possui acesso somente aos registros existentes.'} /> : null}
 		</section>
 	);
 }

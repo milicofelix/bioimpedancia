@@ -22,6 +22,12 @@ export async function createBioimpedanceClient(payload) {
 	return data.client;
 }
 
+export async function updateBioimpedanceClientProfile(clientId, profile) {
+	const { data } = await window.axios.patch(`/bioimpedance/clients/${clientId}/profile`, profile);
+
+	return data.client;
+}
+
 export async function processRelaxmedicImage(image) {
 	const payload = new FormData();
 	payload.append('image', image);

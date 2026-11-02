@@ -1,13 +1,13 @@
 import { relaxmedicMetricLabels, relaxmedicMetricMetadata } from '../../../domain/bioimpedance/relaxmedic';
 
 const omronMetrics = [
-	{ field: 'weight_kg', label: 'Peso', unit: 'kg', decimals: 1 },
-	{ field: 'calculated_bmi', label: 'IMC calculado', unit: '', decimals: 1 },
-	{ field: 'body_fat_percentage', label: 'Gordura corporal', unit: '%', decimals: 1 },
-	{ field: 'skeletal_muscle_percentage', label: 'Músculo esquelético', unit: '%', decimals: 1 },
-	{ field: 'visceral_fat_level', label: 'Gordura visceral', unit: '', decimals: 1 },
-	{ field: 'resting_metabolism_kcal', label: 'Metabolismo basal', unit: 'kcal', decimals: 0 },
-	{ field: 'body_age', label: 'Índice de idade corporal do aparelho', unit: 'anos', decimals: 0 },
+	{ field: 'weight_kg', label: 'Peso', unit: 'kg', decimals: 1, type: 'Medida', note: 'Peso registrado pelo equipamento no momento da avaliação.' },
+	{ field: 'calculated_bmi', label: 'IMC calculado', unit: '', decimals: 1, type: 'Índice calculado', note: 'Relação entre peso e altura; não deve definir objetivos isoladamente.' },
+	{ field: 'body_fat_percentage', label: 'Gordura corporal', unit: '%', decimals: 1, type: 'Estimativa', note: 'Estimativa de composição corporal produzida pelo equipamento.' },
+	{ field: 'skeletal_muscle_percentage', label: 'Músculo esquelético', unit: '%', decimals: 1, type: 'Estimativa', note: 'Estimativa corporal; não mede força ou função muscular.' },
+	{ field: 'visceral_fat_level', label: 'Gordura visceral', unit: '', decimals: 1, type: 'Índice do dispositivo', note: 'Índice do equipamento, não uma quantidade de gordura em kg.' },
+	{ field: 'resting_metabolism_kcal', label: 'Metabolismo basal', unit: 'kcal', decimals: 0, type: 'Estimativa energética', note: 'Não corresponde ao gasto energético total nem a uma prescrição.' },
+	{ field: 'body_age', label: 'Índice de idade corporal do aparelho', unit: 'anos', decimals: 0, type: 'Índice proprietário', note: 'Não representa idade biológica ou diagnóstico clínico.' },
 ];
 
 const relaxmedicUnits = {

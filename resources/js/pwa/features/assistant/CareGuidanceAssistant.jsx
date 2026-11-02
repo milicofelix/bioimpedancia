@@ -6,6 +6,9 @@ import PwaCard from '../../components/ui/PwaCard';
 import PwaIcon from '../../components/ui/PwaIcon';
 import CareGuidanceProgress from './CareGuidanceProgress';
 import CareGuidanceEvidence from './CareGuidanceEvidence';
+import PwaAlert from '../../components/ui/PwaAlert';
+import PwaInfoCard from '../../components/ui/PwaInfoCard';
+import PwaSectionHeader from '../../components/ui/PwaSectionHeader';
 
 export default function CareGuidanceAssistant({ assessment, online, onApproved }) {
 	const runAction = useActionLock();
@@ -15,7 +18,7 @@ export default function CareGuidanceAssistant({ assessment, online, onApproved }
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState('');
 	const edited = Boolean(assistant?.suggestion && draft !== assistant.suggestion);
-	const blocked = Boolean(assistant && assistant.status !== 'generated');
+	const blocked = Boolean(assistant && (assistant.status !== 'generated' || (assistant.validation_status && assistant.validation_status !== 'passed')));
 
 	useEffect(() => {
 		setAssistant(null);
@@ -69,20 +72,19 @@ export default function CareGuidanceAssistant({ assessment, online, onApproved }
 
 	return (
 		<PwaCard className="border-teal-200 p-5">
-			<div className="flex items-start gap-3"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-teal-100 text-teal-800"><PwaIcon name="sparkles" size={21} /></span><div><p className="text-xs font-bold uppercase tracking-wide text-teal-700">Agente de orientações</p><h2 className="text-lg font-bold text-slate-950">Próximos cuidados</h2></div></div>
-			<p className="mt-3 text-sm leading-6 text-slate-700">Gera orientações educativas de alimentação, movimento e acompanhamento com base na observação aprovada. Não realiza diagnóstico nem prescrição.</p>
-			{assessment.care_guidance ? <div className="mt-4 rounded-xl border border-teal-200 bg-teal-50 p-4"><p className="text-xs font-bold uppercase text-teal-800">Orientações aprovadas no relatório</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{assessment.care_guidance}</p></div> : null}
+			<PwaSectionHeader icon="sparkles" eyebrow="Orientação" title="Próximos cuidados" description="Orientações educativas baseadas na observação aprovada, sempre sujeitas à revisão profissional." tone="teal" />
+			{assessment.care_guidance ? <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><p className="flex items-center gap-2 text-xs font-bold uppercase text-emerald-800"><PwaIcon name="check" size={15} />Conteúdo aprovado para o relatório</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{assessment.care_guidance}</p></div> : null}
 			{assistant ? <div className="mt-4 space-y-4">
-				<div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-950"><strong>Revisão obrigatória:</strong> confirme se as orientações são adequadas ao histórico e às limitações conhecidas do cliente.</div>
-				{assistant.validation_errors?.length ? <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"><strong>A sugestão foi bloqueada:</strong><ul className="mt-1 list-disc pl-5">{assistant.validation_errors.map((message) => <li key={message}>{message}</li>)}</ul></div> : null}
-				{blocked ? <div role="status" className="rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm leading-6 text-slate-700"><strong>A aprovação está desativada por segurança.</strong> Isso não depende do módulo de Relatórios corporais. Volte e gere outra sugestão para que somente um texto aprovado pela validação possa seguir para o relatório.</div> : null}
+				<PwaAlert tone="attention" title="Pendente de revisão">Confirme se as orientações são adequadas ao histórico e às limitações conhecidas do cliente.</PwaAlert>
+				{assistant.validation_errors?.length ? <PwaAlert tone="error" title="Orientação bloqueada"><ul className="list-disc pl-5">{assistant.validation_errors.map((message) => <li key={message}>{message}</li>)}</ul></PwaAlert> : null}
+				{blocked ? <PwaAlert tone="info" title="Aprovação indisponível">Gere uma nova sugestão para que somente um conteúdo aprovado pelas regras de segurança possa seguir para o relatório.</PwaAlert> : null}
 				<label className="block text-sm font-bold text-slate-800">Orientações sugeridas<textarea rows="14" maxLength={4000} value={draft} onChange={(event) => setDraft(event.target.value)} disabled={blocked} className="pwa-focus mt-2 w-full rounded-xl border border-teal-200 bg-white p-3 font-normal leading-6 disabled:bg-slate-100" /></label>
 				{edited ? <p className="text-xs font-bold text-violet-700">Texto editado pelo profissional.</p> : null}
 				<CareGuidanceEvidence assistant={assistant} />
 				<div className="grid gap-2 sm:grid-cols-2"><PwaButton type="button" variant="secondary" onClick={() => { setAssistant(null); setDraft(''); }}>{blocked ? 'Voltar e tentar novamente' : 'Descartar'}</PwaButton><PwaButton type="button" icon="check" onClick={approve} disabled={blocked || saving || draft.trim().length < 100 || !online} loading={saving}>{saving ? 'Aprovando...' : blocked ? 'Aprovação bloqueada' : 'Aprovar para o relatório'}</PwaButton></div>
 			</div> : <PwaButton type="button" icon="sparkles" onClick={generate} disabled={!online} className="mt-4 w-full">{assessment.care_guidance ? 'Gerar nova sugestão' : 'Sugerir próximos cuidados'}</PwaButton>}
-			{error ? <p role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">{error}</p> : null}
-			<p className="mt-3 text-xs leading-5 text-slate-600">Vitaminas e suplementos dependem de avaliação individual e não são indicados automaticamente pelo agente.</p>
+			{error ? <PwaAlert tone="error" title="Não foi possível concluir a ação" className="mt-3">{error}</PwaAlert> : null}
+			<PwaInfoCard icon="shield" title="Limite do assistente" className="mt-3"><p className="text-xs leading-5 text-slate-600">Vitaminas e suplementos dependem de avaliação individual e não são indicados automaticamente.</p></PwaInfoCard>
 		</PwaCard>
 	);
 }

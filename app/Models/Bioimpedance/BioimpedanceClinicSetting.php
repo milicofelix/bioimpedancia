@@ -43,6 +43,7 @@ class BioimpedanceClinicSetting extends Model
         'assessment_module_enabled' => true,
         'screening_module_enabled' => true,
         'reports_module_enabled' => true,
+        'assessment_pdf_enabled' => true,
     ];
 
     protected $fillable = [
@@ -65,6 +66,7 @@ class BioimpedanceClinicSetting extends Model
         'assessment_module_enabled',
         'screening_module_enabled',
         'reports_module_enabled',
+        'assessment_pdf_enabled',
     ];
 
     protected function casts(): array
@@ -73,6 +75,7 @@ class BioimpedanceClinicSetting extends Model
             'assessment_module_enabled' => 'boolean',
             'screening_module_enabled' => 'boolean',
             'reports_module_enabled' => 'boolean',
+            'assessment_pdf_enabled' => 'boolean',
         ];
     }
 

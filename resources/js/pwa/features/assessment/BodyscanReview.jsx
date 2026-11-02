@@ -7,6 +7,9 @@ import { relaxmedicIntegerFields, relaxmedicTextFields } from './relaxmedicAsses
 import { segmentClassificationOptions, segmentLabels } from './bodyscanAssessmentForm';
 import SegmentalBodyMap from '../../../components/bioimpedance/SegmentalBodyMap';
 import { bodyscanLayoutPresentation, isVerticalBodyscanLayout } from './BodyscanReportFormatGuide';
+import PwaAlert from '../../components/ui/PwaAlert';
+import PwaInfoCard from '../../components/ui/PwaInfoCard';
+import PwaSectionHeader from '../../components/ui/PwaSectionHeader';
 
 const valueFields = ['mass_kg', 'reference_percentage', 'classification', 'reference_min_percentage', 'reference_max_percentage'];
 const segmentFieldLabels = {
@@ -127,6 +130,25 @@ function SegmentInput({ label, value, onChange }) {
 	return <label className="text-xs font-semibold text-slate-700">{label}<input required inputMode="decimal" value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-2 font-normal outline-none focus:ring-2 focus:ring-emerald-400" /></label>;
 }
 
+function AthleteModeSelector({ value, onChange, compact = false, error }) {
+	return (
+		<fieldset id={compact ? 'bodyscan-athlete-mode-dock' : 'bodyscan-athlete-mode'} className="min-w-0">
+			<legend className={`${compact ? 'text-xs' : 'text-sm'} font-bold text-slate-800`}>Perfil usado na balança</legend>
+			<div className="mt-1 grid grid-cols-2 gap-2" role="group" aria-label="Confirmar perfil usado na medição">
+				{[
+					{ value: '0', label: 'Padrão', icon: 'user' },
+					{ value: '1', label: 'Atleta', icon: 'activity' },
+				].map((option) => {
+					const selected = String(value ?? '') === option.value;
+					return <button type="button" key={option.value} aria-pressed={selected} onClick={() => onChange(option.value)} className={`pwa-focus flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-extrabold transition ${selected ? 'border-ricosty-600 bg-ricosty-700 text-white shadow-md shadow-ricosty-100' : 'border-slate-300 bg-white text-slate-700 hover:border-ricosty-300 hover:bg-ricosty-50'}`}><PwaIcon name={selected ? 'check' : option.icon} size={16} /><span className="truncate">{option.label}</span></button>;
+				})}
+			</div>
+			{String(value ?? '') === '' ? <p className="mt-1 text-xs font-semibold text-amber-800">Selecione o perfil após conferir no aplicativo.</p> : null}
+			{error ? <span className="mt-1 block text-xs font-semibold text-rose-700">{error}</span> : null}
+		</fieldset>
+	);
+}
+
 export default function BodyscanReview({ previewUrl, form, extraction, client, confirmed, errors, saving, online, onGeneralUpdate, onProfileUpdate, onSegmentUpdate, onImpedanceUpdate, onConfirm, onSubmit, onRestart }) {
 	const [panel, setPanel] = useState('values');
 	const [confirmationAttempted, setConfirmationAttempted] = useState(false);
@@ -179,25 +201,51 @@ export default function BodyscanReview({ previewUrl, form, extraction, client, c
 		onConfirm(checked);
 	}
 
+	function handleAthleteModeChange(value) {
+		if (String(form.profile?.athlete_mode_at_assessment ?? '') === value) return;
+		onProfileUpdate('athlete_mode_at_assessment', value);
+		onConfirm(false);
+		setConfirmationAttempted(false);
+	}
+
+	function showPendingItems() {
+		setConfirmationAttempted(true);
+		onConfirm(false);
+		window.requestAnimationFrame(() => {
+			const targetId = String(form.profile?.athlete_mode_at_assessment ?? '') === '' ? 'bodyscan-athlete-mode' : 'bodyscan-confirmation-pending';
+			document.getElementById(targetId)?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+		});
+	}
+
+	function handleSubmit(event) {
+		if (incomplete || !confirmed || saving || !online) {
+			event.preventDefault();
+			if (incomplete) showPendingItems();
+			else document.getElementById('bodyscan-athlete-mode-dock')?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+			return;
+		}
+		onSubmit(event);
+	}
+
 	return (
-		<form onSubmit={onSubmit} aria-busy={saving} className="pwa-card p-4 sm:p-5">
-			<div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Conferência humana</p><h2 className="mt-1 text-lg font-bold text-slate-950">Compare todos os dados Bodyscan</h2></div><PwaButton type="button" variant="ghost" icon="refresh" onClick={() => { if (window.confirm('Descartar a leitura e todas as correções para trocar a imagem?')) onRestart(); }}>Trocar imagem</PwaButton></div>
-			{extraction?.side_consistency?.possible_swap ? <p role="alert" className="mt-3 rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm font-bold text-rose-800">Possível troca entre os lados L (esquerdo) e R (direito). Confira os marcadores diretamente na imagem.</p> : null}
-			{qualityWarnings.length ? <details className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm"><summary className="min-h-11 cursor-pointer font-bold">Qualidade da imagem · {qualityWarnings.length} {qualityWarnings.length === 1 ? 'observação' : 'observações'}</summary><p className="mb-2 text-xs text-amber-900">Estas mensagens tratam apenas de nitidez, resolução ou enquadramento.</p><ul className="list-disc space-y-1 pl-5">{qualityWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></details> : null}
-			{readingWarnings.length ? <details className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm"><summary className="min-h-11 cursor-pointer font-bold">Campos para conferir · {readingWarnings.length}</summary><p className="mb-2 text-xs text-amber-900">Confira somente os textos, números, unidades ou lados que não puderam ser lidos com segurança.</p><ul className="list-disc space-y-1 pl-5">{readingWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></details> : null}
+		<form onSubmit={handleSubmit} aria-busy={saving} className="pwa-card p-4 sm:p-5">
+			<PwaSectionHeader icon="eye" eyebrow="Conferência humana" title="Compare todos os dados Bodyscan" description="Revise somente os itens sinalizados e confirme os demais diretamente na imagem original." action={<PwaButton type="button" variant="ghost" icon="refresh" className="px-2 text-xs" onClick={() => { if (window.confirm('Descartar a leitura e todas as correções para trocar a imagem?')) onRestart(); }}>Trocar imagem</PwaButton>} />
+			{extraction?.side_consistency?.possible_swap ? <PwaAlert tone="error" className="mt-3" title="Possível troca entre os lados">Confira os marcadores L (esquerdo) e R (direito) diretamente na imagem.</PwaAlert> : null}
+			{qualityWarnings.length ? <details className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm"><summary className="pwa-focus flex min-h-11 cursor-pointer items-center gap-2 rounded-lg font-bold"><PwaIcon name="image" size={17} />Qualidade da imagem <span className="ml-auto rounded-full bg-amber-200 px-2 py-0.5 text-xs">{qualityWarnings.length}</span></summary><p className="mb-2 text-xs text-amber-900">Estas mensagens tratam apenas de nitidez, resolução ou enquadramento.</p><ul className="list-disc space-y-1 pl-5">{qualityWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></details> : null}
+			{readingWarnings.length ? <details className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm"><summary className="pwa-focus flex min-h-11 cursor-pointer items-center gap-2 rounded-lg font-bold"><PwaIcon name="alertTriangle" size={17} />Campos para conferir <span className="ml-auto rounded-full bg-amber-200 px-2 py-0.5 text-xs">{readingWarnings.length}</span></summary><p className="mb-2 text-xs text-amber-900">Confira somente os textos, números, unidades ou lados que não puderam ser lidos com segurança.</p><ul className="list-disc space-y-1 pl-5">{readingWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></details> : null}
 			<div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-950">
 				<div className="flex flex-wrap items-center gap-2"><strong>Layout detectado:</strong><span>{layoutPresentation ? `${layoutPresentation.application} · ${layoutPresentation.label}` : 'Não identificado'}</span>{layoutPresentation ? <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${layoutPresentation.tone === 'recommended' ? 'bg-emerald-100 text-emerald-800' : 'bg-white text-sky-800'}`}>{layoutPresentation.badge}</span> : null}</div>
 				{extraction?.layout_profile_version ? <span className="mt-1 block text-sky-800">Perfil de leitura: {extraction.layout_profile_version}</span> : null}
 			</div>
-			{verticalWithoutImpedance ? <div role="status" className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700"><strong className="text-slate-900">Relatório vertical processado normalmente.</strong><p className="mt-1 text-xs leading-5">Este formato não apresenta a tabela de impedância bioelétrica. Isso é esperado e não impede a conferência nem a criação da avaliação.</p></div> : null}
+			{verticalWithoutImpedance ? <PwaInfoCard className="mt-3" icon="info" title="Relatório vertical processado normalmente"><span className="text-xs">Este formato não apresenta a tabela de impedância bioelétrica. Isso é esperado e não impede a conferência nem a criação da avaliação.</span></PwaInfoCard> : null}
 			<p className="mt-3 text-xs text-slate-500">O arquivo selecionado foi removido da fila de envio após o processamento. A prévia local permanece somente durante esta conferência e será limpa ao concluir ou trocar a imagem.</p>
-			{hasProfileDivergence ? <p role="alert" className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">O perfil impresso diverge do cadastro. Confira sexo, idade e altura antes de confirmar a avaliação.</p> : null}
-			<div className="mt-4 grid grid-cols-2 gap-2 lg:hidden"><button type="button" onClick={() => setPanel('image')} className={`min-h-11 rounded-xl font-bold ${panel === 'image' ? 'bg-ricosty-700 text-white' : 'bg-slate-100'}`}>Imagem</button><button type="button" onClick={() => setPanel('values')} className={`min-h-11 rounded-xl font-bold ${panel === 'values' ? 'bg-ricosty-700 text-white' : 'bg-slate-100'}`}>Valores</button></div>
+			{hasProfileDivergence ? <PwaAlert tone="attention" className="mt-3" title="Perfil divergente">O perfil impresso diverge do cadastro. Confira sexo, idade e altura antes de confirmar a avaliação.</PwaAlert> : null}
+			<div className="mt-4 grid grid-cols-2 gap-2 lg:hidden" role="tablist" aria-label="Conferência Bodyscan"><button type="button" role="tab" aria-selected={panel === 'image'} onClick={() => setPanel('image')} className={`pwa-focus flex min-h-11 items-center justify-center gap-2 rounded-xl font-bold ${panel === 'image' ? 'bg-ricosty-700 text-white' : 'bg-slate-100'}`}><PwaIcon name="image" size={16} />Imagem</button><button type="button" role="tab" aria-selected={panel === 'values'} onClick={() => setPanel('values')} className={`pwa-focus flex min-h-11 items-center justify-center gap-2 rounded-xl font-bold ${panel === 'values' ? 'bg-ricosty-700 text-white' : 'bg-slate-100'}`}><PwaIcon name="clipboard" size={16} />Valores</button></div>
 			<div className="mt-4 lg:grid lg:grid-cols-[minmax(0,.7fr)_minmax(0,1.3fr)] lg:gap-5">
 				<div className={`${panel === 'image' ? 'block' : 'hidden'} lg:block`}><div className="sticky top-20 max-h-[75vh] overflow-y-auto rounded-xl border bg-slate-100 p-2"><img src={previewUrl} alt="Relatório Bodyscan Pro original para conferência" className="mx-auto h-auto w-full rounded-lg object-contain" /></div></div>
 				<div className={`${panel === 'values' ? 'block' : 'hidden'} space-y-4 lg:block`}>
 					<section className="rounded-2xl border border-ricosty-200 bg-ricosty-50/40 p-4">
-						<h3 className="font-bold text-slate-950">Perfil usado na medição</h3>
+						<div className="flex items-center gap-2"><PwaIcon name="user" size={18} className="text-ricosty-700" /><h3 className="font-bold text-slate-950">Perfil usado na medição</h3></div>
 						<p className="mt-1 text-xs leading-5 text-slate-600">Confirme o perfil configurado no aplicativo. No relatório técnico, os dados impressos são comparados ao cadastro sem substituição automática.</p>
 						<div className="mt-3 grid gap-2 sm:grid-cols-3">
 							<ProfileValue label="Sexo no cadastro" value={client?.biological_sex === 'female' ? 'Feminino' : client?.biological_sex === 'male' ? 'Masculino' : 'Não informado'} printedValue={isTechnicalLayout ? (printedProfile.biological_sex === 'female' ? 'Feminino' : printedProfile.biological_sex === 'male' ? 'Masculino' : 'Ilegível') : null} matches={profileComparison.biological_sex} />
@@ -207,13 +255,13 @@ export default function BodyscanReview({ previewUrl, form, extraction, client, c
 						{isTechnicalLayout && printedProfile.raw_value ? <p className="mt-2 text-xs text-slate-500">Cabeçalho lido: {printedProfile.raw_value}</p> : null}
 						<div className="mt-3 grid gap-3 sm:grid-cols-2">
 							<label className="text-sm font-semibold text-slate-800">Aplicativo de origem<select required value={form.profile?.measurement_application ?? ''} onChange={(event) => onProfileUpdate('measurement_application', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3"><option value="">Selecione após conferir</option><option value="relaxfit">RelaxFit</option><option value="fitdays">Fitdays</option></select>{firstError(errors, 'measurement_application') ? <span className="mt-1 block text-xs text-rose-700">{firstError(errors, 'measurement_application')}</span> : null}</label>
-							<label className="text-sm font-semibold text-slate-800">Modo atleta<select required value={form.profile?.athlete_mode_at_assessment ?? ''} onChange={(event) => onProfileUpdate('athlete_mode_at_assessment', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3"><option value="">Selecione após conferir</option><option value="0">Desativado</option><option value="1">Ativado</option></select>{firstError(errors, 'athlete_mode_at_assessment') ? <span className="mt-1 block text-xs text-rose-700">{firstError(errors, 'athlete_mode_at_assessment')}</span> : null}</label>
+							<AthleteModeSelector value={form.profile?.athlete_mode_at_assessment} onChange={handleAthleteModeChange} error={firstError(errors, 'athlete_mode_at_assessment')} />
 						</div>
 						<p className="mt-3 text-xs font-semibold text-slate-600">Equipamento RM-BD0015A · Manual de referência V1.1222</p>
 					</section>
-					<section className="rounded-2xl border border-slate-200 bg-white p-4"><h3 className="font-bold text-slate-950">Composição corporal</h3><label className="mt-3 block text-sm font-semibold">Data e hora<input type="datetime-local" required max={localDatetimeNow()} value={form.general.evaluated_at} onChange={(event) => onGeneralUpdate('evaluated_at', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label><div className="mt-3 grid gap-2 sm:grid-cols-2">{compositionFields.map(([field, label]) => { const flagged = ['missing', 'unrecognized', 'suspicious'].includes(statuses[`metrics.${field}`]); const rawText = extraction?.raw_values?.metric_text?.[field]; return <label key={field} className={`rounded-xl border p-3 text-xs font-semibold ${flagged ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}`}>{label}{flagged ? <span className="ml-2 text-[10px] font-bold text-amber-800">CONFERIR</span> : null}{field === 'obesity_level' ? <select required value={form.general[field]} onChange={(event) => onGeneralUpdate(field, event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 font-normal"><option value="">Selecione após conferir</option>{(extraction?.allowed_values?.obesity_level ?? []).map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input required type="text" inputMode={relaxmedicTextFields.includes(field) ? 'text' : relaxmedicIntegerFields.includes(field) ? 'numeric' : 'decimal'} value={form.general[field]} onChange={(event) => onGeneralUpdate(field, event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 font-normal" />}{rawText ? <span className="mt-1 block font-normal text-slate-500">Leitura bruta: {rawText}</span> : null}{firstError(errors, field) ? <span className="mt-1 block text-rose-700">{firstError(errors, field)}</span> : null}</label>; })}</div></section>
+					<section className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center gap-2"><PwaIcon name="activity" size={18} className="text-ricosty-700" /><h3 className="font-bold text-slate-950">Composição corporal</h3></div><label className="mt-3 block text-sm font-semibold">Data e hora<input type="datetime-local" required max={localDatetimeNow()} value={form.general.evaluated_at} onChange={(event) => onGeneralUpdate('evaluated_at', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label><div className="mt-3 grid gap-2 sm:grid-cols-2">{compositionFields.map(([field, label]) => { const flagged = ['missing', 'unrecognized', 'suspicious'].includes(statuses[`metrics.${field}`]); const rawText = extraction?.raw_values?.metric_text?.[field]; return <label key={field} className={`rounded-xl border p-3 text-xs font-semibold ${flagged ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}`}>{label}{flagged ? <span className="ml-2 text-[10px] font-bold text-amber-800">CONFERIR</span> : null}{field === 'obesity_level' ? <select required value={form.general[field]} onChange={(event) => onGeneralUpdate(field, event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 font-normal"><option value="">Selecione após conferir</option>{(extraction?.allowed_values?.obesity_level ?? []).map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input required type="text" inputMode={relaxmedicTextFields.includes(field) ? 'text' : relaxmedicIntegerFields.includes(field) ? 'numeric' : 'decimal'} value={form.general[field]} onChange={(event) => onGeneralUpdate(field, event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 font-normal" />}{rawText ? <span className="mt-1 block font-normal text-slate-500">Leitura bruta: {rawText}</span> : null}{firstError(errors, field) ? <span className="mt-1 block text-rose-700">{firstError(errors, field)}</span> : null}</label>; })}</div></section>
 					<ExtendedMetrics metrics={extendedMetrics} />
-					<div className="grid gap-4 print:grid-cols-2 lg:grid-cols-2"><SegmentalBodyMap measurements={form.segments} type="fat" /><SegmentalBodyMap measurements={form.segments} type="muscle" /></div>
+					<div className="grid min-w-0 grid-cols-1 gap-4 print:grid-cols-2"><SegmentalBodyMap measurements={form.segments} type="fat" /><SegmentalBodyMap measurements={form.segments} type="muscle" /></div>
 					<SegmentSection title="Gordura segmentar" type="fat" segments={grouped.fat} statuses={statuses} errors={errors} onUpdate={onSegmentUpdate} />
 					<SegmentSection title="Equilíbrio muscular" type="muscle" segments={grouped.muscle} statuses={statuses} errors={errors} onUpdate={onSegmentUpdate} />
 					<ImpedanceSection readings={form.impedanceReadings ?? []} statuses={statuses} errors={errors} onUpdate={onImpedanceUpdate} />
@@ -221,10 +269,21 @@ export default function BodyscanReview({ previewUrl, form, extraction, client, c
 					<label className="block text-sm font-semibold">Observações<input maxLength={2000} value={form.general.notes} onChange={(event) => onGeneralUpdate('notes', event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label>
 				</div>
 			</div>
-			<label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border p-4 text-sm font-semibold ${confirmationAttempted && incomplete ? 'border-amber-400 bg-amber-50' : 'border-ricosty-200 bg-ricosty-50'}`}><input type="checkbox" checked={confirmed} onChange={(event) => handleConfirmationChange(event.target.checked)} aria-describedby={confirmationAttempted && incomplete ? 'bodyscan-confirmation-pending' : undefined} className="mt-0.5 h-5 w-5" /><span>Comparei a imagem original e confirmo o perfil usado na medição, as métricas gerais e estendidas, os segmentos corporais e, quando disponível, a tabela técnica de impedância.</span></label>
-			{confirmationAttempted && incomplete ? <div id="bodyscan-confirmation-pending" role="alert" className="mt-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"><strong className="block">Ainda não é possível confirmar a conferência.</strong><p className="mt-1 text-xs leading-5">Revise as pendências abaixo e marque novamente a confirmação:</p><ul className="mt-2 list-disc space-y-1 pl-5">{confirmationPendingItems.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
-			{firstError(errors, 'source_metadata') || firstError(errors, 'bodyscan_review_confirmed') || firstError(errors, 'segmental_measurements') ? <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-700">{firstError(errors, 'source_metadata') ?? firstError(errors, 'bodyscan_review_confirmed') ?? firstError(errors, 'segmental_measurements')}</p> : null}
-			<PwaButton type="submit" disabled={incomplete || !confirmed || saving || !online} loading={saving} icon="check" className="mt-4 w-full">{saving ? 'Criando avaliação...' : 'Confirmar e criar avaliação'}</PwaButton>
+			{confirmationAttempted && incomplete ? <div id="bodyscan-confirmation-pending"><PwaAlert tone="attention" className="mt-3" title={`Ainda não é possível confirmar · ${confirmationPendingItems.length} pendência(s)`}><p className="text-xs">Revise os itens abaixo e marque novamente a confirmação:</p><ul className="mt-2 list-disc space-y-1 pl-5">{confirmationPendingItems.map((item) => <li key={item}>{item}</li>)}</ul></PwaAlert></div> : null}
+			{firstError(errors, 'source_metadata') || firstError(errors, 'bodyscan_review_confirmed') || firstError(errors, 'segmental_measurements') ? <PwaAlert tone="error" className="mt-3" title="Não foi possível salvar">{firstError(errors, 'source_metadata') ?? firstError(errors, 'bodyscan_review_confirmed') ?? firstError(errors, 'segmental_measurements')}</PwaAlert> : null}
+			<aside className="pwa-review-dock sticky z-10 mt-4 rounded-2xl border border-ricosty-200 bg-white/95 p-3 shadow-[0_16px_40px_rgba(97,38,55,0.18)] backdrop-blur-xl" aria-label="Conclusão da conferência">
+				<div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(13rem,.75fr)_minmax(0,1.25fr)] sm:items-end">
+					<AthleteModeSelector compact value={form.profile?.athlete_mode_at_assessment} onChange={handleAthleteModeChange} />
+					<div className="min-w-0">
+						<label className={`mb-2 flex cursor-pointer items-start gap-2 rounded-xl border px-3 py-2 text-xs font-semibold ${confirmationAttempted && incomplete ? 'border-amber-300 bg-amber-50 text-amber-950' : 'border-ricosty-100 bg-ricosty-50/70 text-slate-700'}`}><input type="checkbox" checked={confirmed} onChange={(event) => handleConfirmationChange(event.target.checked)} aria-describedby={confirmationAttempted && incomplete ? 'bodyscan-confirmation-pending' : undefined} className="mt-0.5 h-5 w-5 shrink-0" /><span>Confirmo que conferi a imagem, o perfil, as métricas, os segmentos e a impedância disponível.</span></label>
+						<div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+							<span className={`inline-flex items-center gap-1.5 font-bold ${!online ? 'text-rose-800' : incomplete || !confirmed ? 'text-amber-800' : 'text-emerald-800'}`}><PwaIcon name={!online ? 'wifiOff' : incomplete || !confirmed ? 'alertTriangle' : 'check'} size={15} />{!online ? 'Sem conexão para salvar' : incomplete ? `${confirmationPendingItems.length} pendência(s)` : confirmed ? 'Conferência pronta' : 'Falta confirmar a conferência'}</span>
+							{incomplete ? <button type="button" onClick={showPendingItems} className="pwa-focus min-h-9 rounded-lg px-2 font-bold text-ricosty-700 hover:bg-ricosty-50">Ver pendências</button> : null}
+						</div>
+						<PwaButton type="submit" disabled={incomplete || !confirmed || saving || !online} loading={saving} icon="check" className="w-full shadow-lg shadow-ricosty-200">{saving ? 'Criando avaliação...' : 'Confirmar e criar avaliação'}</PwaButton>
+					</div>
+				</div>
+			</aside>
 		</form>
 	);
 }

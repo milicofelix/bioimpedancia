@@ -93,6 +93,46 @@ class BioimpedanceWorkflow
         ]);
     }
 
+    public function updateClientProfile(Request $request, BioimpedanceClient $client): JsonResponse
+    {
+        $this->authorizeClinicalProfessional($request);
+        $this->ensureClientIsNotAnonymized($client);
+        $request->merge([
+            'height_cm' => $this->normalizeHeightToCentimeters($request->input('height_cm')),
+        ]);
+        $validated = $request->validate([
+            'birth_date' => ['required', 'date', 'before:today'],
+            'biological_sex' => ['required', Rule::in(['female', 'male'])],
+            'height_cm' => ['required', 'numeric', 'between:100,199.5'],
+        ], [
+            'height_cm.between' => 'Informe a altura em metros ou centímetros. Exemplo: 1,74 ou 174.',
+            'height_cm.numeric' => 'Informe uma altura válida. Exemplo: 1,74 ou 174.',
+        ]);
+
+        if ($client->assessments()->where('evaluated_at', '<', Carbon::parse($validated['birth_date'])->startOfDay())->exists()) {
+            throw ValidationException::withMessages([
+                'birth_date' => 'A data informada é posterior a uma avaliação já registrada para este cliente.',
+            ]);
+        }
+
+        DB::transaction(function () use ($client, $request, $validated): void {
+            $oldValues = $this->clientAuditPayload($client);
+            $client->update($validated);
+            $this->audit(
+                $request,
+                'bioimpedance_client.profile_updated',
+                $client,
+                'Dados biométricos básicos do cliente atualizados',
+                $oldValues,
+                $this->clientAuditPayload($client->refresh()),
+            );
+        });
+
+        return response()->json([
+            'client' => $this->clientPayload($this->loadClientAssessments($client->refresh())),
+        ]);
+    }
+
     public function inactivateClient(Request $request, BioimpedanceClient $client): JsonResponse
     {
         $this->authorizeClinicalProfessional($request);
@@ -245,6 +285,7 @@ class BioimpedanceWorkflow
             'assessment_module_enabled' => ['required', 'boolean'],
             'screening_module_enabled' => ['required', 'boolean'],
             'reports_module_enabled' => ['required', 'boolean'],
+            'assessment_pdf_enabled' => ['required', 'boolean'],
         ]);
 
         if (! collect([
@@ -616,6 +657,12 @@ class BioimpedanceWorkflow
 
     public function downloadAssessmentPdf(BioimpedanceAssessment $assessment, LegacyBioimpedanceAnalysisRefresher $legacyAnalysisRefresher): Response
     {
+        abort_unless(
+            BioimpedanceClinicSetting::current()->assessment_pdf_enabled,
+            403,
+            'A geração do relatório em PDF está desativada nas configurações da clínica.',
+        );
+
         $assessment->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements', 'extendedMetrics', 'impedanceReadings']);
         $legacyAnalysisRefresher->refreshIfLegacy($assessment);
         $assessment->refresh()->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements', 'extendedMetrics', 'impedanceReadings']);

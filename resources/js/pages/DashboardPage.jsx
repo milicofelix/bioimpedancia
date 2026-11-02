@@ -91,6 +91,7 @@ const defaultClinic = {
 	assessment_module_enabled: true,
 	screening_module_enabled: true,
 	reports_module_enabled: true,
+	assessment_pdf_enabled: true,
 };
 
 const emptyUserForm = {
@@ -1431,6 +1432,14 @@ export default function DashboardPage({ userName }) {
 									))}
 								</div>
 							</fieldset>
+							<fieldset className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+								<legend className="px-1 text-xs font-bold uppercase tracking-wide text-slate-700">Recursos dos relatórios</legend>
+								<p className="mb-3 text-xs leading-5 text-slate-600">Defina se profissionais podem abrir, baixar ou imprimir o documento final em PDF. A visualização interna do relatório permanece disponível.</p>
+								<label className="flex min-h-11 items-start gap-3 rounded-lg bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 ring-1 ring-slate-200">
+									<input type="checkbox" checked={Boolean(clinicForm.assessment_pdf_enabled)} onChange={(event) => updateClinic('assessment_pdf_enabled', event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500" />
+									<span><span className="block">Documento final em PDF</span><span className="mt-0.5 block text-xs font-normal leading-5 text-slate-500">Disponibiliza os comandos Abrir PDF, Baixar PDF e Imprimir / baixar PDF.</span></span>
+								</label>
+							</fieldset>
 							<Field label="Modelo da balança">
 								<select value={clinicForm.scale_model} onChange={(event) => updateClinic('scale_model', event.target.value)} className={inputClass()}>
 									<option value="relaxmedic_bodyscan_pro">Bodyscan Pro (padrão)</option>
@@ -2169,14 +2178,14 @@ function Report({ clinic, client, assessment, professional }) {
 	return (
 		<article className="report overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm print:border-0 print:shadow-none">
 			<div className="no-print mb-4 flex flex-wrap gap-2">
-				{assessment ? (
+				{assessment && clinic.assessment_pdf_enabled ? (
 					<a href={`/bioimpedance/assessments/${assessment.id}/pdf`} target="_blank" rel="noreferrer" className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">
 						Baixar PDF oficial
 					</a>
 				) : null}
-				<button type="button" onClick={() => window.print()} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700">
+				{clinic.assessment_pdf_enabled ? <button type="button" onClick={() => window.print()} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700">
 					Imprimir / baixar PDF
-				</button>
+				</button> : null}
 				<button type="button" onClick={() => navigator.share?.({ title: 'Relatório de bioimpedância', text: client.full_name })} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
 					Compartilhar
 				</button>
