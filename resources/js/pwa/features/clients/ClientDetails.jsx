@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { formatDate, formatIssueDate, localDatetimeNow, numberBr } from '../../../shared/formatters';
-import { cpfMask } from '../../../shared/inputMasks';
+import { cpfMask, heightMask } from '../../../shared/inputMasks';
 import { assessmentAccess, canUseClinicalFeatures } from './clientAccess';
-import { apiErrorMessage, apiValidationErrors, updateBioimpedanceClientBirthDate } from '../../../services/bioimpedanceApi';
+import { apiErrorMessage, apiValidationErrors, updateBioimpedanceClientProfile } from '../../../services/bioimpedanceApi';
 import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaIcon from '../../components/ui/PwaIcon';
@@ -17,6 +17,14 @@ function initials(name) {
 	return String(name ?? '?').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 }
 
+function clientProfile(client) {
+	return {
+		birth_date: client.birth_date ?? '',
+		biological_sex: client.biological_sex ?? '',
+		height_cm: client.height_cm ? String(client.height_cm).replace('.', ',') : '',
+	};
+}
+
 export default function ClientDetails({ client, currentUser, scaleModel, enabledModules, onBack, onClientUpdated, onNewAssessment, onOpenAssistant, onOpenReport }) {
 	const access = assessmentAccess(client, currentUser, scaleModel);
 	const assessments = [...(client.assessments ?? [])].sort((left, right) => new Date(right.evaluated_at) - new Date(left.evaluated_at));
@@ -28,39 +36,41 @@ export default function ClientDetails({ client, currentUser, scaleModel, enabled
 	const opensSingleModuleDirectly = enabledModuleCount === 1 && (enabledModules.assessment || enabledModules.screening);
 	const [activeTab, setActiveTab] = useState(firstActiveTab);
 	const [showClientDetails, setShowClientDetails] = useState(false);
-	const [editingBirthDate, setEditingBirthDate] = useState(false);
-	const [birthDate, setBirthDate] = useState(client.birth_date ?? '');
-	const [birthDateError, setBirthDateError] = useState('');
-	const [savingBirthDate, setSavingBirthDate] = useState(false);
+	const [editingProfile, setEditingProfile] = useState(false);
+	const [profile, setProfile] = useState(() => clientProfile(client));
+	const [profileErrors, setProfileErrors] = useState({});
+	const [savingProfile, setSavingProfile] = useState(false);
 	const clientDetailsId = `client-profile-details-${client.id}`;
-	const canEditBirthDate = canUseClinicalFeatures(currentUser) && !client.is_anonymized;
+	const canEditProfile = canUseClinicalFeatures(currentUser) && !client.is_anonymized;
 
 	useEffect(() => setActiveTab(firstActiveTab), [client.id, firstActiveTab]);
 	useEffect(() => setShowClientDetails(false), [client.id]);
 	useEffect(() => {
-		setEditingBirthDate(false);
-		setBirthDate(client.birth_date ?? '');
-		setBirthDateError('');
-	}, [client.id, client.birth_date]);
+		setEditingProfile(false);
+		setProfile(clientProfile(client));
+		setProfileErrors({});
+	}, [client.id, client.birth_date, client.biological_sex, client.height_cm]);
 
-	async function saveBirthDate(event) {
+	function updateProfileField(field, value) {
+		setProfile((current) => ({ ...current, [field]: field === 'height_cm' ? heightMask(value) : value }));
+		setProfileErrors((current) => ({ ...current, [field]: undefined }));
+	}
+
+	async function saveProfile(event) {
 		event.preventDefault();
-		if (savingBirthDate || birthDate === client.birth_date) {
-			setEditingBirthDate(false);
-			return;
-		}
+		if (savingProfile) return;
 
-		setSavingBirthDate(true);
-		setBirthDateError('');
+		setSavingProfile(true);
+		setProfileErrors({});
 		try {
-			const updatedClient = await updateBioimpedanceClientBirthDate(client.id, birthDate);
+			const updatedClient = await updateBioimpedanceClientProfile(client.id, profile);
 			onClientUpdated(updatedClient);
-			setEditingBirthDate(false);
+			setEditingProfile(false);
 		} catch (error) {
 			const validationErrors = apiValidationErrors(error);
-			setBirthDateError(validationErrors.birth_date?.[0] ?? apiErrorMessage(error, 'Não foi possível atualizar a data de nascimento.'));
+			setProfileErrors({ ...validationErrors, form: apiErrorMessage(error, 'Não foi possível atualizar os dados do cliente.') });
 		} finally {
-			setSavingBirthDate(false);
+			setSavingProfile(false);
 		}
 	}
 
@@ -103,20 +113,15 @@ export default function ClientDetails({ client, currentUser, scaleModel, enabled
 				</div>
 
 				{showClientDetails ? <div id={clientDetailsId} className="animate-[pwa-screen-enter_180ms_ease-out]">
-					<dl className="mt-5 grid gap-2 text-sm sm:grid-cols-2">
-						{[['Idade', `${client.age ?? '-'} anos`], ['Sexo', sexLabels[client.biological_sex] ?? '-'], ['Altura', `${numberBr(client.height_cm, 0)} cm`]].map(([label, value]) => <div key={label} className="rounded-xl bg-ricosty-cream/70 p-3"><dt className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{label}</dt><dd className="mt-1 font-bold text-ricosty-ink">{value}</dd></div>)}
-						<div className="rounded-xl bg-ricosty-cream/70 p-3">
-							<dt className="flex items-center justify-between gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-600"><span>Nascimento</span>{canEditBirthDate && !editingBirthDate ? <button type="button" onClick={() => setEditingBirthDate(true)} className="pwa-focus min-h-8 rounded-lg px-2 text-[11px] font-bold normal-case tracking-normal text-ricosty-700 hover:bg-white">Editar</button> : null}</dt>
-							<dd className="mt-1 font-bold text-ricosty-ink">
-								{editingBirthDate ? <form onSubmit={saveBirthDate} className="space-y-2">
-									<label className="sr-only" htmlFor={`client-birth-date-${client.id}`}>Data de nascimento</label>
-									<input id={`client-birth-date-${client.id}`} type="date" required max={localDatetimeNow().slice(0, 10)} value={birthDate} onChange={(event) => { setBirthDate(event.target.value); setBirthDateError(''); }} className="pwa-focus min-h-11 w-full rounded-lg border border-ricosty-200 bg-white px-2 font-normal" />
-									<div className="flex flex-wrap gap-2"><button type="submit" disabled={savingBirthDate} className="pwa-focus min-h-9 rounded-lg bg-ricosty-700 px-3 text-xs font-bold text-white disabled:opacity-60">{savingBirthDate ? 'Salvando...' : 'Salvar'}</button><button type="button" disabled={savingBirthDate} onClick={() => { setEditingBirthDate(false); setBirthDate(client.birth_date ?? ''); setBirthDateError(''); }} className="pwa-focus min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 disabled:opacity-60">Cancelar</button></div>
-									{birthDateError ? <p role="alert" className="text-xs font-semibold leading-5 text-rose-700">{birthDateError}</p> : null}
-								</form> : formatIssueDate(client.birth_date)}
-							</dd>
-						</div>
-					</dl>
+					<div className="mt-5 flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-600">Dados biométricos básicos</p>{canEditProfile && !editingProfile ? <button type="button" onClick={() => setEditingProfile(true)} className="pwa-focus min-h-9 rounded-lg px-3 text-xs font-bold text-ricosty-700 hover:bg-ricosty-cream">Editar dados</button> : null}</div>
+					{editingProfile ? <form onSubmit={saveProfile} className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+						<div className="rounded-xl bg-ricosty-cream/70 p-3"><span className="text-[11px] font-bold uppercase tracking-wide text-slate-600">Idade</span><strong className="mt-2 block text-ricosty-ink">{client.age ?? '-'} anos</strong><span className="mt-1 block text-[11px] text-slate-500">Calculada automaticamente</span></div>
+						<label className="rounded-xl bg-ricosty-cream/70 p-3 text-[11px] font-bold uppercase tracking-wide text-slate-600">Sexo biológico<select required value={profile.biological_sex} onChange={(event) => updateProfileField('biological_sex', event.target.value)} className="pwa-focus mt-2 min-h-11 w-full rounded-lg border border-ricosty-200 bg-white px-2 text-sm font-normal normal-case tracking-normal text-slate-900"><option value="female">Feminino</option><option value="male">Masculino</option></select>{profileErrors.biological_sex?.[0] ? <span className="mt-1 block text-xs normal-case tracking-normal text-rose-700">{profileErrors.biological_sex[0]}</span> : null}</label>
+						<label className="rounded-xl bg-ricosty-cream/70 p-3 text-[11px] font-bold uppercase tracking-wide text-slate-600">Altura<input required inputMode="decimal" placeholder="1,74 ou 174" value={profile.height_cm} onChange={(event) => updateProfileField('height_cm', event.target.value)} className="pwa-focus mt-2 min-h-11 w-full rounded-lg border border-ricosty-200 bg-white px-2 text-sm font-normal normal-case tracking-normal text-slate-900" />{profileErrors.height_cm?.[0] ? <span className="mt-1 block text-xs normal-case tracking-normal text-rose-700">{profileErrors.height_cm[0]}</span> : null}</label>
+						<label className="rounded-xl bg-ricosty-cream/70 p-3 text-[11px] font-bold uppercase tracking-wide text-slate-600">Nascimento<input type="date" required max={localDatetimeNow().slice(0, 10)} value={profile.birth_date} onChange={(event) => updateProfileField('birth_date', event.target.value)} className="pwa-focus mt-2 min-h-11 w-full rounded-lg border border-ricosty-200 bg-white px-2 text-sm font-normal normal-case tracking-normal text-slate-900" />{profileErrors.birth_date?.[0] ? <span className="mt-1 block text-xs normal-case tracking-normal text-rose-700">{profileErrors.birth_date[0]}</span> : null}</label>
+						<div className="flex flex-wrap gap-2 sm:col-span-2"><button type="submit" disabled={savingProfile} className="pwa-focus min-h-10 rounded-lg bg-ricosty-700 px-4 text-xs font-bold text-white disabled:opacity-60">{savingProfile ? 'Salvando...' : 'Salvar dados'}</button><button type="button" disabled={savingProfile} onClick={() => { setEditingProfile(false); setProfile(clientProfile(client)); setProfileErrors({}); }} className="pwa-focus min-h-10 rounded-lg border border-slate-300 bg-white px-4 text-xs font-bold text-slate-700 disabled:opacity-60">Cancelar</button></div>
+						{profileErrors.form && !profileErrors.birth_date && !profileErrors.biological_sex && !profileErrors.height_cm ? <p role="alert" className="text-xs font-semibold leading-5 text-rose-700 sm:col-span-2">{profileErrors.form}</p> : null}
+					</form> : <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-2">{[['Idade', `${client.age ?? '-'} anos`], ['Sexo', sexLabels[client.biological_sex] ?? '-'], ['Altura', `${numberBr(client.height_cm, 0)} cm`], ['Nascimento', formatIssueDate(client.birth_date)]].map(([label, value]) => <div key={label} className="rounded-xl bg-ricosty-cream/70 p-3"><dt className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{label}</dt><dd className="mt-1 font-bold text-ricosty-ink">{value}</dd></div>)}</dl>}
 
 					<div className="mt-4 space-y-2 border-t border-ricosty-100 pt-4 text-sm text-slate-600">
 						<p className="flex items-center gap-2"><PwaIcon name="phone" size={16} className="text-ricosty-500" /><strong className="sr-only">Telefone:</strong> {client.phone || '-'}</p>

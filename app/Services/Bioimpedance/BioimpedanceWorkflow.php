@@ -93,12 +93,20 @@ class BioimpedanceWorkflow
         ]);
     }
 
-    public function updateClientBirthDate(Request $request, BioimpedanceClient $client): JsonResponse
+    public function updateClientProfile(Request $request, BioimpedanceClient $client): JsonResponse
     {
         $this->authorizeClinicalProfessional($request);
         $this->ensureClientIsNotAnonymized($client);
+        $request->merge([
+            'height_cm' => $this->normalizeHeightToCentimeters($request->input('height_cm')),
+        ]);
         $validated = $request->validate([
             'birth_date' => ['required', 'date', 'before:today'],
+            'biological_sex' => ['required', Rule::in(['female', 'male'])],
+            'height_cm' => ['required', 'numeric', 'between:100,199.5'],
+        ], [
+            'height_cm.between' => 'Informe a altura em metros ou centímetros. Exemplo: 1,74 ou 174.',
+            'height_cm.numeric' => 'Informe uma altura válida. Exemplo: 1,74 ou 174.',
         ]);
 
         if ($client->assessments()->where('evaluated_at', '<', Carbon::parse($validated['birth_date'])->startOfDay())->exists()) {
@@ -109,12 +117,12 @@ class BioimpedanceWorkflow
 
         DB::transaction(function () use ($client, $request, $validated): void {
             $oldValues = $this->clientAuditPayload($client);
-            $client->update(['birth_date' => $validated['birth_date']]);
+            $client->update($validated);
             $this->audit(
                 $request,
-                'bioimpedance_client.birth_date_updated',
+                'bioimpedance_client.profile_updated',
                 $client,
-                'Data de nascimento do cliente atualizada',
+                'Dados biométricos básicos do cliente atualizados',
                 $oldValues,
                 $this->clientAuditPayload($client->refresh()),
             );

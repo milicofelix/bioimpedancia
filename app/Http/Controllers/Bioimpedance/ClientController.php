@@ -23,9 +23,9 @@ class ClientController extends Controller
         return $this->workflow->updateClient($request, $client);
     }
 
-    public function updateBirthDate(Request $request, BioimpedanceClient $client): JsonResponse
+    public function updateProfile(Request $request, BioimpedanceClient $client): JsonResponse
     {
-        return $this->workflow->updateClientBirthDate($request, $client);
+        return $this->workflow->updateClientProfile($request, $client);
     }
 
     public function inactivate(Request $request, BioimpedanceClient $client): JsonResponse

@@ -64,7 +64,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/bioimpedance/users/{user}/inactivate', [UserController::class, 'inactivate'])->name('bioimpedance.users.inactivate');
     Route::post('/bioimpedance/clients', [ClientController::class, 'store'])->name('bioimpedance.clients.store');
     Route::put('/bioimpedance/clients/{client}', [ClientController::class, 'update'])->name('bioimpedance.clients.update');
-    Route::patch('/bioimpedance/clients/{client}/birth-date', [ClientController::class, 'updateBirthDate'])->name('bioimpedance.clients.birth-date.update');
+    Route::patch('/bioimpedance/clients/{client}/profile', [ClientController::class, 'updateProfile'])->name('bioimpedance.clients.profile.update');
     Route::patch('/bioimpedance/clients/{client}/inactivate', [ClientController::class, 'inactivate'])->name('bioimpedance.clients.inactivate');
     Route::get('/bioimpedance/clients/{client}/privacy-export', [ClientController::class, 'exportPrivacyData'])->name('bioimpedance.clients.privacy-export');
     Route::patch('/bioimpedance/clients/{client}/anonymize', [ClientController::class, 'anonymize'])->name('bioimpedance.clients.anonymize');

@@ -22,8 +22,8 @@ export async function createBioimpedanceClient(payload) {
 	return data.client;
 }
 
-export async function updateBioimpedanceClientBirthDate(clientId, birthDate) {
-	const { data } = await window.axios.patch(`/bioimpedance/clients/${clientId}/birth-date`, { birth_date: birthDate });
+export async function updateBioimpedanceClientProfile(clientId, profile) {
+	const { data } = await window.axios.patch(`/bioimpedance/clients/${clientId}/profile`, profile);
 
 	return data.client;
 }
