@@ -219,7 +219,7 @@ class BioimpedanceModuleTest extends TestCase
 
         $this->actingAs($user)->patchJson(route('bioimpedance.clinic.update'), [
             'display_name' => 'Vita Scan Análise clínica Biológica',
-            'legal_name' => 'Ricosty Clinica LTDA',
+            'legal_name' => 'Vita Scan Clínica LTDA',
             'document' => '12.345.678/0001-99',
             'phone' => '(11) 3333-4444',
             'whatsapp' => '(11) 95555-4444',
@@ -235,7 +235,7 @@ class BioimpedanceModuleTest extends TestCase
             'technical_notice' => 'Aviso técnico personalizado.',
             'scale_model' => BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDI,
         ])->assertOk()
-            ->assertJsonPath('clinic.legal_name', 'Ricosty Clinica LTDA')
+            ->assertJsonPath('clinic.legal_name', 'Vita Scan Clínica LTDA')
             ->assertJsonPath('clinic.primary_color', '#cc7a8a')
             ->assertJsonPath('clinic.footer_text', 'Rodapé personalizado da clínica')
             ->assertJsonPath('clinic.scale_model', BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDI);
@@ -266,7 +266,7 @@ class BioimpedanceModuleTest extends TestCase
         ])->assertForbidden();
 
         $this->actingAs($admin)->postJson(route('bioimpedance.users.store'), [
-            'name' => 'Recepção Ricosty',
+            'name' => 'Recepção Vita Scan',
             'email' => 'recepcao@example.com',
             'password' => 'password',
             'role' => User::ROLE_RECEPTION,
@@ -1032,7 +1032,7 @@ class BioimpedanceModuleTest extends TestCase
                     ]],
                     'general_guidance' => [[
                         'text' => 'Manter condições semelhantes entre as medições.',
-                        'source_chunk_ids' => ['ricosty-measurement-protocol'],
+                        'source_chunk_ids' => ['vita-scan-measurement-protocol'],
                     ]],
                     'professional_observation' => 'Os resultados mostram gordura corporal elevada, músculo esquelético normal e gordura visceral normal. O IMC calculado foi classificado como sobrepeso. Recomenda-se acompanhar a evolução nas próximas avaliações, mantendo condições semelhantes de medição.',
                     'prohibited_content_detected' => false,

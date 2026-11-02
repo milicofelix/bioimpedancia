@@ -1,6 +1,6 @@
 # Vita Scan — Análise clínica Biológica
 
-Sistema Laravel + React para cadastro de clientes, avaliações de bioimpedância Omron HBF-514C, relatório PDF profissional, histórico corporal, compartilhamento seguro e assistente de observações fundamentado em referências parametrizadas.
+Sistema Laravel + React para cadastro de clientes, avaliações corporais com múltiplos equipamentos, relatório PDF profissional, histórico, compartilhamento seguro, triagens e assistentes fundamentados em referências aprovadas.
 
 ## Stack
 
@@ -46,14 +46,14 @@ http://localhost:8081/login
 Usuários demo:
 
 ```text
-Admin: valor de RICOSTY_DEMO_ADMIN_EMAIL
-Profissional: valor de RICOSTY_DEMO_PROFESSIONAL_EMAIL
-Recepção: valor de RICOSTY_DEMO_RECEPTION_EMAIL
-Senha: valor de RICOSTY_DEMO_PASSWORD
+Admin: valor de VITA_SCAN_DEMO_ADMIN_EMAIL
+Profissional: valor de VITA_SCAN_DEMO_PROFESSIONAL_EMAIL
+Recepção: valor de VITA_SCAN_DEMO_RECEPTION_EMAIL
+Senha: valor de VITA_SCAN_DEMO_PASSWORD
 ```
 
 Esses usuários demo são ignorados automaticamente quando `APP_ENV=production`.
-Defina `RICOSTY_DEMO_PASSWORD` no `.env` local antes de rodar `php artisan migrate --seed`.
+Defina `VITA_SCAN_DEMO_PASSWORD` no `.env` local antes de rodar `php artisan migrate --seed`.
 
 ## Desenvolvimento Frontend
 
@@ -93,7 +93,7 @@ Para gerar pacote limpo:
 scripts/build-release.sh
 ```
 
-O pacote gerado remove arquivos sensíveis e temporários, incluindo `.env`, banco SQLite, logs, cache, `vendor`, `node_modules`, `__MACOSX` e ZIPs antigos.
+O pacote é montado somente com arquivos rastreados ou não ignorados pelo Git. Antes de distribuí-lo, revise seu conteúdo e confirme que `.env`, bancos locais, logs, caches e outros arquivos sensíveis permanecem ignorados.
 
 ## Variáveis Críticas de Produção
 
@@ -128,7 +128,7 @@ Depois do deploy:
 
 ```bash
 php artisan migrate --force
-php artisan ricosty:create-admin
+php artisan vita-scan:create-admin
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
@@ -143,9 +143,15 @@ php artisan view:cache
 - Usar HTTPS em produção.
 - Manter `APP_DEBUG=false`.
 - Não executar `php artisan db:seed` em produção.
-- Criar o primeiro administrador com `php artisan ricosty:create-admin`.
+- Criar o primeiro administrador com `php artisan vita-scan:create-admin`.
 - Rodar backup de banco e storage antes de atualizar produção.
 - Revisar permissões de `storage` e `bootstrap/cache`.
+
+## Compatibilidade de nomenclatura
+
+- Variáveis `RICOSTY_DEMO_*` ainda são aceitas como fallback durante a transição, mas novas configurações devem usar `VITA_SCAN_DEMO_*`.
+- O comando `ricosty:create-admin` permanece como alias temporário; use `vita-scan:create-admin` em novos procedimentos.
+- Prefixos antigos de cache, preferências do navegador, migrations históricas, nomes de classes CSS e o arquivo físico `ricosty-logo.png` são mantidos apenas para compatibilidade. Eles não representam a marca exibida ao usuário.
 
 ## Commit Sugerido Por Fase
 
