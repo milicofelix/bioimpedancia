@@ -36,35 +36,29 @@ export default function OperationalShell({ activeSection, currentUser, enabledMo
 	return (
 		<div className="pwa-shell pwa-native-shell pb-28 text-ricosty-ink">
 			<a href="#operational-content" className="pwa-focus fixed left-3 top-3 z-50 -translate-y-24 rounded-xl bg-ricosty-950 px-4 py-3 text-sm font-bold text-white transition focus:translate-y-0">Pular para o conteúdo</a>
-			<header className="pwa-safe-top pwa-safe-inline sticky top-0 z-20 border-b border-ricosty-200/70 bg-white/90 pb-3 backdrop-blur-xl">
-				<div className="mx-auto flex max-w-xl items-center justify-between gap-3">
+			<header className="pwa-safe-top pwa-safe-inline sticky top-0 z-20 border-b border-ricosty-200/70 bg-white/95 pb-2.5 shadow-[0_8px_24px_rgba(97,38,55,0.05)] backdrop-blur-xl">
+				<div className="mx-auto flex max-w-xl flex-wrap items-center gap-x-2.5 gap-y-2 sm:flex-nowrap sm:gap-3">
 					<VitaScanBrand headingLevel="h1" size="compact" showTagline={false} className="shrink-0" />
-					<div className="flex items-center gap-1.5">
-						<span role="status" aria-live="polite" title={isOnline ? 'Conectado' : 'Sem conexão'} className={`pwa-status-enter flex min-h-11 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-bold ${isOnline ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200' : 'bg-rose-50 text-rose-800 ring-1 ring-rose-200'}`}>
+					<div className="order-3 flex min-w-0 basis-full items-center gap-2 border-t border-ricosty-100 pt-2 sm:order-none sm:basis-auto sm:border-l sm:border-t-0 sm:py-0 sm:pl-3 sm:pt-0">
+						<span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-ricosty-100 to-ricosty-200 text-sm font-black text-ricosty-800 ring-1 ring-ricosty-200" aria-hidden="true">{userInitial(currentUser?.name)}</span>
+						<div className="min-w-0" title={currentUser?.name ?? 'Profissional'}>
+							<p className="truncate text-sm font-extrabold leading-4 text-ricosty-950">Olá, {currentUser?.name ?? 'profissional'}</p>
+							<p className="mt-0.5 text-[11px] font-medium leading-4 text-slate-500">Bem-vindo ao atendimento</p>
+						</div>
+					</div>
+					<div className="ml-auto flex shrink-0 items-center gap-1.5">
+						<span role="status" aria-live="polite" title={isOnline ? 'Conectado' : 'Sem conexão'} className={`pwa-status-enter flex min-h-10 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-bold ${isOnline ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200' : 'bg-rose-50 text-rose-800 ring-1 ring-rose-200'}`}>
 							<PwaIcon name={isOnline ? 'wifi' : 'wifiOff'} size={15} />
 							<span className="hidden sm:inline">{isOnline ? 'Online' : 'Offline'}</span>
 						</span>
-						<a href="/dashboard" aria-label="Abrir painel completo" title="Painel completo" className="pwa-focus flex h-11 w-11 items-center justify-center rounded-full border border-ricosty-200 bg-white text-ricosty-700 transition hover:bg-ricosty-50"><PwaIcon name="grid" size={18} /></a>
-						<PwaButton type="button" onClick={onLogout} aria-label="Sair da conta" title="Sair" variant="ghost" icon="logOut" className="h-11 w-11 rounded-full border border-ricosty-200 bg-white px-0 hover:bg-ricosty-50"><span className="sr-only">Sair da conta</span></PwaButton>
+						<a href="/dashboard" aria-label="Abrir painel completo" title="Painel completo" className="pwa-focus flex h-10 w-10 items-center justify-center rounded-xl border border-ricosty-200 bg-white text-ricosty-700 transition hover:bg-ricosty-50"><PwaIcon name="grid" size={18} /></a>
+						<PwaButton type="button" onClick={onLogout} aria-label="Sair da conta" title="Sair" variant="ghost" icon="logOut" className="h-10 w-10 rounded-xl border border-ricosty-200 bg-white px-0 hover:bg-ricosty-50"><span className="sr-only">Sair da conta</span></PwaButton>
 					</div>
 				</div>
 			</header>
 
-			<main id="operational-content" ref={mainReference} tabIndex="-1" className="pwa-safe-inline mx-auto max-w-xl py-5 outline-none">
+			<main id="operational-content" ref={mainReference} tabIndex="-1" className="pwa-safe-inline mx-auto max-w-xl py-4 outline-none">
 				{!isOnline ? <OfflineNotice detail="Consultas e ações que enviam dados ficam bloqueadas até a reconexão. Nenhum dado clínico é armazenado para uso offline." className="mb-4" /> : null}
-
-				<div className="relative mb-5 overflow-hidden rounded-[1.6rem] bg-gradient-to-br from-ricosty-800 via-ricosty-700 to-ricosty-500 p-5 text-white shadow-[0_18px_45px_rgba(114,42,62,0.22)]">
-					<div aria-hidden="true" className="absolute -right-8 -top-12 h-36 w-36 rounded-full border-[28px] border-white/10" />
-					<div aria-hidden="true" className="absolute -bottom-16 right-20 h-28 w-28 rounded-full bg-ricosty-gold/25 blur-2xl" />
-					<div className="relative flex items-center gap-4">
-						<div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/25 bg-white/15 text-lg font-black shadow-inner backdrop-blur">{userInitial(currentUser?.name)}</div>
-						<div className="min-w-0">
-							<p className="text-[11px] font-bold uppercase tracking-[0.2em] text-ricosty-100">Atendimento Vita Scan</p>
-							<h1 className="mt-1 break-words text-xl font-bold">Olá, {currentUser?.name ?? 'profissional'}</h1>
-							<p className="mt-1 text-sm text-ricosty-100">Selecione um cliente para iniciar ou continuar o atendimento.</p>
-						</div>
-					</div>
-				</div>
 
 				<InstallGuide />
 				<div key={activeSection} className="pwa-screen-enter">{children}</div>
