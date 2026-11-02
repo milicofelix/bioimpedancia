@@ -9,6 +9,7 @@ import PwaAlert from '../../components/ui/PwaAlert';
 import PwaIcon from '../../components/ui/PwaIcon';
 import PwaSectionHeader from '../../components/ui/PwaSectionHeader';
 import PwaState from '../../components/ui/PwaState';
+import PwaScrollToTopButton from '../../components/ui/PwaScrollToTopButton';
 
 export default function AssessmentReportFeature({ client, assessment, pdfEnabled = true, currentUser, onBackToClients, onAssessmentUpdated }) {
 	if (!client || !assessment) {
@@ -22,6 +23,7 @@ export default function AssessmentReportFeature({ client, assessment, pdfEnabled
 
 	return (
 		<div className="space-y-4">
+			<PwaScrollToTopButton />
 			<ResponsiveAssessmentReport client={client} assessment={assessment} previous={previous} />
 
 			{pdfEnabled ? <PwaCard className="p-5">
