@@ -165,6 +165,10 @@ body {
         max-width: 24rem;
     }
 
+    .pwa-review-dock {
+        bottom: calc(5.75rem + env(safe-area-inset-bottom));
+    }
+
     .pwa-screen-enter {
         animation: pwa-screen-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
     }
@@ -197,6 +201,10 @@ html[data-keyboard-open] .pwa-update-notice {
 
 html[data-keyboard-open] .pwa-native-shell {
     padding-bottom: 1rem;
+}
+
+html[data-keyboard-open] .pwa-review-dock {
+    position: static;
 }
 
 @media (max-width: 379px) {
@@ -249,6 +257,10 @@ html[data-keyboard-open] .pwa-native-shell {
 
     .pwa-content-safe {
         padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
+    }
+
+    .pwa-review-dock {
+        bottom: calc(3.75rem + env(safe-area-inset-bottom));
     }
 
     .pwa-dialog-backdrop {
