@@ -46,8 +46,8 @@ export default function PwaConfirmSheet({ open, title, description, detail, icon
 	const descriptionId = `confirm-sheet-description-${tone}`;
 
 	return createPortal(
-		<div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-4 backdrop-blur-sm sm:items-center" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}>
-			<div ref={dialogReference} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} className="pwa-screen-enter w-full max-w-sm rounded-[1.5rem] bg-white p-5 shadow-2xl">
+		<div className="pwa-dialog-backdrop fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-slate-950/45 p-4 backdrop-blur-sm sm:items-center" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}>
+			<div ref={dialogReference} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} className="pwa-screen-enter my-auto max-h-[calc(var(--pwa-viewport-height,100dvh)-2rem)] w-full max-w-sm overflow-y-auto rounded-[1.5rem] bg-white p-5 shadow-2xl">
 				<div className="mx-auto h-1 w-12 rounded-full bg-slate-200 sm:hidden" aria-hidden="true" />
 				<div className={`mt-3 flex h-12 w-12 items-center justify-center rounded-2xl ${tones[tone] ?? tones.warning}`}><PwaIcon name={icon} /></div>
 				<h2 id={titleId} className="mt-4 text-lg font-bold text-slate-950">{title}</h2>

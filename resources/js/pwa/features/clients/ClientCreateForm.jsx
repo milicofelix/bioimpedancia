@@ -112,7 +112,7 @@ export default function ClientCreateForm({ onCancel, onCreated }) {
 
 					{message ? <PwaAlert tone="error" title="Não foi possível cadastrar">{message}</PwaAlert> : null}
 
-					<PwaButton type="submit" disabled={saving} busy={saving} icon="check" className="w-full">{saving ? 'Cadastrando...' : 'Cadastrar cliente'}</PwaButton>
+					<PwaButton type="submit" disabled={saving} loading={saving} icon="check" className="w-full">{saving ? 'Cadastrando...' : 'Cadastrar cliente'}</PwaButton>
 				</form>
 			</PwaCard>
 		</section>

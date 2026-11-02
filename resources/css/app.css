@@ -66,7 +66,17 @@ body {
         min-height: var(--pwa-viewport-height, 100dvh);
     }
 
+    .pwa-content-safe {
+        padding-bottom: calc(6.75rem + env(safe-area-inset-bottom));
+    }
+
+    .pwa-native-shell :where(input, select, textarea) {
+        min-width: 0;
+        max-width: 100%;
+    }
+
     .pwa-card {
+        min-width: 0;
         border: 1px solid rgb(246 213 219 / 75%);
         border-radius: 1.25rem;
         background: rgb(255 255 255 / 92%);
@@ -189,6 +199,63 @@ html[data-keyboard-open] .pwa-native-shell {
     padding-bottom: 1rem;
 }
 
+@media (max-width: 379px) {
+    .pwa-safe-inline {
+        padding-left: max(0.75rem, env(safe-area-inset-left));
+        padding-right: max(0.75rem, env(safe-area-inset-right));
+    }
+
+    .pwa-section-action {
+        width: 100%;
+    }
+
+    .pwa-section-action > :where(button, a) {
+        width: 100%;
+    }
+
+    .pwa-step-indicator {
+        padding-inline: 0.25rem;
+    }
+
+    .pwa-step-label {
+        font-size: 0.625rem;
+    }
+
+    .pwa-navigation-item {
+        font-size: 0.625rem;
+    }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+    .pwa-operational-header {
+        min-height: 2.75rem;
+    }
+
+    .pwa-bottom-navigation {
+        padding-top: 0.25rem;
+        padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+    }
+
+    .pwa-navigation-item {
+        min-height: 2.75rem;
+        flex-direction: row;
+        gap: 0.25rem;
+    }
+
+    .pwa-navigation-item > span:first-child {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+
+    .pwa-content-safe {
+        padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
+    }
+
+    .pwa-dialog-backdrop {
+        align-items: flex-start;
+    }
+}
+
 @media (display-mode: standalone) {
     .pwa-native-shell {
         overscroll-behavior: none;
@@ -198,6 +265,13 @@ html[data-keyboard-open] .pwa-native-shell {
 @media (forced-colors: active) {
     .pwa-focus:focus-visible {
         outline: 3px solid Highlight;
+    }
+
+    .pwa-card,
+    .pwa-card-soft,
+    .pwa-button-primary,
+    .pwa-button-secondary {
+        border: 1px solid CanvasText;
     }
 }
 

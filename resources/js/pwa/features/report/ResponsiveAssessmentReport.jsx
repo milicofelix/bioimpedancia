@@ -69,8 +69,8 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 							<p className="mt-1 text-xs text-slate-500">Anterior: {formatDate(previous.evaluated_at)} · {previous.device_model}</p>
 							<div className="mt-3 space-y-2">
 								{metrics.filter((metric) => !metric.text && previous[metric.field] !== null && previous[metric.field] !== undefined).map((metric) => (
-									<div key={metric.field} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg bg-white px-3 py-3 text-xs">
-										<div>
+									<div key={metric.field} className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg bg-white px-3 py-3 text-xs">
+										<div className="min-w-0 flex-1">
 											<p className="font-semibold text-slate-800">{metric.label}</p>
 											<p className="mt-1 flex flex-wrap items-center gap-2 text-slate-600">
 												<span><span className="mr-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">Anterior</span>{formatMetric(previous[metric.field], metric)}</span>
@@ -82,8 +82,8 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 									</div>
 								))}
 							</div>
-							{extendedComparisons.length ? <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white"><p className="bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800">Métricas estendidas presentes nos dois relatórios</p>{extendedComparisons.map((metric) => <div key={metric.key} className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-100 px-3 py-2 text-xs"><span>{metric.label}</span><strong>{metric.previous.toLocaleString('pt-BR')} {metric.unit} → {metric.current.toLocaleString('pt-BR')} {metric.unit}</strong></div>)}</div> : null}
-							{impedanceComparisons.length ? <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white"><p className="bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800">Impedância presente nas duas avaliações</p>{impedanceComparisons.map((reading) => <div key={`${reading.frequency_khz}-${reading.region}-${reading.side}`} className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-100 px-3 py-2 text-xs"><span>{reading.frequency_khz} kHz · {impedanceLabel(reading)}</span><strong>{reading.previous_ohms.toLocaleString('pt-BR')} Ω → {reading.current_ohms.toLocaleString('pt-BR')} Ω</strong></div>)}</div> : null}
+							{extendedComparisons.length ? <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white"><p className="bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800">Métricas estendidas presentes nos dois relatórios</p>{extendedComparisons.map((metric) => <div key={metric.key} className="flex min-w-0 flex-wrap justify-between gap-x-3 gap-y-1 border-t border-slate-100 px-3 py-2 text-xs"><span className="min-w-0 break-words">{metric.label}</span><strong className="break-words text-right">{metric.previous.toLocaleString('pt-BR')} {metric.unit} → {metric.current.toLocaleString('pt-BR')} {metric.unit}</strong></div>)}</div> : null}
+							{impedanceComparisons.length ? <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white"><p className="bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800">Impedância presente nas duas avaliações</p>{impedanceComparisons.map((reading) => <div key={`${reading.frequency_khz}-${reading.region}-${reading.side}`} className="flex min-w-0 flex-wrap justify-between gap-x-3 gap-y-1 border-t border-slate-100 px-3 py-2 text-xs"><span className="min-w-0 break-words">{reading.frequency_khz} kHz · {impedanceLabel(reading)}</span><strong className="break-words text-right">{reading.previous_ohms.toLocaleString('pt-BR')} Ω → {reading.current_ohms.toLocaleString('pt-BR')} Ω</strong></div>)}</div> : null}
 						</>
 					) : <p className="mt-2 text-sm text-slate-600">Esta é a primeira avaliação disponível para comparação.</p>}
 				</section>
