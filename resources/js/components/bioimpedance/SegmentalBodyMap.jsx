@@ -15,10 +15,10 @@ export default function SegmentalBodyMap({ measurements = [], type = 'fat', titl
 	const heading = title ?? presentation.label;
 
 	return (
-		<figure className="rounded-2xl border border-ricosty-100 bg-gradient-to-b from-white to-ricosty-50/40 p-3 print:break-inside-avoid" aria-labelledby={titleId} aria-describedby={descriptionId}>
+		<figure className="w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-ricosty-100 bg-gradient-to-b from-white to-ricosty-50/40 p-3 print:break-inside-avoid" aria-labelledby={titleId} aria-describedby={descriptionId}>
 			<figcaption id={titleId} className="text-center font-bold text-slate-950">{heading}</figcaption>
-			<p id={descriptionId} className="mt-1 text-center text-xs text-slate-600">Vista frontal · L = esquerdo · R = direito. {presentation.description}</p>
-			<svg viewBox="42 0 276 640" className="mx-auto mt-2 h-auto max-h-[28rem] w-full sm:hidden" aria-hidden="true" focusable="false">
+			<p id={descriptionId} className="mx-auto mt-1 max-w-2xl break-words text-center text-xs leading-5 text-slate-600">Vista frontal · L = esquerdo · R = direito. {presentation.description}</p>
+			<svg viewBox="42 0 276 640" className="mx-auto mt-2 h-auto max-h-[28rem] w-full max-w-xs sm:hidden" aria-hidden="true" focusable="false">
 				<SegmentalBodyFigure classifications={classifications} type={type} />
 			</svg>
 			<SegmentalCompactRegions items={items} />

@@ -6,7 +6,7 @@ import { previousAssessment } from './reportMetrics';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaButton from '../../components/ui/PwaButton';
 
-export default function AssessmentReportFeature({ client, assessment, currentUser, onBackToClients, onAssessmentUpdated }) {
+export default function AssessmentReportFeature({ client, assessment, pdfEnabled = true, currentUser, onBackToClients, onAssessmentUpdated }) {
 	if (!client || !assessment) {
 		return (
 			<section className="rounded-2xl border border-amber-200 bg-white p-6 text-center shadow-sm">
@@ -25,7 +25,7 @@ export default function AssessmentReportFeature({ client, assessment, currentUse
 		<div className="space-y-4">
 			<ResponsiveAssessmentReport client={client} assessment={assessment} previous={previous} />
 
-			<PwaCard className="p-5">
+			{pdfEnabled ? <PwaCard className="p-5">
 				<p className="text-xs font-bold uppercase tracking-[0.14em] text-ricosty-600">Documento final</p>
 				<h2 className="mt-1 text-lg font-bold text-slate-950">Relatório em PDF</h2>
 				<p className="mt-1 text-sm leading-6 text-slate-600">Abra para conferir o documento final ou faça o download no aparelho.</p>
@@ -33,7 +33,7 @@ export default function AssessmentReportFeature({ client, assessment, currentUse
 					<a href={`${pdfUrl}?inline=1`} target="_blank" rel="noreferrer" className="pwa-button-secondary pwa-focus inline-flex min-h-12 items-center justify-center gap-2 px-4 text-center text-sm"><span aria-hidden="true">◉</span>Abrir PDF</a>
 					<a href={pdfUrl} className="pwa-button-primary pwa-focus inline-flex min-h-12 items-center justify-center gap-2 px-4 text-center text-sm"><span aria-hidden="true">↓</span>Baixar PDF</a>
 				</div>
-			</PwaCard>
+			</PwaCard> : null}
 
 			{assessment.is_canceled ? (
 				<section className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm font-semibold leading-6 text-rose-800">O compartilhamento está desabilitado porque esta avaliação foi cancelada.</section>

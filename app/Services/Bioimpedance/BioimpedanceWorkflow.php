@@ -245,6 +245,7 @@ class BioimpedanceWorkflow
             'assessment_module_enabled' => ['required', 'boolean'],
             'screening_module_enabled' => ['required', 'boolean'],
             'reports_module_enabled' => ['required', 'boolean'],
+            'assessment_pdf_enabled' => ['required', 'boolean'],
         ]);
 
         if (! collect([
@@ -616,6 +617,12 @@ class BioimpedanceWorkflow
 
     public function downloadAssessmentPdf(BioimpedanceAssessment $assessment, LegacyBioimpedanceAnalysisRefresher $legacyAnalysisRefresher): Response
     {
+        abort_unless(
+            BioimpedanceClinicSetting::current()->assessment_pdf_enabled,
+            403,
+            'A geração do relatório em PDF está desativada nas configurações da clínica.',
+        );
+
         $assessment->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements', 'extendedMetrics', 'impedanceReadings']);
         $legacyAnalysisRefresher->refreshIfLegacy($assessment);
         $assessment->refresh()->load(['client', 'professional', 'correctedBy', 'canceledBy', 'segmentalMeasurements', 'extendedMetrics', 'impedanceReadings']);

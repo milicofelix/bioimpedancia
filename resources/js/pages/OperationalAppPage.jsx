@@ -169,6 +169,7 @@ export default function OperationalAppPage() {
 				<AssessmentReportFeature
 					client={selectedClient}
 					assessment={selectedAssessment}
+					pdfEnabled={workspace.clinic.assessment_pdf_enabled !== false}
 					currentUser={workspace.current_user}
 					onBackToClients={() => navigate('clientes')}
 					onAssessmentUpdated={updateSelectedAssessment}
