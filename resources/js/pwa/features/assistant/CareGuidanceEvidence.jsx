@@ -1,4 +1,6 @@
 import React from 'react';
+import PwaAlert from '../../components/ui/PwaAlert';
+import PwaIcon from '../../components/ui/PwaIcon';
 
 const categoryLabels = {
 	assessment_context: 'Contexto da avaliação',
@@ -19,13 +21,8 @@ export default function CareGuidanceEvidence({ assistant }) {
 
 	return (
 		<div className="space-y-4">
-			<div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
-				<p><strong>Provedor utilizado:</strong> {assistant.provider === 'openai' ? 'OpenAI' : 'Motor local de referências'}</p>
-				{assistant.fallback_used ? <p className="mt-1 text-amber-800"><strong>Processamento alternativo:</strong> {assistant.fallback_reason}</p> : null}
-			</div>
-
 			<div>
-				<h3 className="text-xs font-bold uppercase text-slate-600">Afirmações validadas</h3>
+				<h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-600"><PwaIcon name="fileText" size={15} />Fontes e critérios utilizados</h3>
 				<div className="mt-2 space-y-2">
 					{(assistant.claims ?? []).map((claim) => (
 						<details key={claim.id} className="rounded-xl border border-teal-100 bg-teal-50/50 p-3 text-xs" open>
@@ -44,10 +41,9 @@ export default function CareGuidanceEvidence({ assistant }) {
 			</div>
 
 			{assistant.blocked_claims?.length ? (
-				<details className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
-					<summary className="cursor-pointer font-bold">{assistant.blocked_claims.length} afirmação(ões) bloqueada(s)</summary>
-					<ul className="mt-2 space-y-2">{assistant.blocked_claims.map((claim, index) => <li key={`${claim.id}-${index}`}><strong>{claim.text || 'Afirmação sem texto válido'}</strong><br />{claim.blocked_reasons?.join(' ')}</li>)}</ul>
-				</details>
+				<PwaAlert tone="error" title={`${assistant.blocked_claims.length} trecho(s) removido(s) por segurança`}>
+					<details><summary className="pwa-focus min-h-11 cursor-pointer rounded-lg py-2 text-xs font-bold">Ver detalhes da revisão</summary><ul className="mt-2 space-y-2 text-xs">{assistant.blocked_claims.map((claim, index) => <li key={`${claim.id}-${index}`}><strong>{claim.text || 'Trecho sem conteúdo válido'}</strong><br />{claim.blocked_reasons?.join(' ')}</li>)}</ul></details>
+				</PwaAlert>
 			) : null}
 		</div>
 	);

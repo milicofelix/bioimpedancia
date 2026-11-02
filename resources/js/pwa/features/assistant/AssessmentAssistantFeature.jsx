@@ -8,6 +8,11 @@ import useOnlineStatus from '../../hooks/useOnlineStatus';
 import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaJourneyHeader from '../../components/ui/PwaJourneyHeader';
+import PwaAlert from '../../components/ui/PwaAlert';
+import PwaIcon from '../../components/ui/PwaIcon';
+import PwaInfoCard from '../../components/ui/PwaInfoCard';
+import PwaSectionHeader from '../../components/ui/PwaSectionHeader';
+import PwaState from '../../components/ui/PwaState';
 import useActionLock from '../../../hooks/useActionLock';
 import CareGuidanceAssistant from './CareGuidanceAssistant';
 
@@ -112,11 +117,9 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 			</PwaJourneyHeader>
 
 			{approved ? (
-				<PwaCard className="p-5 text-center">
-					<div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-lg font-black text-emerald-700">✓</div>
-					<h2 className="mt-3 text-lg font-bold text-slate-950">Observação adicionada</h2>
-					<p className="mt-2 text-sm leading-6 text-slate-600">A aprovação humana foi registrada na avaliação e na auditoria. O texto já poderá ser usado no relatório.</p>
-					<div className={`mx-auto mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ${approvedAsEdited ? 'bg-violet-100 text-violet-700' : 'bg-emerald-100 text-emerald-700'}`}><span aria-hidden="true">{approvedAsEdited ? '✎' : '✓'}</span>{approvedAsEdited ? 'Versão editada aprovada' : 'Sugestão original aprovada'}</div>
+				<PwaCard className="border-emerald-200 bg-emerald-50/40 p-5">
+					<PwaSectionHeader icon="check" eyebrow="Conteúdo aprovado" title="Observação adicionada" description="A observação foi registrada e já pode compor o relatório." tone="teal" />
+					<div className={`mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ${approvedAsEdited ? 'bg-violet-100 text-violet-700' : 'bg-emerald-100 text-emerald-700'}`}><PwaIcon name={approvedAsEdited ? 'user' : 'check'} size={14} />{approvedAsEdited ? 'Versão revisada pelo profissional' : 'Versão aprovada sem edição'}</div>
 					<div className={`mt-4 grid gap-3 ${canOpenReport ? 'sm:grid-cols-2' : ''}`}><PwaButton type="button" onClick={() => setApproved(false)} variant="secondary" icon="refresh">Gerar outra sugestão</PwaButton>{canOpenReport ? <PwaButton type="button" onClick={onOpenReport} icon="fileText">Abrir relatório</PwaButton> : null}</div>
 				</PwaCard>
 			) : generating ? (
@@ -124,12 +127,11 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 			) : assistant ? (
 				<ObservationSuggestion assistant={assistant} draft={draft} saving={saving} online={isOnline} error={error} onDraftChange={setDraft} onApprove={approve} onDiscard={discard} />
 			) : (
-				<PwaCard className="p-5">
-					<div className="flex items-center gap-3"><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-ricosty-600 text-xl text-white shadow-lg shadow-violet-100">✦</span><div><p className="text-xs font-bold uppercase tracking-wide text-violet-700">IA com revisão humana</p><h2 className="text-lg font-bold text-slate-950">Gerar observação assistida</h2></div></div>
-					<p className="mt-2 text-sm leading-6 text-slate-600">O assistente consulta dados da avaliação e fontes aprovadas. Nada será adicionado sem sua revisão e aprovação.</p>
-					<div className="mt-4 grid gap-2 text-center text-xs font-bold text-violet-900 sm:grid-cols-3"><span className="rounded-xl bg-violet-50 px-2 py-2">1. IA gera</span><span className="rounded-xl bg-violet-50 px-2 py-2">2. Você revisa</span><span className="rounded-xl bg-violet-50 px-2 py-2">3. Você aprova</span></div>
-					{assessment.notes ? <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-600"><strong className="text-slate-800">Observação atual:</strong><p className="mt-1 leading-6">{assessment.notes}</p></div> : null}
-					{error ? <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p> : null}
+				<PwaCard className="border-violet-200 p-5">
+					<PwaSectionHeader icon="sparkles" eyebrow="Observação" title="Gerar sugestão para revisão" description="O conteúdo só será adicionado após sua conferência e aprovação." tone="brand" />
+					<div className="mt-4 grid gap-2 text-xs font-bold text-violet-900 sm:grid-cols-3">{[['sparkles', 'Gerar sugestão'], ['eye', 'Revisar conteúdo'], ['check', 'Aprovar versão']].map(([icon, label], index) => <span key={label} className="flex items-center gap-2 rounded-xl bg-violet-50 px-3 py-2"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-violet-700"><PwaIcon name={icon} size={14} /></span>{index + 1}. {label}</span>)}</div>
+					{assessment.notes ? <PwaInfoCard icon="fileText" title="Observação atual" className="mt-4"><p className="text-sm leading-6 text-slate-700">{assessment.notes}</p></PwaInfoCard> : null}
+					{error ? <PwaAlert tone="error" title="Não foi possível gerar a observação" className="mt-4">{error}</PwaAlert> : null}
 					<PwaButton type="button" onClick={generate} disabled={!isOnline} icon="sparkles" className="mt-5 w-full">Gerar observação</PwaButton>
 				</PwaCard>
 			)}
@@ -140,14 +142,7 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 }
 
 function AssistantState({ title, description, onBack, tone = 'amber' }) {
-	const colors = tone === 'rose' ? 'border-rose-200 text-rose-700' : 'border-amber-200 text-amber-700';
-
 	return (
-		<PwaCard className={`p-6 text-center ${colors}`}>
-			<p className="text-xs font-bold uppercase tracking-wide">Assistente</p>
-			<h2 className="mt-2 text-xl font-bold text-slate-950">{title}</h2>
-			<p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
-			<PwaButton type="button" onClick={onBack} icon="arrowLeft" className="mt-5">Ir para clientes</PwaButton>
-		</PwaCard>
+		<PwaState type={tone === 'rose' ? 'error' : 'empty'} icon={tone === 'rose' ? 'alertTriangle' : 'sparkles'} title={title} description={description} action={<PwaButton type="button" onClick={onBack} icon="arrowLeft">Ir para clientes</PwaButton>} />
 	);
 }
