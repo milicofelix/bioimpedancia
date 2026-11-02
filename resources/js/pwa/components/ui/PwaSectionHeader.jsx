@@ -8,9 +8,9 @@ const tones = {
 	neutral: 'bg-slate-100 text-slate-700',
 };
 
-export default function PwaSectionHeader({ icon = 'clipboard', eyebrow, title, description, action, headingLevel: Heading = 'h2', headingId, tone = 'brand', className = '' }) {
+export default function PwaSectionHeader({ icon = 'clipboard', eyebrow, title, description, action, headingLevel: Heading = 'h2', headingId, tone = 'brand', divided = false, className = '' }) {
 	return (
-		<header className={`flex min-w-0 items-start justify-between gap-3 ${className}`}>
+		<header className={`flex min-w-0 items-start justify-between gap-3 ${divided ? 'border-b border-ricosty-100 pb-3 sm:border-b-0 sm:pb-0' : ''} ${className}`}>
 			<div className="flex min-w-0 items-start gap-3">
 				<span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tones[tone] ?? tones.brand}`} aria-hidden="true"><PwaIcon name={icon} size={20} /></span>
 				<div className="min-w-0">
@@ -19,6 +19,7 @@ export default function PwaSectionHeader({ icon = 'clipboard', eyebrow, title, d
 					{description ? <p className="mt-1 text-sm leading-5 text-slate-600">{description}</p> : null}
 				</div>
 			</div>
+			{divided ? <span className="mt-5 hidden h-px min-w-8 flex-1 bg-gradient-to-r from-ricosty-200 to-transparent sm:block" aria-hidden="true" /> : null}
 			{action ? <div className="shrink-0">{action}</div> : null}
 		</header>
 	);

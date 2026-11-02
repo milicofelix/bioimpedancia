@@ -20,18 +20,19 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 	const comparability = assessmentComparability(assessment, previous);
 	const extendedComparisons = commonExtendedMetricComparisons(assessment, previous);
 	const impedanceComparisons = commonImpedanceComparisons(assessment, previous);
+	const decoratedPrimaryMetrics = primaryMetrics.map((metric) => decorateMetric(metric, assessment));
+	const decoratedSecondaryMetrics = secondaryMetrics.map((metric) => decorateMetric(metric, assessment));
 
 	return (
 		<article className="pwa-card min-w-0 overflow-hidden">
 			<header className="bg-white">
 				<div className="flex flex-wrap items-center justify-between gap-4 border-b border-ricosty-100 px-5 py-4 sm:px-6">
 					<VitaScanBrand headingLevel="h2" size="compact" showTagline={false} />
-					<div className="text-right"><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ricosty-700">Documento clínico</p><p className="mt-1 text-xs font-semibold text-slate-600">Avaliação #{assessment.id}</p></div>
+					<div className="flex items-center gap-2 text-right"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-ricosty-50 text-ricosty-700" aria-hidden="true"><PwaIcon name="fileText" size={18} /></span><div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ricosty-700">Documento clínico</p><p className="mt-0.5 text-xs font-semibold text-slate-600">Vita Scan</p></div></div>
 				</div>
 				<div className="relative overflow-hidden bg-gradient-to-br from-ricosty-950 via-ricosty-900 to-amber-800 p-5 text-white sm:p-6">
 					<div className="absolute -right-8 -top-12 h-40 w-40 rounded-full bg-white/10 blur-2xl" aria-hidden="true" />
-					<p className="relative text-xs font-bold uppercase tracking-[0.16em] text-ricosty-100">Relatório de bioimpedância</p>
-					<h2 className="mt-2 text-2xl font-bold">{client.full_name}</h2>
+					<div className="relative flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[0.16em] text-ricosty-100">Relatório de bioimpedância</p><h2 className="mt-2 break-words text-2xl font-extrabold sm:text-3xl">{client.full_name}</h2></div><span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-bold backdrop-blur">Avaliação #{assessment.id}</span></div>
 					<PwaMetadata className="mt-4 border-t border-white/20 pt-4 text-white" items={[
 						{ key: 'date', icon: 'calendar', label: 'Medição', value: formatDate(assessment.evaluated_at) },
 						{ key: 'device', icon: 'activity', label: 'Equipamento', value: assessment.device_model },
@@ -41,18 +42,18 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 			</header>
 
 			<div className="min-w-0 p-4 sm:p-5">
-				{specifications ? <PwaInfoCard className="mb-4" title="Especificações do equipamento">{specifications.electrodes} eletrodos · dupla frequência de {specifications.frequencies_khz.join(' kHz + ')} kHz · temperatura operacional de {specifications.minimum_temperature_c} °C a {specifications.maximum_temperature_c} °C. O manual não informa margem de erro; os valores são apresentados conforme o relatório importado.</PwaInfoCard> : null}
-				<PwaSectionHeader className="mb-3" icon="activity" eyebrow="Resultados" title="Principais resultados" headingLevel="h3" />
+				{specifications ? <PwaInfoCard className="mb-5 py-3" icon="info" title="Especificações do equipamento"><span className="text-xs">{specifications.electrodes} eletrodos · {specifications.frequencies_khz.join(' kHz + ')} kHz · operação entre {specifications.minimum_temperature_c} °C e {specifications.maximum_temperature_c} °C. Valores reproduzidos conforme o relatório importado; o manual não informa margem de erro.</span></PwaInfoCard> : null}
+				<PwaSectionHeader className="mb-3" icon="activity" eyebrow="Resultados" title="Principais resultados" headingLevel="h3" divided />
 				<div className="grid gap-3 sm:grid-cols-3">
-					{primaryMetrics.map((metric) => (
-						<PwaMetricCard key={metric.field} label={metric.label} value={formatMetric(assessment[metric.field], metric)} type={metric.type} note={metric.note} />
+					{decoratedPrimaryMetrics.map((metric) => (
+						<PwaMetricCard key={metric.field} icon={metric.icon} label={metric.label} value={formatMetric(assessment[metric.field], metric)} classification={metric.classification} classificationTone={metric.classificationTone} type={metric.type} note={metric.note} tone={metric.tone} />
 					))}
 				</div>
-				<div className="mt-3 grid gap-3 sm:grid-cols-2">{secondaryMetrics.map((metric) => <div key={metric.field} className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{metric.label}</p><p className="mt-1 break-words text-base font-bold text-slate-950">{formatMetric(assessment[metric.field], metric)}</p>{metric.type ? <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-sky-700">{metric.type}</p> : null}{metric.note ? <p className="mt-1 text-xs leading-5 text-slate-600">{metric.note}</p> : null}</div>)}</div>
+				{decoratedSecondaryMetrics.length ? <section className="mt-5"><PwaSectionHeader className="mb-3" icon="clipboard" title="Indicadores complementares" description="Estimativas e índices adicionais apresentados pelo equipamento." headingLevel="h3" divided tone="neutral" /><div className="grid gap-3 sm:grid-cols-2">{decoratedSecondaryMetrics.map((metric) => <PwaMetricCard key={metric.field} compact icon={metric.icon} label={metric.label} value={formatMetric(assessment[metric.field], metric)} classification={metric.classification} classificationTone={metric.classificationTone} type={metric.type} note={metric.note} tone="neutral" />)}</div></section> : null}
 
 				{['Relaxmedic', 'Bodyscan Pro'].includes(assessment.device_model) ? <section className="mt-5 rounded-xl border border-sky-200 bg-sky-50 p-4 text-xs leading-5 text-sky-950"><strong>Como interpretar:</strong> os dados de composição corporal são estimativas produzidas por algoritmos do equipamento. Coerência matemática entre massa gorda, massa magra e peso não comprova precisão fisiológica. Compare tendências em condições semelhantes e não use IMC ou “peso ideal” isoladamente para definir objetivos.</section> : null}
 				{informationalReferences.length ? <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-4"><h3 className="font-bold text-slate-950">Referências informativas do manual</h3><p className="mt-1 text-xs leading-5 text-slate-600">Faixas genéricas, sem separação por sexo ou idade e sem classificação clínica. O manual descreve uso doméstico e não apresenta validação clínica. Apenas o IMC utiliza classificação automática convencional.</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{informationalReferences.map((reference) => <div key={reference.key} className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-bold text-slate-800">{reference.label}</p><p className="mt-1 text-base font-extrabold text-slate-950">{reference.manual_range}</p><p className="mt-1 text-xs leading-5 text-slate-600">{reference.note}</p></div>)}</div></section> : null}
-				{assessment.segmental_measurements?.length ? <section className="mt-5 min-w-0"><p className="mb-3 break-words text-xs font-bold uppercase tracking-[0.14em] text-ricosty-600">Análise segmentar Bodyscan</p><div className="grid min-w-0 grid-cols-1 gap-4 print:grid-cols-2"><SegmentalBodyMap measurements={assessment.segmental_measurements} type="fat" /><SegmentalBodyMap measurements={assessment.segmental_measurements} type="muscle" /></div></section> : null}
+				{assessment.segmental_measurements?.length ? <section className="mt-5 min-w-0"><PwaSectionHeader className="mb-3" icon="body" eyebrow="Composição corporal" title="Análise segmentar Bodyscan" description="Distribuição apresentada por região corporal, com equivalência textual acessível." headingLevel="h3" divided /><div className="grid min-w-0 grid-cols-1 gap-4 print:grid-cols-2"><SegmentalBodyMap measurements={assessment.segmental_measurements} type="fat" /><SegmentalBodyMap measurements={assessment.segmental_measurements} type="muscle" /></div></section> : null}
 				{assessment.segmental_measurements?.length ? <SegmentalComparison current={assessment.segmental_measurements} previous={previous?.segmental_measurements ?? []} previousDate={previous ? formatDate(previous.evaluated_at) : null} comparability={comparability} /> : null}
 				{assessment.age_at_assessment >= 60 ? <section className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-950"><strong>Atenção à funcionalidade:</strong> em pessoas com 60 anos ou mais, o planejamento deve considerar preservação de massa, força, equilíbrio, mobilidade e autonomia. O percentual muscular estimado não comprova, isoladamente, força ou função preservada.</section> : null}
 
@@ -93,6 +94,84 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 			</div>
 		</article>
 	);
+}
+
+const metricPresentation = {
+	weight_kg: { icon: 'scale', tone: 'brand' },
+	calculated_bmi: { icon: 'gauge', tone: 'blue' },
+	scale_bmi: { icon: 'gauge', tone: 'blue' },
+	body_fat_percentage: { icon: 'body', tone: 'brand' },
+	skeletal_muscle_percentage: { icon: 'activity', tone: 'teal' },
+	muscle_rate_percentage: { icon: 'activity', tone: 'teal' },
+	lean_body_mass_kg: { icon: 'body', tone: 'neutral' },
+	muscle_mass_kg: { icon: 'activity', tone: 'teal' },
+	fat_mass_kg: { icon: 'body', tone: 'brand' },
+	subcutaneous_fat_percentage: { icon: 'body', tone: 'brand' },
+	visceral_fat_level: { icon: 'body', tone: 'brand' },
+	body_water_percentage: { icon: 'droplets', tone: 'blue' },
+	water_weight_kg: { icon: 'droplets', tone: 'blue' },
+	bone_mass_kg: { icon: 'bone', tone: 'neutral' },
+	protein_percentage: { icon: 'activity', tone: 'neutral' },
+	protein_mass_kg: { icon: 'activity', tone: 'neutral' },
+	resting_metabolism_kcal: { icon: 'flame', tone: 'brand' },
+	body_age: { icon: 'clock', tone: 'neutral' },
+	ideal_body_weight_kg: { icon: 'scale', tone: 'neutral' },
+	obesity_level: { icon: 'gauge', tone: 'neutral' },
+	body_type: { icon: 'body', tone: 'neutral' },
+};
+
+const indicatorByField = {
+	weight_kg: 'weight',
+	calculated_bmi: 'bmi',
+	scale_bmi: 'bmi',
+	body_fat_percentage: 'body_fat',
+	skeletal_muscle_percentage: 'skeletal_muscle',
+	visceral_fat_level: 'visceral_fat',
+	resting_metabolism_kcal: 'resting_metabolism',
+	body_age: 'body_age',
+};
+
+const extendedCodeByField = {
+	weight_kg: 'weight',
+	calculated_bmi: 'bmi',
+	scale_bmi: 'bmi',
+	body_fat_percentage: 'body_fat_percentage',
+	fat_mass_kg: 'fat_mass',
+	bone_mass_kg: 'bone_mass',
+	protein_mass_kg: 'protein_mass',
+	protein_percentage: 'protein_mass',
+	body_water_percentage: 'body_water',
+	water_weight_kg: 'body_water',
+	muscle_mass_kg: 'muscle_mass',
+	muscle_rate_percentage: 'muscle_rate',
+	skeletal_muscle_percentage: 'skeletal_muscle',
+	subcutaneous_fat_percentage: 'subcutaneous_fat',
+	visceral_fat_level: 'visceral_fat',
+};
+
+function decorateMetric(metric, assessment) {
+	const presentation = metricPresentation[metric.field] ?? { icon: 'activity', tone: 'neutral' };
+	const indicator = assessment.analysis?.indicators?.[indicatorByField[metric.field]];
+	const extendedMetric = (assessment.extended_metrics ?? []).find((item) => item.metric_code === extendedCodeByField[metric.field]);
+	const usesApplicationClassification = Boolean(extendedMetric?.application_classification);
+	const analysisClassification = indicator?.pending ? 'Sem classificação disponível' : indicator?.classification;
+	const classification = usesApplicationClassification
+		? `Aplicativo: ${extendedMetric.application_classification}`
+		: analysisClassification ?? (metric.field === 'weight_kg' ? 'Medida registrada' : null);
+	const classificationTone = usesApplicationClassification
+		? classificationToneFromText(extendedMetric.application_classification)
+		: indicator?.pending ? 'pending' : indicator?.tone ?? 'neutral';
+
+	return { ...metric, ...presentation, classification, classificationTone };
+}
+
+function classificationToneFromText(value) {
+	const normalized = String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+	if (normalized.includes('muito alto') || normalized.includes('muito elevada')) return 'danger';
+	if (normalized.includes('alto') || normalized.includes('elevad')) return 'warning';
+	if (normalized.includes('baixo')) return 'attention';
+	if (normalized.includes('padrao') || normalized.includes('normal') || normalized.includes('excelente')) return 'good';
+	return 'neutral';
 }
 
 function impedanceLabel(reading) {

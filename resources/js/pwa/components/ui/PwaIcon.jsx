@@ -35,6 +35,12 @@ const icons = {
 	info: <><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></>,
 	activity: <><path d="M3 12h4l2-6 4 12 2-6h6"/></>,
 	x: <><path d="m6 6 12 12M18 6 6 18"/></>,
+	scale: <><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 10a4 4 0 0 1 8 0M12 10l2-2"/></>,
+	gauge: <><path d="M4 17a8 8 0 1 1 16 0"/><path d="m12 13 4-4M6 17h12"/></>,
+	body: <><circle cx="12" cy="4" r="2"/><path d="M8 22l1-7-2-4 2-4h6l2 4-2 4 1 7M9 15h6"/></>,
+	droplets: <><path d="M8 3S4 8 4 12a4 4 0 0 0 8 0C12 8 8 3 8 3Z"/><path d="M17 8s-3 3.8-3 6.5a3 3 0 0 0 6 0C20 11.8 17 8 17 8Z"/></>,
+	flame: <path d="M12 22c4 0 7-3 7-7 0-3-1.5-5.5-4-8 .2 3-1.2 4.5-2.5 5.5.2-4-1.8-7-4.5-9.5.2 4-3 6-3 10 0 5 3 9 7 9Z"/>,
+	bone: <path d="M7.5 8.5 15.5 16.5M5 10a3 3 0 1 1 2-5 3 3 0 1 1 3 3M19 14a3 3 0 1 1-2 5 3 3 0 1 1-3-3"/>,
 };
 
 export default function PwaIcon({ name, size = 20, className = '', label }) {
