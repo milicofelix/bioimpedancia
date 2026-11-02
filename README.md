@@ -136,6 +136,7 @@ php artisan view:cache
 
 ## Segurança
 
+- Consultar a matriz de perfis, acessos públicos e roteiro de validação em [`docs/permissions-matrix.md`](docs/permissions-matrix.md).
 - Não versionar `.env`.
 - Não versionar `database/*.sqlite`.
 - Não enviar `storage/logs/*.log`.

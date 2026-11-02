@@ -49,7 +49,7 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [AuthenticatedSessionController::class, 'store']);
 });
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'active.user'])->group(function () {
     Route::view('/dashboard', 'dashboard')->name('dashboard');
     Route::view('/app', 'operational-app')->name('operational-app');
     Route::get('/bioimpedance', [WorkspaceController::class, 'index'])->name('bioimpedance.index');

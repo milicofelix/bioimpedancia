@@ -904,7 +904,7 @@ class BioimpedanceWorkflow
 
     public function revokeAssessmentShare(Request $request, BioimpedanceReportShare $share): JsonResponse
     {
-        $this->authorizeClinicalProfessional($request);
+        $this->authorizeWrite($request);
         $oldValues = $this->reportSharePresenter->payload($share);
         $share->update(['revoked_at' => now()]);
         $this->audit($request, 'bioimpedance_report_share.revoked', $share, 'Link temporário do relatório revogado', $oldValues, $this->reportSharePresenter->payload($share->refresh()));

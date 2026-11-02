@@ -575,6 +575,40 @@ class BioimpedanceModuleTest extends TestCase
         $this->get($shareResponse->json('share.url'))->assertStatus(410);
     }
 
+    public function test_reception_can_create_and_revoke_report_share_but_viewer_cannot(): void
+    {
+        $professional = User::factory()->create(['role' => User::ROLE_PROFESSIONAL]);
+        $reception = User::factory()->create(['role' => User::ROLE_RECEPTION]);
+        $viewer = User::factory()->create(['role' => User::ROLE_VIEWER]);
+        $assessment = $this->createAssessmentForUser($professional);
+
+        $shareResponse = $this->actingAs($reception)->postJson(route('bioimpedance.assessments.shares.store', $assessment->id), [
+            'channel' => 'copy',
+            'expires_in_days' => 7,
+        ])->assertCreated();
+
+        $this->actingAs($viewer)->patchJson(route('bioimpedance.report-shares.revoke', $shareResponse->json('share.id')))
+            ->assertForbidden();
+
+        $this->actingAs($reception)->patchJson(route('bioimpedance.report-shares.revoke', $shareResponse->json('share.id')))
+            ->assertOk()
+            ->assertJsonPath('share.is_active', false);
+    }
+
+    public function test_inactivated_user_with_existing_session_loses_internal_access(): void
+    {
+        $user = User::factory()->create([
+            'role' => User::ROLE_PROFESSIONAL,
+            'inactivated_at' => now(),
+        ]);
+
+        $this->actingAs($user)->getJson(route('bioimpedance.index'))
+            ->assertUnauthorized()
+            ->assertJsonPath('message', 'Sua conta está inativa. Solicite a reativação ao administrador.');
+
+        $this->assertGuest();
+    }
+
     public function test_reception_can_create_records_but_cannot_change_clinical_outputs(): void
     {
         $professional = User::factory()->create(['role' => User::ROLE_PROFESSIONAL]);

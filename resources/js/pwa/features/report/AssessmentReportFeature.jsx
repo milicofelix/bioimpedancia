@@ -1,5 +1,5 @@
 import React from 'react';
-import { canCreateReportShare, canUseClinicalFeatures } from '../clients/clientAccess';
+import { canCreateReportShare } from '../clients/clientAccess';
 import ReportSharing from './ReportSharing';
 import ResponsiveAssessmentReport from './ResponsiveAssessmentReport';
 import { previousAssessment } from './reportMetrics';
@@ -35,7 +35,7 @@ export default function AssessmentReportFeature({ client, assessment, pdfEnabled
 			{assessment.is_canceled ? (
 				<PwaAlert tone="error" title="Compartilhamento indisponível">O compartilhamento está desabilitado porque esta avaliação foi cancelada.</PwaAlert>
 			) : (
-				<ReportSharing assessment={assessment} canCreate={canCreateReportShare(currentUser)} canRevoke={canUseClinicalFeatures(currentUser)} onAssessmentUpdated={onAssessmentUpdated} />
+				<ReportSharing assessment={assessment} canCreate={canCreateReportShare(currentUser)} canRevoke={canCreateReportShare(currentUser)} onAssessmentUpdated={onAssessmentUpdated} />
 			)}
 		</div>
 	);

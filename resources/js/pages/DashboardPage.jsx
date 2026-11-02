@@ -1235,7 +1235,7 @@ export default function DashboardPage({ userName }) {
 	}
 
 	async function revokeShare(share) {
-		if (!canClinicalProfessional || !share || revokingShareId || !window.confirm('Revogar este link temporário?')) return;
+		if (!canWrite || !share || revokingShareId || !window.confirm('Revogar este link temporário?')) return;
 		setRevokingShareId(share.id);
 
 		try {
@@ -1767,7 +1767,7 @@ export default function DashboardPage({ userName }) {
 														<p className="text-xs font-bold uppercase text-slate-500">{share.channel} • expira {formatDate(share.expires_at)}</p>
 														<p className="mt-1 text-xs text-slate-500">Visualizações: {share.view_count} • {share.is_active ? 'Ativo' : 'Revogado/expirado'}</p>
 													</div>
-											<button type="button" disabled={!canClinicalProfessional || !share.is_active || Boolean(revokingShareId)} aria-busy={revokingShareId === share.id} onClick={() => runAction(`revoke-share-${share.id}`, () => revokeShare(share))} className="rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-50">
+											<button type="button" disabled={!canWrite || !share.is_active || Boolean(revokingShareId)} aria-busy={revokingShareId === share.id} onClick={() => runAction(`revoke-share-${share.id}`, () => revokeShare(share))} className="rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-50">
 												{revokingShareId === share.id ? 'Revogando...' : 'Revogar'}
 													</button>
 												</div>
