@@ -1,20 +1,38 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import PwaIcon from './PwaIcon';
 
-const VISIBILITY_THRESHOLD = 640;
+const MINIMUM_SCROLL_DISTANCE = 800;
+const VIEWPORT_MULTIPLIER = 0.9;
+
+function visibilityThreshold() {
+	return Math.max(MINIMUM_SCROLL_DISTANCE, window.innerHeight * VIEWPORT_MULTIPLIER);
+}
 
 export default function PwaScrollToTopButton() {
-	const [visible, setVisible] = useState(() => window.scrollY > VISIBILITY_THRESHOLD);
+	const [visible, setVisible] = useState(false);
+	const animationFrame = useRef(null);
 
 	useEffect(() => {
 		function updateVisibility() {
-			setVisible(window.scrollY > VISIBILITY_THRESHOLD);
+			if (animationFrame.current !== null) return;
+
+			animationFrame.current = window.requestAnimationFrame(() => {
+				animationFrame.current = null;
+				const scrollPosition = window.scrollY || document.documentElement.scrollTop;
+				const shouldBeVisible = scrollPosition >= visibilityThreshold();
+				setVisible((current) => current === shouldBeVisible ? current : shouldBeVisible);
+			});
 		}
 
 		window.addEventListener('scroll', updateVisibility, { passive: true });
+		window.addEventListener('resize', updateVisibility, { passive: true });
 		updateVisibility();
 
-		return () => window.removeEventListener('scroll', updateVisibility);
+		return () => {
+			window.removeEventListener('scroll', updateVisibility);
+			window.removeEventListener('resize', updateVisibility);
+			if (animationFrame.current !== null) window.cancelAnimationFrame(animationFrame.current);
+		};
 	}, []);
 
 	function scrollToTop() {
