@@ -3,7 +3,7 @@ let operationalRegistration = null;
 let reloadingForUpdate = false;
 let reloadWhenControlled = false;
 
-export const PWA_UPDATE_AVAILABLE_EVENT = 'ricosty:pwa-update-available';
+export const PWA_UPDATE_AVAILABLE_EVENT = 'vita-scan:pwa-update-available';
 
 function notifyUpdateAvailable() {
 	window.dispatchEvent(new CustomEvent(PWA_UPDATE_AVAILABLE_EVENT));

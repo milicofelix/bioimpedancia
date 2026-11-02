@@ -1,14 +1,14 @@
 {
     "id": "/app",
-    "name": "Ricosty Atendimento",
-    "short_name": "Ricosty",
-    "description": "Área operacional para clientes, avaliações e relatórios de bioimpedância.",
+    "name": "Vita Scan — Análise Clínica Biológica",
+    "short_name": "Vita Scan",
+    "description": "Área operacional Vita Scan para clientes, avaliações e relatórios de composição corporal.",
     "lang": "pt-BR",
     "start_url": "/app",
     "scope": "/app",
     "display": "standalone",
     "display_override": ["standalone", "minimal-ui"],
-    "orientation": "portrait-primary",
+    "orientation": "any",
     "background_color": "#fffaf6",
     "theme_color": "#ad3f5b",
     "categories": ["health", "medical", "productivity"],
@@ -27,13 +27,7 @@
             "src": "/pwa/icons/icon-512.png",
             "sizes": "512x512",
             "type": "image/png",
-            "purpose": "any"
-        },
-        {
-            "src": "/pwa/icons/icon-maskable-512.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "maskable"
+            "purpose": "any maskable"
         }
     ]
 }
