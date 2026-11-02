@@ -156,7 +156,7 @@ function decorateMetric(metric, assessment) {
 	const usesApplicationClassification = Boolean(extendedMetric?.application_classification);
 	const analysisClassification = indicator?.pending ? 'Sem classificação disponível' : indicator?.classification;
 	const classification = usesApplicationClassification
-		? `Aplicativo: ${extendedMetric.application_classification}`
+		? `Classificação: ${extendedMetric.application_classification}`
 		: analysisClassification ?? (metric.field === 'weight_kg' ? 'Medida registrada' : null);
 	const classificationTone = usesApplicationClassification
 		? classificationToneFromText(extendedMetric.application_classification)
