@@ -1,7 +1,11 @@
+import { clearClinicalDrafts } from './clinicalDraftStorage';
+
 const PWA_CACHE_PREFIXES = ['vita-scan-pwa-', 'ricosty-pwa-'];
 let redirectingToLogin = false;
 
 export async function clearOperationalCaches() {
+	clearClinicalDrafts();
+
 	if ('serviceWorker' in navigator) {
 		const registration = await navigator.serviceWorker.getRegistration('/');
 		registration?.active?.postMessage({ type: 'CLEAR_OPERATIONAL_CACHES' });

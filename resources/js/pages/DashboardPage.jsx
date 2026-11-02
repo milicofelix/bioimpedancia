@@ -29,6 +29,8 @@ import ClientModuleSummary from '../shared/ClientModuleSummary';
 import ClientWorkspaceTabs from '../shared/ClientWorkspaceTabs';
 import ClientAssessmentHeader from '../shared/ClientAssessmentHeader';
 import { clinicModules } from '../shared/clinicModules';
+import { clearOperationalCaches } from '../security/browserSession';
+import { purgeLegacyClinicalDrafts, readAssessmentDraft, removeAssessmentDraft, writeAssessmentDraft } from '../security/clinicalDraftStorage';
 
 const emptyClient = {
 	full_name: '',
@@ -431,10 +433,6 @@ function assessmentFormFromAssessment(assessment) {
 	};
 }
 
-function assessmentDraftKey(clientId) {
-	return clientId ? `ricosty:assessment-draft:${clientId}` : null;
-}
-
 function hasAssessmentDraftData(form) {
 	return [
 		'weight_kg',
@@ -524,6 +522,10 @@ export default function DashboardPage({ userName }) {
 	const [bodyscanProgressStep, setBodyscanProgressStep] = useState(1);
 
 	useEffect(() => {
+		purgeLegacyClinicalDrafts();
+	}, []);
+
+	useEffect(() => {
 		loadBioimpedanceWorkspace().then((data) => {
 			setClients(data.clients);
 			setClinic(data.clinic);
@@ -567,40 +569,29 @@ export default function DashboardPage({ userName }) {
 	useEffect(() => {
 		if (!selectedClientId || assessmentMode !== 'create' || ['relaxmedic', 'relaxmedic_bodyscan_pro'].includes(clinic.scale_model)) return;
 
-		const key = assessmentDraftKey(selectedClientId);
-		const storedDraft = key ? window.localStorage.getItem(key) : null;
+		const storedDraft = readAssessmentDraft(selectedClientId);
 		if (!storedDraft) {
 			setAssessmentDraftSavedAt(null);
 			return;
 		}
 
-		try {
-			const parsedDraft = JSON.parse(storedDraft);
-			if (parsedDraft?.form && hasAssessmentDraftData(parsedDraft.form)) {
-				setAssessmentForm(parsedDraft.form);
-				setAssessmentDraftSavedAt(parsedDraft.saved_at ?? null);
-			}
-		} catch {
-			window.localStorage.removeItem(key);
-			setAssessmentDraftSavedAt(null);
+		if (hasAssessmentDraftData(storedDraft.form)) {
+			setAssessmentForm(storedDraft.form);
+			setAssessmentDraftSavedAt(storedDraft.saved_at ?? null);
 		}
 	}, [assessmentMode, clinic.scale_model, selectedClientId]);
 
 	useEffect(() => {
 		if (!selectedClientId || assessmentMode !== 'create' || ['relaxmedic', 'relaxmedic_bodyscan_pro'].includes(clinic.scale_model)) return;
 
-		const key = assessmentDraftKey(selectedClientId);
-		if (!key) return;
-
 		if (!hasAssessmentDraftData(assessmentForm)) {
-			window.localStorage.removeItem(key);
+			removeAssessmentDraft(selectedClientId);
 			setAssessmentDraftSavedAt(null);
 			return;
 		}
 
 		const timeout = window.setTimeout(() => {
-			const savedAt = new Date().toISOString();
-			window.localStorage.setItem(key, JSON.stringify({ form: assessmentForm, saved_at: savedAt }));
+			const savedAt = writeAssessmentDraft(selectedClientId, assessmentForm);
 			setAssessmentDraftSavedAt(savedAt);
 		}, 500);
 
@@ -680,8 +671,12 @@ export default function DashboardPage({ userName }) {
 	}, [clientWorkspaceTab, enabledModules.assessment, enabledModules.screening, enabledModules.reports]);
 
 	async function handleLogout() {
-		await logout();
-		window.location.assign('/login');
+		try {
+			await logout();
+		} finally {
+			await clearOperationalCaches().catch(() => {});
+			window.location.assign('/login');
+		}
 	}
 
 	async function refreshAdminDashboard() {
@@ -900,10 +895,7 @@ export default function DashboardPage({ userName }) {
 	}
 
 	function clearAssessmentDraft() {
-		const key = assessmentDraftKey(selectedClientId);
-		if (key) {
-			window.localStorage.removeItem(key);
-		}
+		removeAssessmentDraft(selectedClientId);
 		setAssessmentForm({ ...emptyAssessment, evaluated_at: localDatetimeNow() });
 		setAssessmentDraftSavedAt(null);
 	}
@@ -1140,10 +1132,7 @@ export default function DashboardPage({ userName }) {
 			setClients((current) => current.map((client) => (client.id === data.client.id ? data.client : client)));
 			setAuditEvents(data.audit_events ?? auditEvents);
 			setSelectedAssessmentId(data.assessment.id);
-			const key = assessmentDraftKey(selectedClient.id);
-			if (key) {
-				window.localStorage.removeItem(key);
-			}
+			removeAssessmentDraft(selectedClient.id);
 			setAssessmentDraftSavedAt(null);
 			startNewAssessment();
 			if (enabledModules.reports) setClientWorkspaceTab('reports');
@@ -1823,7 +1812,7 @@ export default function DashboardPage({ userName }) {
 									</div> : null}
 									{!isImageAssessment && assessmentDraftSavedAt ? (
 										<div className="flex items-center gap-2 text-xs text-slate-500">
-											<span>Rascunho salvo {formatDate(assessmentDraftSavedAt)}</span>
+											<span>Rascunho temporário salvo nesta aba {formatDate(assessmentDraftSavedAt)}</span>
 											<button type="button" onClick={clearAssessmentDraft} className="font-bold text-rose-600">Descartar</button>
 										</div>
 									) : null}
