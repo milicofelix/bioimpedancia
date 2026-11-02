@@ -32,6 +32,9 @@ const icons = {
 	trendUp: <path d="m3 17 6-6 4 4 8-8M15 7h6v6"/>,
 	trendDown: <path d="m3 7 6 6 4-4 8 8M15 17h6v-6"/>,
 	minus: <path d="M5 12h14"/>,
+	info: <><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></>,
+	activity: <><path d="M3 12h4l2-6 4 12 2-6h6"/></>,
+	x: <><path d="m6 6 12 12M18 6 6 18"/></>,
 };
 
 export default function PwaIcon({ name, size = 20, className = '', label }) {

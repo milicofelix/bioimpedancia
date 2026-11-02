@@ -6,16 +6,15 @@ import { apiErrorMessage, apiValidationErrors, updateBioimpedanceClientProfile }
 import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaIcon from '../../components/ui/PwaIcon';
+import PwaAlert from '../../components/ui/PwaAlert';
+import PwaClientIdentity from '../../components/ui/PwaClientIdentity';
+import PwaState from '../../components/ui/PwaState';
 import ScreeningInvitationPanel from './ScreeningInvitationPanel';
 import ClientModuleSummary from '../../../shared/ClientModuleSummary';
 import ClientWorkspaceTabs from '../../../shared/ClientWorkspaceTabs';
 import ClientAssessmentHeader from '../../../shared/ClientAssessmentHeader';
 
 const sexLabels = { female: 'Feminino', male: 'Masculino' };
-
-function initials(name) {
-	return String(name ?? '?').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
-}
 
 function clientProfile(client) {
 	return {
@@ -84,21 +83,11 @@ export default function ClientDetails({ client, currentUser, scaleModel, enabled
 			<PwaButton type="button" onClick={onBack} variant="ghost" icon="arrowLeft" className="-ml-3">Voltar para clientes</PwaButton>
 
 			<PwaCard className="mt-3 p-5 sm:p-6">
-				<div className="flex flex-wrap items-start justify-between gap-3">
-					<div className="flex min-w-0 items-center gap-3">
-						<span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-ricosty-100 to-ricosty-200 text-lg font-extrabold text-ricosty-800 ring-1 ring-ricosty-200">{initials(client.full_name)}</span>
-						<div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[0.14em] text-ricosty-600">Cliente</p>
-						<h2 id="client-details-title" className="mt-1 break-words text-xl font-extrabold text-ricosty-ink">{client.full_name}</h2></div>
-					</div>
-					<div className="flex shrink-0 flex-col items-end gap-1">
-						{client.is_anonymized ? (
-							<span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-bold uppercase text-amber-900">Anonimizado</span>
-						) : !client.is_active ? (
-							<span className="rounded-full bg-slate-200 px-2 py-1 text-[11px] font-bold uppercase text-slate-800">Inativo</span>
-						) : (
-							<span className="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-bold uppercase text-emerald-900">Ativo</span>
-						)}
-						<PwaButton
+				<PwaClientIdentity
+					name={client.full_name}
+					headingId="client-details-title"
+					status={client.is_anonymized ? 'anonymized' : client.is_active ? 'active' : 'inactive'}
+					action={<PwaButton
 							type="button"
 							variant="ghost"
 							aria-expanded={showClientDetails}
@@ -108,9 +97,8 @@ export default function ClientDetails({ client, currentUser, scaleModel, enabled
 						>
 							{showClientDetails ? 'Ocultar detalhes' : 'Ver detalhes'}
 							<PwaIcon name="chevronRight" size={15} className={`transition-transform ${showClientDetails ? 'rotate-90' : ''}`} />
-						</PwaButton>
-					</div>
-				</div>
+						</PwaButton>}
+				/>
 
 				{showClientDetails ? <div id={clientDetailsId} className="animate-[pwa-screen-enter_180ms_ease-out]">
 					<div className="mt-5 flex items-center justify-between gap-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-600">Dados biométricos básicos</p>{canEditProfile && !editingProfile ? <button type="button" onClick={() => setEditingProfile(true)} className="pwa-focus min-h-9 rounded-lg px-3 text-xs font-bold text-ricosty-700 hover:bg-ricosty-cream">Editar dados</button> : null}</div>
@@ -143,8 +131,8 @@ export default function ClientDetails({ client, currentUser, scaleModel, enabled
 					onOpenReports={() => latestActiveAssessment && onOpenReport(client, latestActiveAssessment)}
 					enabledModules={enabledModules}
 				/>
-				{access.reason ? <p className="mt-2 text-center text-xs font-semibold text-amber-700">{access.reason}</p> : null}
-			</div> : access.reason && enabledModules.assessment ? <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-xs font-semibold text-amber-800">{access.reason}</p> : null}
+				{access.reason ? <PwaAlert tone="attention" className="mt-2" title="Avaliação indisponível">{access.reason}</PwaAlert> : null}
+			</div> : access.reason && enabledModules.assessment ? <PwaAlert tone="attention" className="mt-4" title="Avaliação indisponível">{access.reason}</PwaAlert> : null}
 
 			{needsModuleChoice ? <div className="mt-4"><ClientWorkspaceTabs activeTab={activeTab} onChange={setActiveTab} enabledModules={enabledModules} sticky /></div> : null}
 
@@ -182,17 +170,14 @@ export default function ClientDetails({ client, currentUser, scaleModel, enabled
 							</div>
 						</li>
 					))}
-					{!assessments.length ? <li className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500">Nenhuma avaliação registrada.</li> : null}
+					{!assessments.length ? <li><PwaState icon="history" title="Nenhuma avaliação registrada" description="A primeira avaliação corporal aparecerá aqui após ser concluída." /></li> : null}
 				</ol>
 			</PwaCard>
 			</div>
 
 			<div id="client-panel-screenings" role="tabpanel" aria-labelledby="client-tab-screenings" className={enabledModules.screening && activeTab === 'screenings' ? '' : 'hidden'}>
 				{canAccessScreenings ? <ScreeningInvitationPanel client={client} canCreateInvitation={client.is_active && !client.is_anonymized} creationUnavailableReason={client.is_anonymized ? 'Cliente anonimizado não pode receber novas triagens. Os dados remanescentes seguem as regras de retenção e auditoria.' : 'Cliente inativo não pode receber novas triagens. O histórico permanece disponível para consulta.'} /> : (
-					<PwaCard className="mt-4 border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-						<strong>Triagens indisponíveis para este perfil.</strong>
-						<p className="mt-1">É necessário usar uma conta de administrador ou profissional para consultar e administrar triagens.</p>
-					</PwaCard>
+					<PwaAlert className="mt-4" tone="attention" title="Triagens indisponíveis para este perfil">É necessário usar uma conta de administrador ou profissional para consultar e administrar triagens.</PwaAlert>
 				)}
 			</div>
 		</section>

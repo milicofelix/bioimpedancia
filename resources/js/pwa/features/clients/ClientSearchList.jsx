@@ -3,6 +3,8 @@ import { formatIssueDate } from '../../../shared/formatters';
 import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaIcon from '../../components/ui/PwaIcon';
+import PwaSectionHeader from '../../components/ui/PwaSectionHeader';
+import PwaState from '../../components/ui/PwaState';
 
 function searchable(value) {
 	return String(value ?? '')
@@ -58,21 +60,21 @@ export default function ClientSearchList({ clients, canCreate, onCreate, onSelec
 
 	return (
 		<section aria-labelledby="clients-title">
-			<div className="flex items-start justify-between gap-3">
-				<div>
-					<p className="text-xs font-bold uppercase tracking-[0.16em] text-ricosty-600">Atendimento</p>
-					<h2 id="clients-title" className="mt-1 text-2xl font-bold text-ricosty-950">Clientes</h2>
-					<p className="mt-1 text-sm text-slate-500">Localize rapidamente quem será atendido.</p>
-				</div>
-				{canCreate ? <PwaButton type="button" icon="plus" onClick={onCreate} className="min-h-11 px-3">Cadastrar</PwaButton> : null}
-			</div>
+			<PwaSectionHeader
+				icon="users"
+				eyebrow="Atendimento"
+				title="Clientes"
+				headingId="clients-title"
+				description="Localize rapidamente quem será atendido."
+				action={canCreate ? <PwaButton type="button" icon="plus" onClick={onCreate} className="min-h-11 px-3">Cadastrar</PwaButton> : null}
+			/>
 
 			<PwaCard className="mt-5 p-3">
 				<label className="relative block">
 					<span className="sr-only">Buscar clientes</span>
 					<PwaIcon name="search" size={20} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ricosty-500" />
 					<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nome, telefone, e-mail ou CPF" className="pwa-focus min-h-13 w-full rounded-xl border border-ricosty-100 bg-ricosty-cream/50 py-3 pl-12 pr-12 text-base transition placeholder:text-slate-500 focus:border-ricosty-400 focus:bg-white" />
-					{query ? <button type="button" onClick={() => setQuery('')} aria-label="Limpar busca de clientes" className="pwa-focus absolute right-1.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-xl text-slate-600 hover:bg-ricosty-50">×</button> : null}
+					{query ? <button type="button" onClick={() => setQuery('')} aria-label="Limpar busca de clientes" className="pwa-focus absolute right-1.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-slate-600 hover:bg-ricosty-50"><PwaIcon name="x" size={18} /></button> : null}
 				</label>
 				<div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1" role="group" aria-label="Filtrar clientes por situação">
 					{[{ key: 'active', label: 'Ativos' }, { key: 'unavailable', label: 'Indisponíveis' }, { key: 'all', label: 'Todos' }].map((filter) => <button type="button" key={filter.key} onClick={() => setStatusFilter(filter.key)} aria-pressed={statusFilter === filter.key} aria-label={`${filter.label}: ${counts[filter.key]} clientes`} className={`pwa-focus min-h-11 rounded-lg px-1 text-xs font-bold transition ${statusFilter === filter.key ? 'bg-white text-ricosty-800 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}>{filter.label}<span className="ml-1" aria-hidden="true">{counts[filter.key]}</span></button>)}
@@ -98,12 +100,7 @@ export default function ClientSearchList({ clients, canCreate, onCreate, onSelec
 				})}
 			</div>
 
-			{!visibleClients.length ? (
-				<div className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center">
-					<p className="font-semibold text-slate-800">{clients.length ? 'Nenhum cliente encontrado.' : 'Nenhum cliente cadastrado.'}</p>
-					<p className="mt-1 text-sm text-slate-500">{canCreate ? 'Use o botão Cadastrar para iniciar o primeiro atendimento.' : 'Seu perfil possui acesso somente aos registros existentes.'}</p>
-				</div>
-			) : null}
+			{!visibleClients.length ? <PwaState className="mt-3" icon={clients.length ? 'search' : 'users'} title={clients.length ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'} description={canCreate ? 'Use o botão Cadastrar para iniciar o primeiro atendimento.' : 'Seu perfil possui acesso somente aos registros existentes.'} /> : null}
 		</section>
 	);
 }

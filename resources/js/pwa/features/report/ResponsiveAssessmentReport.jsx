@@ -5,6 +5,10 @@ import PwaIcon from '../../components/ui/PwaIcon';
 import SegmentalBodyMap from '../../../components/bioimpedance/SegmentalBodyMap';
 import SegmentalComparison from '../../../components/bioimpedance/SegmentalComparison';
 import VitaScanBrand from '../../../components/brand/VitaScanBrand';
+import PwaInfoCard from '../../components/ui/PwaInfoCard';
+import PwaMetadata from '../../components/ui/PwaMetadata';
+import PwaMetricCard from '../../components/ui/PwaMetricCard';
+import PwaSectionHeader from '../../components/ui/PwaSectionHeader';
 
 export default function ResponsiveAssessmentReport({ client, assessment, previous }) {
 	const metrics = metricsForAssessment(assessment);
@@ -28,26 +32,20 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 					<div className="absolute -right-8 -top-12 h-40 w-40 rounded-full bg-white/10 blur-2xl" aria-hidden="true" />
 					<p className="relative text-xs font-bold uppercase tracking-[0.16em] text-ricosty-100">Relatório de bioimpedância</p>
 					<h2 className="mt-2 text-2xl font-bold">{client.full_name}</h2>
-					<div className="mt-4 grid gap-x-4 gap-y-3 border-t border-white/20 pt-4 text-xs sm:grid-cols-3">
-						<div><span className="block text-[11px] uppercase text-white/75">Medição</span><strong className="mt-0.5 block">{formatDate(assessment.evaluated_at)}</strong></div>
-						<div><span className="block text-[11px] uppercase text-white/75">Equipamento</span><strong className="mt-0.5 block">{assessment.device_model}</strong></div>
-						<div><span className="block text-[11px] uppercase text-white/75">Profissional</span><strong className="mt-0.5 block break-words">{assessment.professional_name ?? '-'}</strong></div>
-					</div>
+					<PwaMetadata className="mt-4 border-t border-white/20 pt-4 text-white" items={[
+						{ key: 'date', icon: 'calendar', label: 'Medição', value: formatDate(assessment.evaluated_at) },
+						{ key: 'device', icon: 'activity', label: 'Equipamento', value: assessment.device_model },
+						{ key: 'professional', icon: 'user', label: 'Profissional', value: assessment.professional_name ?? '-' },
+					]} />
 				</div>
 			</header>
 
 			<div className="min-w-0 p-4 sm:p-5">
-				{specifications ? <p className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-700"><strong>Especificações do equipamento:</strong> {specifications.electrodes} eletrodos · dupla frequência de {specifications.frequencies_khz.join(' kHz + ')} kHz · temperatura operacional de {specifications.minimum_temperature_c} °C a {specifications.maximum_temperature_c} °C. O manual não informa margem de erro; os valores são apresentados conforme o relatório importado.</p> : null}
-				<p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-ricosty-600">Principais resultados</p>
+				{specifications ? <PwaInfoCard className="mb-4" title="Especificações do equipamento">{specifications.electrodes} eletrodos · dupla frequência de {specifications.frequencies_khz.join(' kHz + ')} kHz · temperatura operacional de {specifications.minimum_temperature_c} °C a {specifications.maximum_temperature_c} °C. O manual não informa margem de erro; os valores são apresentados conforme o relatório importado.</PwaInfoCard> : null}
+				<PwaSectionHeader className="mb-3" icon="activity" eyebrow="Resultados" title="Principais resultados" headingLevel="h3" />
 				<div className="grid gap-3 sm:grid-cols-3">
 					{primaryMetrics.map((metric) => (
-						<div key={metric.field} className="relative overflow-hidden rounded-2xl border border-ricosty-200 bg-gradient-to-br from-ricosty-50 to-white p-4 shadow-sm">
-							<span className="absolute -right-5 -top-6 h-16 w-16 rounded-full bg-ricosty-100/70" aria-hidden="true" />
-							<p className="relative text-[11px] font-bold uppercase tracking-wide text-ricosty-700">{metric.label}</p>
-							<p className="relative mt-2 text-2xl font-extrabold text-ricosty-900">{formatMetric(assessment[metric.field], metric)}</p>
-							{metric.type ? <p className="relative mt-2 text-[10px] font-bold uppercase tracking-wide text-sky-700">{metric.type}</p> : null}
-							{metric.note ? <p className="relative mt-1 text-xs leading-5 text-slate-600">{metric.note}</p> : null}
-						</div>
+						<PwaMetricCard key={metric.field} label={metric.label} value={formatMetric(assessment[metric.field], metric)} type={metric.type} note={metric.note} />
 					))}
 				</div>
 				<div className="mt-3 grid gap-3 sm:grid-cols-2">{secondaryMetrics.map((metric) => <div key={metric.field} className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{metric.label}</p><p className="mt-1 break-words text-base font-bold text-slate-950">{formatMetric(assessment[metric.field], metric)}</p>{metric.type ? <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-sky-700">{metric.type}</p> : null}{metric.note ? <p className="mt-1 text-xs leading-5 text-slate-600">{metric.note}</p> : null}</div>)}</div>
