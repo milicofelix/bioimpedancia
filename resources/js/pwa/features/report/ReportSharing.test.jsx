@@ -15,6 +15,8 @@ vi.mock('../../../services/bioimpedanceApi', () => ({
 
 const activeShare = {
     id: 9,
+    url: 'https://example.test/r/persisted-token',
+    message: 'Relatório disponível em https://example.test/r/persisted-token',
     expires_at: '2030-01-20T12:00:00.000Z',
     revoked_at: null,
     is_active: true,
@@ -57,6 +59,14 @@ describe('ReportSharing', () => {
         await waitFor(() => expect(createAssessmentShare).toHaveBeenCalledWith(15, expect.objectContaining({ expires_in_days: 15 })));
         expect(await screen.findByText('https://example.test/r/token')).toBeInTheDocument();
         expect(onAssessmentUpdated).toHaveBeenCalledWith(expect.objectContaining({ id: 15 }));
+    });
+
+    it('mantém ações do link ativo em consultas posteriores', () => {
+        render(<ReportSharing assessment={{ id: 15, shares: [activeShare] }} canCreate canRevoke onAssessmentUpdated={() => {}} />);
+
+        expect(screen.getByText(activeShare.url)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Copiar link' })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Abrir link' })).toHaveAttribute('href', activeShare.url);
     });
 
     it('exige confirmação antes de revogar um link ativo', async () => {

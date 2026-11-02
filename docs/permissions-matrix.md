@@ -61,7 +61,7 @@ O token concede acesso somente ao recurso específico. Ele não cria sessão int
 - A ativação de módulos reduz o acesso; nunca amplia o perfil do usuário.
 - A PWA reflete as permissões do backend, mas a configuração de módulos permanece na versão web administrativa.
 - O modo offline não autoriza gravações clínicas. Operações que dependem do servidor ficam indisponíveis até a reconexão.
-- Links de relatório não incluem o token em auditorias ou mensagens persistidas.
+- Links de relatório não incluem o token em auditorias ou mensagens persistidas. Para permitir nova cópia por perfis autorizados a compartilhar enquanto o acesso estiver ativo, o token é guardado em coluna criptografada e eliminado quando o link é revogado. O visualizador recebe somente estado, validade e quantidade de acessos.
 - Dados administrativos e eventos globais de auditoria são retornados apenas ao administrador.
 - Acesso de leitura ao PDF pode registrar emissão/download e, portanto, gera auditoria mesmo sem alterar o conteúdo clínico.
 

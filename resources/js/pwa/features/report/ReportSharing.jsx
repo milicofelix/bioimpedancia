@@ -29,7 +29,7 @@ export default function ReportSharing({ assessment, canCreate, canRevoke, onAsse
 	const [error, setError] = useState('');
 	const [pendingShareAction, setPendingShareAction] = useState(null);
 	const [pendingRevoke, setPendingRevoke] = useState(null);
-	const [copied, setCopied] = useState(false);
+	const [copiedShareId, setCopiedShareId] = useState(null);
 	const copyFeedbackTimeout = useRef(null);
 	const isOnline = useOnlineStatus();
 
@@ -41,7 +41,7 @@ export default function ReportSharing({ assessment, canCreate, canRevoke, onAsse
 			setCreating(true);
 			setError('');
 			setFeedback('');
-			setCopied(false);
+			setCopiedShareId(null);
 			setShareResult(null);
 
 			try {
@@ -61,43 +61,44 @@ export default function ReportSharing({ assessment, canCreate, canRevoke, onAsse
 		});
 	}
 
-	async function copyLink() {
-		if (!shareResult?.url) return;
+	async function copyLink(share = shareResult) {
+		if (!share?.url) return;
 		setFeedback('');
 		setError('');
 		try {
-			await navigator.clipboard.writeText(shareResult.url);
+			await navigator.clipboard.writeText(share.url);
 			setFeedback('Link copiado para a área de transferência.');
 			setError('');
-			setCopied(true);
+			setCopiedShareId(share.id);
 			window.clearTimeout(copyFeedbackTimeout.current);
-			copyFeedbackTimeout.current = window.setTimeout(() => setCopied(false), 2500);
+			copyFeedbackTimeout.current = window.setTimeout(() => setCopiedShareId(null), 2500);
 		} catch {
-			setCopied(false);
+			setCopiedShareId(null);
 			setError('O navegador não permitiu copiar automaticamente. Toque e segure o link para copiá-lo.');
 		}
 	}
 
-	async function nativeShare() {
-		if (!shareResult?.url) return;
+	async function nativeShare(share = shareResult) {
+		if (!share?.url) return;
 		if (!navigator.share) {
-			await copyLink();
+			await copyLink(share);
 			return;
 		}
 
 		try {
-			await navigator.share({ title: 'Relatório de bioimpedância', text: shareResult.message });
+			await navigator.share({ title: 'Relatório de bioimpedância', text: share.message });
 			setFeedback('Compartilhamento aberto no dispositivo.');
 		} catch (shareError) {
-			if (shareError?.name !== 'AbortError') await copyLink();
+			if (shareError?.name !== 'AbortError') await copyLink(share);
 		}
 	}
 
 	async function confirmShare() {
-		const action = pendingShareAction;
+		const action = pendingShareAction?.type;
+		const share = pendingShareAction?.share;
 		setPendingShareAction(null);
-		if (action === 'native') await nativeShare();
-		if (action === 'copy') await copyLink();
+		if (action === 'native') await nativeShare(share);
+		if (action === 'copy') await copyLink(share);
 	}
 
 	async function revoke(share) {
@@ -139,14 +140,14 @@ export default function ReportSharing({ assessment, canCreate, canRevoke, onAsse
 			{!canCreate ? <PwaAlert tone="info" title="Criação indisponível para este perfil" className="mt-3">Você ainda pode consultar a situação dos links já criados.</PwaAlert> : null}
 			{creating ? <ShareLinkSkeleton /> : null}
 
-			{shareResult ? <div className={`mt-4 rounded-2xl border p-4 transition ${copied ? 'border-emerald-300 bg-emerald-50 ring-2 ring-emerald-100' : 'border-ricosty-200 bg-ricosty-50'}`}><div className="flex flex-wrap items-center justify-between gap-2"><span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-bold uppercase text-emerald-900"><PwaIcon name="check" size={12} />Ativo</span><p className="flex items-center gap-1 text-xs font-bold text-ricosty-900"><PwaIcon name="clock" size={14} />Expira em {formatDate(shareResult.expires_at)}</p></div><p className="mt-3 break-all rounded-lg bg-white/80 p-2 text-sm text-ricosty-950">{shareResult.url}</p><div className="mt-3 grid gap-2 sm:grid-cols-2"><PwaButton type="button" onClick={() => setPendingShareAction('native')} icon="share" className="text-xs">Compartilhar no dispositivo</PwaButton><PwaButton type="button" onClick={() => setPendingShareAction('copy')} icon={copied ? 'check' : 'copy'} variant="secondary" className={`text-xs ${copied ? 'border-emerald-300 text-emerald-800' : ''}`}>{copied ? 'Link copiado!' : 'Copiar link'}</PwaButton></div></div> : null}
+			{shareResult ? <div className={`mt-4 rounded-2xl border p-4 transition ${copiedShareId === shareResult.id ? 'border-emerald-300 bg-emerald-50 ring-2 ring-emerald-100' : 'border-ricosty-200 bg-ricosty-50'}`}><div className="flex flex-wrap items-center justify-between gap-2"><span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-bold uppercase text-emerald-900"><PwaIcon name="check" size={12} />Ativo</span><p className="flex items-center gap-1 text-xs font-bold text-ricosty-900"><PwaIcon name="clock" size={14} />Expira em {formatDate(shareResult.expires_at)}</p></div><p className="mt-3 break-all rounded-lg bg-white/80 p-2 text-sm text-ricosty-950">{shareResult.url}</p><div className="mt-3 grid gap-2 sm:grid-cols-2"><PwaButton type="button" onClick={() => setPendingShareAction({ type: 'native', share: shareResult })} icon="share" className="text-xs">Compartilhar no dispositivo</PwaButton><PwaButton type="button" onClick={() => setPendingShareAction({ type: 'copy', share: shareResult })} icon={copiedShareId === shareResult.id ? 'check' : 'copy'} variant="secondary" className={`text-xs ${copiedShareId === shareResult.id ? 'border-emerald-300 text-emerald-800' : ''}`}>{copiedShareId === shareResult.id ? 'Link copiado!' : 'Copiar link'}</PwaButton></div></div> : null}
 
 			{assessment.shares?.length ? <div className="mt-5"><div className="flex items-center justify-between"><h3 className="flex items-center gap-2 text-sm font-bold text-slate-900"><PwaIcon name="history" size={16} />Histórico de links</h3><span className="text-xs text-slate-600">{assessment.shares.length} no total</span></div><div className="mt-2 space-y-2">{assessment.shares.map((share) => {
 				const status = shareStatus(share);
-				return <div key={share.id} className={`rounded-xl border p-3 ${status.card}`}><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold uppercase ${status.badge}`}><PwaIcon name={status.icon} size={12} />{status.label}</span><p className="mt-2 text-xs font-bold text-slate-800">Expira em {formatDate(share.expires_at)}</p><p className="mt-1 text-xs text-slate-600">{share.view_count} visualização(ões){share.revoked_at ? ` · revogado em ${formatDate(share.revoked_at)}` : ''}</p></div>{status.label === 'Ativo' && canRevoke ? <button type="button" aria-label={`Revogar link que expira em ${formatDate(share.expires_at)}`} onClick={() => setPendingRevoke(share)} disabled={revokingId === share.id || !isOnline} className="pwa-focus min-h-11 min-w-11 rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-bold text-rose-800 disabled:opacity-50">{revokingId === share.id ? 'Revogando...' : 'Revogar'}</button> : null}</div></div>;
+				return <div key={share.id} className={`rounded-xl border p-3 ${status.card}`}><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0 flex-1"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold uppercase ${status.badge}`}><PwaIcon name={status.icon} size={12} />{status.label}</span><p className="mt-2 text-xs font-bold text-slate-800">Expira em {formatDate(share.expires_at)}</p><p className="mt-1 text-xs text-slate-600">{share.view_count} visualização(ões){share.revoked_at ? ` · revogado em ${formatDate(share.revoked_at)}` : ''}</p>{status.label === 'Ativo' && share.url ? <><p className="mt-3 break-all rounded-lg bg-white/80 p-2 text-xs text-slate-700">{share.url}</p><div className="mt-2 flex flex-wrap gap-2"><PwaButton type="button" onClick={() => setPendingShareAction({ type: 'copy', share })} icon={copiedShareId === share.id ? 'check' : 'copy'} variant="secondary" className="text-xs">{copiedShareId === share.id ? 'Link copiado!' : 'Copiar link'}</PwaButton><a href={share.url} target="_blank" rel="noreferrer" className="pwa-focus inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-sky-200 bg-white px-4 py-2 text-xs font-bold text-sky-800"><PwaIcon name="eye" size={15} />Abrir link</a></div></> : null}{status.label === 'Ativo' && !share.url && canCreate ? <p className="mt-2 text-xs font-semibold text-amber-800">Endereço indisponível para este link antigo. Revogue-o e crie um novo para voltar a copiar ou abrir o acesso.</p> : null}{status.label === 'Ativo' && !share.url && !canCreate ? <p className="mt-2 text-xs font-semibold text-slate-600">Seu perfil pode consultar o estado deste acesso, mas não visualizar ou compartilhar o endereço.</p> : null}</div>{status.label === 'Ativo' && canRevoke ? <button type="button" aria-label={`Revogar link que expira em ${formatDate(share.expires_at)}`} onClick={() => setPendingRevoke(share)} disabled={revokingId === share.id || !isOnline} className="pwa-focus min-h-11 min-w-11 rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-bold text-rose-800 disabled:opacity-50">{revokingId === share.id ? 'Revogando...' : 'Revogar'}</button> : null}</div></div>;
 			})}</div></div> : !creating && !shareResult ? <PwaState icon="share" title="Nenhum link criado" description="Quando um link for criado, seu prazo e estado aparecerão aqui." className="mt-5 p-4" /> : null}
 
-			<PwaConfirmSheet open={Boolean(pendingShareAction)} title="Confirmar compartilhamento" description="Este link contém dados clínicos sensíveis. Confirme a identidade do destinatário e evite enviar para grupos ou aparelhos compartilhados." detail={<><strong>Validade:</strong> até {formatDate(shareResult?.expires_at)}</>} confirmIcon={pendingShareAction === 'copy' ? 'copy' : 'share'} onCancel={() => setPendingShareAction(null)} onConfirm={confirmShare} />
+			<PwaConfirmSheet open={Boolean(pendingShareAction)} title="Confirmar compartilhamento" description="Este link contém dados clínicos sensíveis. Confirme a identidade do destinatário e evite enviar para grupos ou aparelhos compartilhados." detail={<><strong>Validade:</strong> até {formatDate(pendingShareAction?.share?.expires_at)}</>} confirmIcon={pendingShareAction?.type === 'copy' ? 'copy' : 'share'} onCancel={() => setPendingShareAction(null)} onConfirm={confirmShare} />
 			<PwaConfirmSheet open={Boolean(pendingRevoke)} title="Revogar este link?" description="O cliente perderá o acesso imediatamente. Esta ação não pode ser desfeita; se necessário, será preciso criar um novo link." icon="alertTriangle" tone="danger" confirmLabel="Revogar link" confirmVariant="danger" onCancel={() => setPendingRevoke(null)} onConfirm={confirmRevoke} />
 		</PwaCard>
 	);

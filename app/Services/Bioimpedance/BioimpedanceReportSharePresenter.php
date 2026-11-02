@@ -4,13 +4,16 @@ namespace App\Services\Bioimpedance;
 
 use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceReportShare;
+use Throwable;
 
 class BioimpedanceReportSharePresenter
 {
-    public function payload(BioimpedanceReportShare $share, ?string $plainToken = null): array
+    public function payload(BioimpedanceReportShare $share, ?string $plainToken = null, bool $includeAccess = true): array
     {
-        $url = $plainToken ? route('bioimpedance.public-report', $plainToken) : null;
-        $message = $plainToken ? $this->message($share->assessment, $plainToken) : $share->message;
+        $isActive = ! $share->revoked_at && ! $share->expires_at->isPast();
+        $accessToken = $plainToken ?? ($includeAccess && $isActive ? $this->recoverableToken($share) : null);
+        $url = $accessToken ? route('bioimpedance.public-report', $accessToken) : null;
+        $message = $accessToken ? $this->message($share->assessment, $accessToken) : $share->message;
 
         return [
             'id' => $share->id,
@@ -24,13 +27,23 @@ class BioimpedanceReportSharePresenter
             'revoked_at' => $share->revoked_at?->toIso8601String(),
             'viewed_at' => $share->viewed_at?->toIso8601String(),
             'view_count' => $share->view_count,
-            'is_active' => ! $share->revoked_at && ! $share->expires_at->isPast(),
+            'is_active' => $isActive,
+            'has_recoverable_url' => $url !== null,
         ];
+    }
+
+    private function recoverableToken(BioimpedanceReportShare $share): ?string
+    {
+        try {
+            return filled($share->encrypted_token) ? $share->encrypted_token : null;
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     public function message(BioimpedanceAssessment $assessment, ?string $plainToken = null): string
     {
-        $url = $plainToken ? route('bioimpedance.public-report', $plainToken) : '[link temporário enviado somente no momento da geração]';
+        $url = $plainToken ? route('bioimpedance.public-report', $plainToken) : '[link temporário protegido]';
 
         return sprintf(
             'Olá, %s! Sua avaliação de bioimpedância realizada em %s está disponível em PDF. Acesse o relatório pelo link: %s',

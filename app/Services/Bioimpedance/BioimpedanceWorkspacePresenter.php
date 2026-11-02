@@ -50,7 +50,7 @@ class BioimpedanceWorkspacePresenter
         ];
     }
 
-    public function client(BioimpedanceClient $client): array
+    public function client(BioimpedanceClient $client, bool $includeShareAccess = false): array
     {
         return [
             'id' => $client->id,
@@ -78,7 +78,7 @@ class BioimpedanceWorkspacePresenter
             'assessments' => $client->assessments
                 ->sortByDesc('evaluated_at')
                 ->values()
-                ->map(fn (BioimpedanceAssessment $assessment) => $this->assessment($assessment))
+                ->map(fn (BioimpedanceAssessment $assessment) => $this->assessment($assessment, $includeShareAccess))
                 ->all(),
         ];
     }
@@ -98,7 +98,10 @@ class BioimpedanceWorkspacePresenter
                 ->latest('evaluated_at')])
             ->orderBy('full_name')
             ->get()
-            ->map(fn (BioimpedanceClient $client) => $this->client($client));
+            ->map(fn (BioimpedanceClient $client) => $this->client(
+                $client,
+                $currentUser->canCreateClinicalRecords()
+            ));
 
         return [
             'clients' => $clients,
@@ -107,7 +110,7 @@ class BioimpedanceWorkspacePresenter
         ];
     }
 
-    public function assessment(BioimpedanceAssessment $assessment): array
+    public function assessment(BioimpedanceAssessment $assessment, bool $includeShareAccess = false): array
     {
         $analysis = $assessment->analysis;
         $requiresCurrentAnalysis = $assessment->device_model === ScaleModel::RELAXMEDIC_NAME
@@ -258,7 +261,10 @@ class BioimpedanceWorkspacePresenter
             'report_issue_count' => $assessment->report_issue_count,
             'shares' => $assessment->relationLoaded('shares')
                 ? $assessment->shares->sortByDesc('created_at')->values()->map(
-                    fn (BioimpedanceReportShare $share) => $this->reportSharePresenter->payload($share),
+                    fn (BioimpedanceReportShare $share) => $this->reportSharePresenter->payload(
+                        $share->setRelation('assessment', $assessment),
+                        includeAccess: $includeShareAccess
+                    ),
                 )->all()
                 : [],
         ];

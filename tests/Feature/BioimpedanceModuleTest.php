@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\Bioimpedance\BioimpedanceObservationAssistant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -533,6 +534,16 @@ class BioimpedanceModuleTest extends TestCase
         $this->assertStringContainsString($plainUrl, $response->json('share.message'));
         $this->assertStringNotContainsString($plainToken, (string) $share->message);
         $this->assertStringNotContainsString($plainUrl, (string) $share->message);
+        $encryptedToken = DB::table('bioimpedance_report_shares')->where('id', $shareId)->value('encrypted_token');
+        $this->assertNotNull($encryptedToken);
+        $this->assertStringNotContainsString($plainToken, $encryptedToken);
+        $this->actingAs($user)->getJson(route('bioimpedance.index'))
+            ->assertOk()
+            ->assertJsonFragment(['url' => $plainUrl]);
+        $viewer = User::factory()->create(['role' => User::ROLE_VIEWER]);
+        $this->actingAs($viewer)->getJson(route('bioimpedance.index'))
+            ->assertOk()
+            ->assertJsonMissing(['url' => $plainUrl]);
         $createdAudit = AppAudit::query()
             ->where('action', 'bioimpedance_report_share.created')
             ->where('auditable_id', $shareId)
@@ -571,6 +582,11 @@ class BioimpedanceModuleTest extends TestCase
         $this->actingAs($user)->patchJson(route('bioimpedance.report-shares.revoke', $shareResponse->json('share.id')))
             ->assertOk()
             ->assertJsonPath('share.is_active', false);
+
+        $this->assertDatabaseHas('bioimpedance_report_shares', [
+            'id' => $shareResponse->json('share.id'),
+            'encrypted_token' => null,
+        ]);
 
         $this->get($shareResponse->json('share.url'))->assertStatus(410);
     }

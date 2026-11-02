@@ -4,7 +4,7 @@ import { openFixtureClient, openOperationalApp } from './support/routes.js';
 
 test('abre relatório, disponibiliza PDF e controla compartilhamento temporário', async ({ page, context }) => {
     const shareWithUrl = { ...activeShare, url: 'https://example.test/r/e2e-token', message: 'Relatório Vita Scan disponível.' };
-    const assessmentWithShare = { ...assessment, shares: [activeShare] };
+    const assessmentWithShare = { ...assessment, shares: [shareWithUrl] };
 
     await page.route('**/bioimpedance/assessments/501/shares', async (route) => {
         await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ share: shareWithUrl, assessment: assessmentWithShare }) });
@@ -31,8 +31,9 @@ test('abre relatório, disponibiliza PDF e controla compartilhamento temporário
     await pdfPage.close();
 
     await page.getByRole('button', { name: 'Criar link temporário' }).click();
-    await expect(page.getByText('https://example.test/r/e2e-token')).toBeVisible();
+    await expect(page.getByText('https://example.test/r/e2e-token').first()).toBeVisible();
     await expect(page.getByText('Histórico de links')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Abrir link' })).toHaveAttribute('href', 'https://example.test/r/e2e-token');
 
     await page.getByRole('button', { name: /Revogar link que expira/ }).click();
     await expect(page.getByRole('dialog', { name: 'Revogar este link?' })).toBeVisible();
