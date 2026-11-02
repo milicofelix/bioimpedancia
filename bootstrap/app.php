@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AttachRequestContext;
 use App\Http\Middleware\EnsureActiveUser;
 use App\Http\Middleware\EnsureClinicModuleEnabled;
 use App\Http\Middleware\EnsureHttps;
@@ -24,7 +25,10 @@ return tap(Application::configure(basePath: dirname(__DIR__))
             $middleware->trustProxies(at: $trustedProxies);
         }
 
-        $middleware->append(EnsureHttps::class);
+        $middleware->append([
+            AttachRequestContext::class,
+            EnsureHttps::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

@@ -159,6 +159,9 @@ php artisan view:cache
 ## Segurança
 
 - Consultar a matriz de perfis, acessos públicos e roteiro de validação em [`docs/permissions-matrix.md`](docs/permissions-matrix.md).
+- Aplicar o checklist de privacidade e proteção de dados em [`docs/lgpd-checklist.md`](docs/lgpd-checklist.md).
+- Validar acessibilidade com [`docs/accessibility-checklist.md`](docs/accessibility-checklist.md).
+- Usar o checklist de liberação em [`docs/release-readiness-checklist.md`](docs/release-readiness-checklist.md).
 - Não versionar `.env`.
 - Não versionar `database/*.sqlite`.
 - Não enviar `storage/logs/*.log`.
@@ -169,6 +172,13 @@ php artisan view:cache
 - Criar o primeiro administrador com `php artisan vita-scan:create-admin`.
 - Rodar backup de banco e storage antes de atualizar produção.
 - Revisar permissões de `storage` e `bootstrap/cache`.
+
+## Operação e recuperação
+
+- Backup, restauração e recuperação de desastre: [`docs/operations/backup-and-restore.md`](docs/operations/backup-and-restore.md).
+- Observabilidade e resposta a incidentes: [`docs/operations/observability-and-incidents.md`](docs/operations/observability-and-incidents.md).
+- Verificação externa de disponibilidade: `scripts/operational-readiness-check.sh https://sistema.exemplo`.
+- O backup é criptografado e acompanhado por checksum. A restauração exige manutenção ativa, confirmação explícita e validação em ambiente isolado antes do uso em produção.
 
 ## Compatibilidade de nomenclatura
 

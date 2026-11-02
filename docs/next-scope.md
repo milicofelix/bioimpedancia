@@ -11,12 +11,14 @@ O antigo controller central de bioimpedância foi dividido em controllers especi
 
 Consolidar a confiabilidade dos fluxos críticos antes de ampliar funcionalidades.
 
-### Prioridades
+### Entregas formalizadas
 
-1. Documentar e revisar a matriz de permissões para administrador, profissional, recepção e visualização.
-2. Adicionar cobertura frontend para componentes e hooks críticos quando a estratégia de testes for aprovada.
-3. Adicionar testes de fluxo completo para autenticação, cliente, importação, revisão, relatório, compartilhamento, atualização do PWA e perda de conexão.
-4. Formalizar procedimentos de backup, restauração, observabilidade e recuperação de desastre.
+1. Matriz de permissões para administrador, profissional, recepção e visualização.
+2. Cobertura frontend dos componentes e hooks críticos.
+3. Fluxos completos de autenticação, cliente, importação, revisão, relatório, compartilhamento, atualização do PWA e perda de conexão.
+4. Procedimentos de backup, restauração, observabilidade, recuperação de desastre, acessibilidade e checklist LGPD.
+
+As rotinas operacionais exigem validação periódica em ambiente controlado. A existência dos scripts e checklists não substitui exercício de restauração, revisão jurídica ou auditoria de acessibilidade.
 
 ## Alvos atuais
 
@@ -25,7 +27,9 @@ Consolidar a confiabilidade dos fluxos críticos antes de ampliar funcionalidade
 - `resources/js/pwa/`
 - `resources/js/pages/DashboardPage.jsx`
 - `tests/Feature/BioimpedanceModuleTest.php`
-- futura estrutura de testes frontend, somente após decisão explícita sobre dependências
+- `docs/operations/`
+- `docs/accessibility-checklist.md`
+- `docs/lgpd-checklist.md`
 
 ## Restrições
 
