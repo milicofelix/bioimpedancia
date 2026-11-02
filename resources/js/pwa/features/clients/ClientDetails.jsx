@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { formatDate, formatIssueDate, numberBr } from '../../../shared/formatters';
+import { formatDate, formatIssueDate, localDatetimeNow, numberBr } from '../../../shared/formatters';
 import { cpfMask } from '../../../shared/inputMasks';
 import { assessmentAccess, canUseClinicalFeatures } from './clientAccess';
+import { apiErrorMessage, apiValidationErrors, updateBioimpedanceClientBirthDate } from '../../../services/bioimpedanceApi';
 import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaIcon from '../../components/ui/PwaIcon';
@@ -16,7 +17,7 @@ function initials(name) {
 	return String(name ?? '?').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 }
 
-export default function ClientDetails({ client, currentUser, scaleModel, enabledModules, onBack, onNewAssessment, onOpenAssistant, onOpenReport }) {
+export default function ClientDetails({ client, currentUser, scaleModel, enabledModules, onBack, onClientUpdated, onNewAssessment, onOpenAssistant, onOpenReport }) {
 	const access = assessmentAccess(client, currentUser, scaleModel);
 	const assessments = [...(client.assessments ?? [])].sort((left, right) => new Date(right.evaluated_at) - new Date(left.evaluated_at));
 	const latestActiveAssessment = assessments.find((assessment) => !assessment.is_canceled) ?? null;
@@ -27,10 +28,41 @@ export default function ClientDetails({ client, currentUser, scaleModel, enabled
 	const opensSingleModuleDirectly = enabledModuleCount === 1 && (enabledModules.assessment || enabledModules.screening);
 	const [activeTab, setActiveTab] = useState(firstActiveTab);
 	const [showClientDetails, setShowClientDetails] = useState(false);
+	const [editingBirthDate, setEditingBirthDate] = useState(false);
+	const [birthDate, setBirthDate] = useState(client.birth_date ?? '');
+	const [birthDateError, setBirthDateError] = useState('');
+	const [savingBirthDate, setSavingBirthDate] = useState(false);
 	const clientDetailsId = `client-profile-details-${client.id}`;
+	const canEditBirthDate = canUseClinicalFeatures(currentUser) && !client.is_anonymized;
 
 	useEffect(() => setActiveTab(firstActiveTab), [client.id, firstActiveTab]);
 	useEffect(() => setShowClientDetails(false), [client.id]);
+	useEffect(() => {
+		setEditingBirthDate(false);
+		setBirthDate(client.birth_date ?? '');
+		setBirthDateError('');
+	}, [client.id, client.birth_date]);
+
+	async function saveBirthDate(event) {
+		event.preventDefault();
+		if (savingBirthDate || birthDate === client.birth_date) {
+			setEditingBirthDate(false);
+			return;
+		}
+
+		setSavingBirthDate(true);
+		setBirthDateError('');
+		try {
+			const updatedClient = await updateBioimpedanceClientBirthDate(client.id, birthDate);
+			onClientUpdated(updatedClient);
+			setEditingBirthDate(false);
+		} catch (error) {
+			const validationErrors = apiValidationErrors(error);
+			setBirthDateError(validationErrors.birth_date?.[0] ?? apiErrorMessage(error, 'Não foi possível atualizar a data de nascimento.'));
+		} finally {
+			setSavingBirthDate(false);
+		}
+	}
 
 	function openScreenings() {
 		setActiveTab('screenings');
@@ -72,7 +104,18 @@ export default function ClientDetails({ client, currentUser, scaleModel, enabled
 
 				{showClientDetails ? <div id={clientDetailsId} className="animate-[pwa-screen-enter_180ms_ease-out]">
 					<dl className="mt-5 grid gap-2 text-sm sm:grid-cols-2">
-						{[['Idade', `${client.age ?? '-'} anos`], ['Sexo', sexLabels[client.biological_sex] ?? '-'], ['Altura', `${numberBr(client.height_cm, 0)} cm`], ['Nascimento', formatIssueDate(client.birth_date)]].map(([label, value]) => <div key={label} className="rounded-xl bg-ricosty-cream/70 p-3"><dt className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{label}</dt><dd className="mt-1 font-bold text-ricosty-ink">{value}</dd></div>)}
+						{[['Idade', `${client.age ?? '-'} anos`], ['Sexo', sexLabels[client.biological_sex] ?? '-'], ['Altura', `${numberBr(client.height_cm, 0)} cm`]].map(([label, value]) => <div key={label} className="rounded-xl bg-ricosty-cream/70 p-3"><dt className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{label}</dt><dd className="mt-1 font-bold text-ricosty-ink">{value}</dd></div>)}
+						<div className="rounded-xl bg-ricosty-cream/70 p-3">
+							<dt className="flex items-center justify-between gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-600"><span>Nascimento</span>{canEditBirthDate && !editingBirthDate ? <button type="button" onClick={() => setEditingBirthDate(true)} className="pwa-focus min-h-8 rounded-lg px-2 text-[11px] font-bold normal-case tracking-normal text-ricosty-700 hover:bg-white">Editar</button> : null}</dt>
+							<dd className="mt-1 font-bold text-ricosty-ink">
+								{editingBirthDate ? <form onSubmit={saveBirthDate} className="space-y-2">
+									<label className="sr-only" htmlFor={`client-birth-date-${client.id}`}>Data de nascimento</label>
+									<input id={`client-birth-date-${client.id}`} type="date" required max={localDatetimeNow().slice(0, 10)} value={birthDate} onChange={(event) => { setBirthDate(event.target.value); setBirthDateError(''); }} className="pwa-focus min-h-11 w-full rounded-lg border border-ricosty-200 bg-white px-2 font-normal" />
+									<div className="flex flex-wrap gap-2"><button type="submit" disabled={savingBirthDate} className="pwa-focus min-h-9 rounded-lg bg-ricosty-700 px-3 text-xs font-bold text-white disabled:opacity-60">{savingBirthDate ? 'Salvando...' : 'Salvar'}</button><button type="button" disabled={savingBirthDate} onClick={() => { setEditingBirthDate(false); setBirthDate(client.birth_date ?? ''); setBirthDateError(''); }} className="pwa-focus min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 disabled:opacity-60">Cancelar</button></div>
+									{birthDateError ? <p role="alert" className="text-xs font-semibold leading-5 text-rose-700">{birthDateError}</p> : null}
+								</form> : formatIssueDate(client.birth_date)}
+							</dd>
+						</div>
 					</dl>
 
 					<div className="mt-4 space-y-2 border-t border-ricosty-100 pt-4 text-sm text-slate-600">

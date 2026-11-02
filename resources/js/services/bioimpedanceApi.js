@@ -22,6 +22,12 @@ export async function createBioimpedanceClient(payload) {
 	return data.client;
 }
 
+export async function updateBioimpedanceClientBirthDate(clientId, birthDate) {
+	const { data } = await window.axios.patch(`/bioimpedance/clients/${clientId}/birth-date`, { birth_date: birthDate });
+
+	return data.client;
+}
+
 export async function processRelaxmedicImage(image) {
 	const payload = new FormData();
 	payload.append('image', image);

@@ -93,6 +93,38 @@ class BioimpedanceWorkflow
         ]);
     }
 
+    public function updateClientBirthDate(Request $request, BioimpedanceClient $client): JsonResponse
+    {
+        $this->authorizeClinicalProfessional($request);
+        $this->ensureClientIsNotAnonymized($client);
+        $validated = $request->validate([
+            'birth_date' => ['required', 'date', 'before:today'],
+        ]);
+
+        if ($client->assessments()->where('evaluated_at', '<', Carbon::parse($validated['birth_date'])->startOfDay())->exists()) {
+            throw ValidationException::withMessages([
+                'birth_date' => 'A data informada é posterior a uma avaliação já registrada para este cliente.',
+            ]);
+        }
+
+        DB::transaction(function () use ($client, $request, $validated): void {
+            $oldValues = $this->clientAuditPayload($client);
+            $client->update(['birth_date' => $validated['birth_date']]);
+            $this->audit(
+                $request,
+                'bioimpedance_client.birth_date_updated',
+                $client,
+                'Data de nascimento do cliente atualizada',
+                $oldValues,
+                $this->clientAuditPayload($client->refresh()),
+            );
+        });
+
+        return response()->json([
+            'client' => $this->clientPayload($this->loadClientAssessments($client->refresh())),
+        ]);
+    }
+
     public function inactivateClient(Request $request, BioimpedanceClient $client): JsonResponse
     {
         $this->authorizeClinicalProfessional($request);

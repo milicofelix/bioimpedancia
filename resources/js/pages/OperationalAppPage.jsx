@@ -71,6 +71,14 @@ export default function OperationalAppPage() {
 		}));
 	}
 
+	function handleClientUpdated(client) {
+		setWorkspace((current) => ({
+			...current,
+			clients: (current.clients ?? []).map((item) => (item.id === client.id ? client : item)),
+		}));
+		setSelectedClient((current) => (current?.id === client.id ? client : current));
+	}
+
 	function startAssessment(client) {
 		setSelectedClient(client);
 		setSelectedAssessment(null);
@@ -140,6 +148,7 @@ export default function OperationalAppPage() {
 					scaleModel={scaleModel}
 					enabledModules={enabledModules}
 					onClientCreated={handleClientCreated}
+					onClientUpdated={handleClientUpdated}
 					onNewAssessment={startAssessment}
 					onOpenAssistant={openAssistant}
 					onOpenReport={openReport}
