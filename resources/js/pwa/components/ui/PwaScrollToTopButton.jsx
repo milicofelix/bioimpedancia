@@ -1,37 +1,33 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import PwaIcon from './PwaIcon';
 
-const MINIMUM_SCROLL_DISTANCE = 800;
-const VIEWPORT_MULTIPLIER = 0.9;
-
-function visibilityThreshold() {
-	return Math.max(MINIMUM_SCROLL_DISTANCE, window.innerHeight * VIEWPORT_MULTIPLIER);
-}
+const REPORT_TRIGGER_ID = 'report-scroll-top-trigger';
+const FALLBACK_SCROLL_DISTANCE = 800;
 
 export default function PwaScrollToTopButton() {
 	const [visible, setVisible] = useState(false);
-	const animationFrame = useRef(null);
 
 	useEffect(() => {
-		function updateVisibility() {
-			if (animationFrame.current !== null) return;
+		const trigger = document.getElementById(REPORT_TRIGGER_ID);
+		if (trigger && 'IntersectionObserver' in window) {
+			const observer = new IntersectionObserver(([entry]) => {
+				setVisible(!entry.isIntersecting && entry.boundingClientRect.top <= 120);
+			}, { rootMargin: '-120px 0px 0px', threshold: 0 });
+			observer.observe(trigger);
 
-			animationFrame.current = window.requestAnimationFrame(() => {
-				animationFrame.current = null;
-				const scrollPosition = window.scrollY || document.documentElement.scrollTop;
-				const shouldBeVisible = scrollPosition >= visibilityThreshold();
-				setVisible((current) => current === shouldBeVisible ? current : shouldBeVisible);
-			});
+			return () => observer.disconnect();
 		}
 
-		window.addEventListener('scroll', updateVisibility, { passive: true });
-		window.addEventListener('resize', updateVisibility, { passive: true });
-		updateVisibility();
+		function updateFallbackVisibility() {
+			const scrollPosition = window.scrollY || document.documentElement.scrollTop;
+			setVisible(scrollPosition >= FALLBACK_SCROLL_DISTANCE);
+		}
+
+		window.addEventListener('scroll', updateFallbackVisibility, { passive: true });
+		updateFallbackVisibility();
 
 		return () => {
-			window.removeEventListener('scroll', updateVisibility);
-			window.removeEventListener('resize', updateVisibility);
-			if (animationFrame.current !== null) window.cancelAnimationFrame(animationFrame.current);
+			window.removeEventListener('scroll', updateFallbackVisibility);
 		};
 	}, []);
 
