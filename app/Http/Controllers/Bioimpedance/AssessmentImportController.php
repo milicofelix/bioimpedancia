@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Bioimpedance;
 use App\Http\Controllers\Controller;
 use App\Models\Bioimpedance\BioimpedanceClinicSetting;
 use App\Services\Bioimpedance\BodyscanProImageProcessor;
+use App\Services\Bioimpedance\ImageReadingFailureResponder;
 use App\Services\Bioimpedance\RelaxmedicImageProcessor;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
@@ -15,6 +16,10 @@ use Illuminate\Validation\ValidationException;
 
 class AssessmentImportController extends Controller
 {
+    public function __construct(
+        private readonly ImageReadingFailureResponder $readingFailureResponder,
+    ) {}
+
     public function processRelaxmedicImage(Request $request, RelaxmedicImageProcessor $processor): JsonResponse
     {
         abort_unless(
@@ -34,7 +39,7 @@ class AssessmentImportController extends Controller
         try {
             $extraction = $processor->process($image);
         } catch (ConnectionException|RequestException $exception) {
-            return $this->externalReadingFailure($exception);
+            return $this->readingFailureResponder->respond($exception);
         } catch (\RuntimeException $exception) {
             return response()->json([
                 'message' => $exception->getMessage(),
@@ -66,7 +71,7 @@ class AssessmentImportController extends Controller
         try {
             $extraction = $processor->process($image);
         } catch (ConnectionException|RequestException $exception) {
-            return $this->externalReadingFailure($exception);
+            return $this->readingFailureResponder->respond($exception);
         } catch (\RuntimeException $exception) {
             return response()->json([
                 'message' => $exception->getMessage(),
@@ -103,22 +108,5 @@ class AssessmentImportController extends Controller
         ]);
 
         return $validated['image'];
-    }
-
-    private function externalReadingFailure(ConnectionException|RequestException $exception): JsonResponse
-    {
-        if ($exception instanceof ConnectionException) {
-            $timedOut = str_contains(mb_strtolower($exception->getMessage()), 'timed out');
-
-            return response()->json([
-                'message' => $timedOut
-                    ? 'A leitura do relatório excedeu o tempo esperado. A imagem não foi salva; tente novamente.'
-                    : 'Não foi possível acessar o serviço de leitura da imagem. Tente novamente.',
-            ], $timedOut ? 504 : 502);
-        }
-
-        return response()->json([
-            'message' => 'O serviço de leitura recusou o processamento da imagem. Tente novamente em alguns instantes.',
-        ], 502);
     }
 }
