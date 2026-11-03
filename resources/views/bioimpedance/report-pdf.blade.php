@@ -7,7 +7,7 @@
         @page { margin: 76px 18px 42px; }
         * { box-sizing: border-box; }
         body { margin: 0; color: #172033; font-family: DejaVu Sans, Arial, sans-serif; font-size: 9px; line-height: 1.4; }
-        .document-header { position: fixed; top: -63px; left: 0; right: 0; height: 52px; padding: 6px 12px; border-bottom: 1px solid #ead5da; background: #fff; }
+        .document-header { position: fixed; top: -63px; left: 0; right: 0; height: 52px; padding: 6px 12px; border-bottom: 1px solid #cde6ea; background: #fff; }
         .document-brand, .document-identification { display: inline-block; width: 49%; vertical-align: middle; }
         .document-logo { display: inline-block; width: 28px; height: 40px; object-fit: contain; vertical-align: middle; }
         .document-brand-copy { display: inline-block; margin-left: 6px; vertical-align: middle; }
@@ -17,19 +17,19 @@
         .document-brand-subtitle { margin: 3px 0 0; color: #526172; font-size: 5px; font-weight: 700; letter-spacing: 1.2px; line-height: 1; text-transform: uppercase; }
         .document-identification { color: #667085; font-size: 7px; text-align: right; }
         .document-identification strong { color: #172033; font-size: 9px; }
-        .document-footer { position: fixed; bottom: -31px; left: 0; right: 0; height: 24px; padding: 6px 12px; border-top: 1px solid #ead5da; color: #667085; font-size: 7px; background: #fff; }
+        .document-footer { position: fixed; bottom: -31px; left: 0; right: 0; height: 24px; padding: 6px 12px; border-top: 1px solid #cde6ea; color: #667085; font-size: 7px; background: #fff; }
         .footer-right { float: right; }
         .report-section { page-break-before: always; }
         .report-section-first { page-break-before: auto; }
-        .section-header { padding: 10px 18px 9px; border: 1px solid #f2c7cf; border-bottom: 2px solid #d88b9a; border-radius: 8px 8px 0 0; background: #fbf2f4; page-break-after: avoid; }
+        .section-header { padding: 10px 18px 9px; border: 1px solid #b2e5e6; border-bottom: 2px solid #087f98; border-radius: 8px 8px 0 0; background: #eef8fa; page-break-after: avoid; }
         .section-heading h1 { margin: 2px 0 3px; font-size: 17px; }
         .eyebrow, .label, .section-title { font-size: 7px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
-        .content { padding: 12px 18px; border-right: 1px solid #f2c7cf; border-bottom: 1px solid #f2c7cf; border-left: 1px solid #f2c7cf; background: #fffafa; }
+        .content { padding: 12px 18px; border-right: 1px solid #b2e5e6; border-bottom: 1px solid #b2e5e6; border-left: 1px solid #b2e5e6; background: #f8fcfd; }
         .section-title { margin: 12px 0 6px; font-size: 10px; letter-spacing: .7px; page-break-after: avoid; }
         .grid { width: 100%; border-collapse: separate; border-spacing: 6px; }
         .grid tr { page-break-inside: avoid; }
-        .box { padding: 9px; border: 1px solid #f2d6dc; border-radius: 8px; background: #fff; vertical-align: top; page-break-inside: avoid; }
-        .hero { background: #f8e8eb; }
+        .box { padding: 9px; border: 1px solid #cde6ea; border-radius: 8px; background: #fff; vertical-align: top; page-break-inside: avoid; }
+        .hero { background: #e2f4f7; }
         .client-name { margin-top: 3px; font-size: 16px; font-weight: 700; }
         .metric-value { margin-top: 5px; color: #101828; font-size: 23px; font-weight: 700; line-height: 1.05; }
         .metric-unit { color: #667085; font-size: 9px; }
@@ -42,8 +42,8 @@
         .attention { background: #e0f2fe; color: #075985; }
         .neutral, .pending { background: #f2f4f7; color: #475467; }
         .summary, .notice, .guidance { margin-top: 8px; padding: 10px 12px; border-radius: 8px; }
-        .summary { border: 1px solid #f2d6dc; background: #fff; }
-        .notice { border-left: 3px solid #d88b9a; background: #fff4f6; }
+        .summary { border: 1px solid #cde6ea; background: #fff; }
+        .notice { border-left: 3px solid #087f98; background: #eef8fa; }
         .guidance { border: 1px solid #b7e3dc; background: #f1fbf8; }
         .guidance-section { margin-top: 5px; padding: 7px 10px; border: 1px solid #b7e3dc; border-radius: 7px; background: #f7fcfa; page-break-inside: auto; }
         .guidance-section-title { margin-bottom: 3px; color: #176b5b; font-size: 8px; font-weight: 700; page-break-after: avoid; }
@@ -82,9 +82,9 @@
         .segmental-page .content { padding: 8px 12px; }
         .segmental-page .notice { margin-top: 4px; padding: 6px 8px; }
         .segmental-grid { width: 100%; border-collapse: separate; border-spacing: 5px; table-layout: fixed; page-break-inside: avoid; }
-        .segmental-grid > tbody > tr > td { width: 50%; padding: 5px; border: 1px solid #f2d6dc; border-radius: 8px; background: #fff; vertical-align: top; }
+        .segmental-grid > tbody > tr > td { width: 50%; padding: 5px; border: 1px solid #cde6ea; border-radius: 8px; background: #fff; vertical-align: top; }
         .segmental-grid, .segmental-grid tr, .segmental-grid td, .segmental-map, .segmental-visual, .segmental-table { page-break-inside: avoid; }
-        .segmental-title { color: #7f1d3f; font-size: 10px; font-weight: 700; text-align: center; }
+        .segmental-title { color: #052f59; font-size: 10px; font-weight: 700; text-align: center; }
         .segmental-subtitle { margin-top: 2px; color: #667085; font-size: 6px; text-align: center; }
         .segmental-visual { width: 100%; height: 190px; border-collapse: collapse; table-layout: fixed; }
         .segmental-visual td { padding: 2px; border: 0; vertical-align: middle; }
@@ -96,16 +96,16 @@
         .segmental-table { width: 100%; border-collapse: collapse; font-size: 6px; }
         .segmental-table caption { padding: 4px 0 3px; color: #475467; font-size: 6px; font-weight: 700; text-align: left; text-transform: uppercase; }
         .segmental-table th, .segmental-table td { padding: 2px 3px; border: 1px solid #e5e7eb; text-align: left; }
-        .segmental-table thead th { background: #fbf2f4; color: #475467; text-transform: uppercase; }
+        .segmental-table thead th { background: #eef8fa; color: #475467; text-transform: uppercase; }
         .segmental-comparison { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 7px; }
         .segmental-comparison thead { display: table-header-group; }
         .segmental-comparison th, .segmental-comparison td { padding: 6px; border: 1px solid #e5e7eb; text-align: left; }
-        .segmental-comparison th { background: #fbf2f4; color: #475467; text-transform: uppercase; }
+        .segmental-comparison th { background: #eef8fa; color: #475467; text-transform: uppercase; }
         .segmental-comparison tr { page-break-inside: avoid; }
         .segmental-comparison caption { padding: 0 0 5px; color: #475467; font-size: 7px; text-align: left; }
         .segmental-legend { width: 100%; border-collapse: separate; border-spacing: 4px; margin-top: 3px; }
         .segmental-legend td { padding: 3px 5px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; font-size: 6px; text-align: center; }
-        .technical-appendix { margin-top: 7px; padding-top: 3px; border-top: 1px solid #ead5da; }
+        .technical-appendix { margin-top: 7px; padding-top: 3px; border-top: 1px solid #cde6ea; }
         .technical-appendix .notice, .technical-appendix .summary { padding: 6px 8px; }
         .technical-appendix .section-title { margin-top: 5px; }
         .impedance-table { page-break-inside: auto; }
@@ -143,8 +143,8 @@
     $sexLabels = ['female' => 'Feminino', 'male' => 'Masculino'];
     $tone = fn ($indicator) => $indicator['tone'] ?? 'neutral';
     $br = fn ($value, $decimals = 1) => $value === null || $value === '' ? '-' : number_format((float) $value, $decimals, ',', '.');
-    $primaryColor = $clinic['primary_color'] ?? '#d88b9a';
-    $secondaryColor = $clinic['secondary_color'] ?? '#4a4a4a';
+    $primaryColor = $clinic['primary_color'] ?? '#087f98';
+    $secondaryColor = $clinic['secondary_color'] ?? '#052f59';
     $isBodyscan = ($assessment['device_model'] ?? null) === 'Bodyscan Pro';
     $isRelaxmedic = in_array(($assessment['device_model'] ?? null), ['Relaxmedic', 'Bodyscan Pro'], true);
     $extendedMetrics = collect($assessment['extended_metrics'] ?? []);

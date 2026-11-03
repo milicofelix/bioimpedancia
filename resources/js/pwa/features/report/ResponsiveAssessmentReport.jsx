@@ -30,7 +30,7 @@ export default function ResponsiveAssessmentReport({ client, assessment, previou
 					<VitaScanBrand headingLevel="h2" size="compact" showTagline={false} />
 					<div className="flex items-center gap-2 text-right"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-ricosty-50 text-ricosty-700" aria-hidden="true"><PwaIcon name="fileText" size={18} /></span><div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ricosty-700">Documento clínico</p><p className="mt-0.5 text-xs font-semibold text-slate-600">Vita Scan</p></div></div>
 				</div>
-				<div className="relative overflow-hidden bg-gradient-to-br from-ricosty-950 via-ricosty-900 to-amber-800 p-5 text-white sm:p-6">
+				<div className="relative overflow-hidden bg-gradient-to-br from-ricosty-950 via-ricosty-900 to-teal-700 p-5 text-white sm:p-6">
 					<div className="absolute -right-8 -top-12 h-40 w-40 rounded-full bg-white/10 blur-2xl" aria-hidden="true" />
 					<div className="relative flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[0.16em] text-ricosty-100">Relatório de bioimpedância</p><h2 className="mt-2 break-words text-2xl font-extrabold sm:text-3xl">{client.full_name}</h2></div><span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-bold backdrop-blur">Avaliação #{assessment.id}</span></div>
 					<PwaMetadata className="mt-4 border-t border-white/20 pt-4 text-white" items={[

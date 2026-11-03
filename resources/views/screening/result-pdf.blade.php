@@ -7,20 +7,20 @@
         @page { margin: 34px 42px; }
         * { box-sizing: border-box; }
         body { margin: 0; color: #17324d; font-family: DejaVu Sans, sans-serif; font-size: 12px; line-height: 1.55; }
-        .brand { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #17a28f; }
-        .brand-name { color: #063e62; font-size: 25px; font-weight: bold; }
-        .brand-name span { color: #11998c; }
+        .brand { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #087f98; }
+        .brand-name { color: #052f59; font-size: 25px; font-weight: bold; }
+        .brand-name span { color: #159fbd; }
         .brand-subtitle { color: #506176; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; }
-        h1 { margin: 0 0 5px; color: #063e62; font-size: 21px; }
+        h1 { margin: 0 0 5px; color: #052f59; font-size: 21px; }
         .meta { margin: 0 0 24px; color: #64748b; font-size: 10px; }
         .result { margin: 22px 0; padding: 24px; border: 1px solid #b9ddd5; border-radius: 14px; background: #f0fbf8; text-align: center; }
-        .score { margin: 0; color: #063e62; font-size: 34px; font-weight: bold; }
+        .score { margin: 0; color: #052f59; font-size: 34px; font-weight: bold; }
         .range { margin: 6px 0 12px; color: #087f73; font-size: 17px; font-weight: bold; }
-        .section { margin-top: 18px; padding: 16px; border-left: 4px solid #17a28f; background: #f5fbfa; }
-        .section h2 { margin: 0 0 6px; color: #063e62; font-size: 13px; }
+        .section { margin-top: 18px; padding: 16px; border-left: 4px solid #087f98; background: #f5fbfa; }
+        .section h2 { margin: 0 0 6px; color: #052f59; font-size: 13px; }
         .visual-choice { border-left-color: #087f73; background: #eefaf7; page-break-inside: avoid; }
         .visual-choice-number { margin: 0 0 4px; color: #087f73; font-size: 10px; font-weight: bold; text-transform: uppercase; }
-        .visual-choice-title { margin: 0 0 8px; color: #063e62; font-size: 15px; font-weight: bold; }
+        .visual-choice-title { margin: 0 0 8px; color: #052f59; font-size: 15px; font-weight: bold; }
         .visual-choice-layout { width: 100%; margin: 8px 0 0; border-collapse: collapse; }
         .visual-choice-layout td { padding: 0; border: 0; vertical-align: middle; }
         .visual-choice-thumbnail { width: 136px; padding-right: 16px !important; color: #087f73; text-align: center; }

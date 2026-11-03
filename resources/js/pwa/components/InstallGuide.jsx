@@ -87,7 +87,7 @@ export default function InstallGuide() {
 				<strong>Atenção:</strong> não instale o aplicativo em celular compartilhado. A instalação mantém acesso rápido à tela de login e pode expor a sessão se você permanecer conectado.
 			</div>
 			<label className="mt-3 flex items-start gap-2 text-xs font-semibold leading-5 text-slate-700">
-				<input type="checkbox" checked={personalDeviceConfirmed} onChange={(event) => setPersonalDeviceConfirmed(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-rose-300 text-[#b96f7d]" />
+				<input type="checkbox" checked={personalDeviceConfirmed} onChange={(event) => setPersonalDeviceConfirmed(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-ricosty-300 text-ricosty-700" />
 				<span>Confirmo que este é um aparelho pessoal e protegido por senha ou biometria.</span>
 			</label>
 

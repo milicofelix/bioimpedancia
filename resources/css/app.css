@@ -8,20 +8,36 @@
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
-    --color-ricosty-50: #fff7f7;
-    --color-ricosty-100: #fcebed;
-    --color-ricosty-200: #f6d5db;
-    --color-ricosty-300: #eeb3bf;
-    --color-ricosty-400: #dc8296;
-    --color-ricosty-500: #c6536e;
-    --color-ricosty-600: #ad3f5b;
-    --color-ricosty-700: #8e3049;
-    --color-ricosty-800: #722a3e;
-    --color-ricosty-900: #612637;
-    --color-ricosty-950: #38101d;
-    --color-ricosty-cream: #fffaf6;
-    --color-ricosty-gold: #d79a63;
-    --color-ricosty-ink: #332b32;
+    --color-vita-50: #f0fdfa;
+    --color-vita-100: #d9f4f3;
+    --color-vita-200: #b2e5e6;
+    --color-vita-300: #7dd3da;
+    --color-vita-400: #37bacb;
+    --color-vita-500: #159fbd;
+    --color-vita-600: #087f98;
+    --color-vita-700: #08667f;
+    --color-vita-800: #07516d;
+    --color-vita-900: #064361;
+    --color-vita-950: #052f59;
+    --color-vita-surface: #f5fafc;
+    --color-vita-accent: #55ce83;
+    --color-vita-ink: #17324d;
+
+    /* Existing utility classes use the current Vita Scan palette as aliases. */
+    --color-ricosty-50: var(--color-vita-50);
+    --color-ricosty-100: var(--color-vita-100);
+    --color-ricosty-200: var(--color-vita-200);
+    --color-ricosty-300: var(--color-vita-300);
+    --color-ricosty-400: var(--color-vita-400);
+    --color-ricosty-500: var(--color-vita-500);
+    --color-ricosty-600: var(--color-vita-600);
+    --color-ricosty-700: var(--color-vita-700);
+    --color-ricosty-800: var(--color-vita-800);
+    --color-ricosty-900: var(--color-vita-900);
+    --color-ricosty-950: var(--color-vita-950);
+    --color-ricosty-cream: var(--color-vita-surface);
+    --color-ricosty-gold: var(--color-vita-accent);
+    --color-ricosty-ink: var(--color-vita-ink);
 }
 
 :root {
@@ -38,7 +54,7 @@ body {
 
 body {
     margin: 0;
-    background: #fffaf6;
+    background: #f5fafc;
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior-y: none;
 }
@@ -49,16 +65,16 @@ body {
 }
 
 :where(a, button, input, select, textarea, summary):focus-visible {
-    outline: 3px solid #8e3049;
+    outline: 3px solid #08667f;
     outline-offset: 2px;
 }
 
 @layer components {
     .pwa-shell {
         background:
-            radial-gradient(circle at 8% 3%, rgb(246 213 219 / 70%), transparent 26rem),
-            radial-gradient(circle at 94% 18%, rgb(247 205 165 / 32%), transparent 22rem),
-            linear-gradient(180deg, #fffaf6 0%, #fff 42%, #fdf7f8 100%);
+            radial-gradient(circle at 8% 3%, rgb(178 229 230 / 70%), transparent 26rem),
+            radial-gradient(circle at 94% 18%, rgb(85 206 131 / 32%), transparent 22rem),
+            linear-gradient(180deg, #f5fafc 0%, #fff 42%, #f0f9fb 100%);
     }
 
     .pwa-native-shell,
@@ -77,32 +93,32 @@ body {
 
     .pwa-card {
         min-width: 0;
-        border: 1px solid rgb(246 213 219 / 75%);
+        border: 1px solid rgb(178 229 230 / 75%);
         border-radius: 1.25rem;
         background: rgb(255 255 255 / 92%);
-        box-shadow: 0 14px 38px rgb(97 38 55 / 7%);
+        box-shadow: 0 14px 38px rgb(5 47 89 / 7%);
         backdrop-filter: blur(14px);
     }
 
     .pwa-card-soft {
-        border: 1px solid rgb(246 213 219 / 70%);
+        border: 1px solid rgb(178 229 230 / 70%);
         border-radius: 1rem;
-        background: linear-gradient(145deg, rgb(255 247 247 / 95%), rgb(255 250 246 / 95%));
+        background: linear-gradient(145deg, rgb(240 253 250 / 95%), rgb(245 250 252 / 95%));
     }
 
     .pwa-button-primary {
         min-height: 3rem;
         border-radius: 0.875rem;
-        background: linear-gradient(135deg, #c6536e, #8e3049);
+        background: linear-gradient(135deg, #087f98, #052f59);
         color: white;
         font-weight: 700;
-        box-shadow: 0 10px 22px rgb(173 63 91 / 22%);
+        box-shadow: 0 10px 22px rgb(8 127 152 / 22%);
         touch-action: manipulation;
         transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
     }
 
     .pwa-button-primary:hover {
-        box-shadow: 0 13px 28px rgb(173 63 91 / 28%);
+        box-shadow: 0 13px 28px rgb(8 127 152 / 28%);
         transform: translateY(-1px);
     }
 
@@ -114,18 +130,18 @@ body {
 
     .pwa-button-secondary {
         min-height: 3rem;
-        border: 1px solid #f0c4cd;
+        border: 1px solid #b2e5e6;
         border-radius: 0.875rem;
         background: white;
-        color: #8e3049;
+        color: #08667f;
         font-weight: 700;
         transition: background 160ms ease, border-color 160ms ease;
         touch-action: manipulation;
     }
 
     .pwa-button-secondary:hover {
-        border-color: #dc8296;
-        background: #fff7f7;
+        border-color: #37bacb;
+        background: #f0fdfa;
     }
 
     .pwa-focus {
@@ -133,7 +149,7 @@ body {
     }
 
     .pwa-focus:focus-visible {
-        outline: 3px solid #8e3049;
+        outline: 3px solid #08667f;
         outline-offset: 2px;
         box-shadow: 0 0 0 5px rgb(255 255 255 / 90%);
     }
@@ -185,7 +201,7 @@ body {
     .pwa-skeleton {
         position: relative;
         overflow: hidden;
-        background: #f6e9eb;
+        background: #e0eff3;
     }
 
     .pwa-skeleton::after {
