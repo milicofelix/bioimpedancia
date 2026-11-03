@@ -38,8 +38,8 @@ class AssistantApprovalGuard
         $assessment = $this->lock($assessment);
         $context = $this->assistantContext->for($assessment);
         $approved = $this->approvedObservation->for($assessment, $context);
-        if (data_get($output->request->structured_context, 'assessment_updated_at') !== $assessment->updated_at?->toIso8601String()
-            || data_get($output->request->structured_context, 'approved_observation') !== $approved) {
+        if (data_get($output->request->structured_context, 'measurement_fingerprint') !== $context['measurement_fingerprint']
+            || ! $this->approvedObservation->matchesSnapshot(data_get($output->request->structured_context, 'approved_observation'), $approved)) {
             throw ValidationException::withMessages(['care_guidance' => 'A avaliação ou a observação aprovada mudou. Gere novamente os próximos cuidados antes de aprovar.']);
         }
 

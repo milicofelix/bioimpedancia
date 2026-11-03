@@ -119,9 +119,10 @@ class BioimpedanceCareGuidanceAssistant
 
         $generation = $this->generate($context, $chunks);
         $validation = $this->semanticValidator->validate($generation['payload'], $chunks, $context);
-        $blockedClaims = $validation['blocked_claims'];
+        $blockedClaims = [];
 
         if ($validation['errors'] && $generation['provider'] === 'openai') {
+            $blockedClaims = $validation['blocked_claims'];
             $generation = [
                 'payload' => $this->localResponse($context),
                 'provider' => 'local_reference_engine',

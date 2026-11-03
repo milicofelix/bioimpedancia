@@ -833,12 +833,6 @@ class BioimpedanceWorkflow
             ->whereHas('request', fn ($query) => $query->where('bioimpedance_assessment_id', $assessment->id)->where('purpose', 'care_guidance'))
             ->firstOrFail();
 
-        if (data_get($output->request->structured_context, 'assessment_updated_at') !== $assessment->updated_at?->toIso8601String()) {
-            throw ValidationException::withMessages([
-                'care_guidance' => 'A avaliação foi alterada depois da geração. Gere uma nova orientação antes de aprovar.',
-            ]);
-        }
-
         $usedSourceIds = collect($output->structured_claims ?? [])->pluck('source_ids')->flatten()->unique();
         $sources = $output->request->sources
             ->filter(fn ($source) => $usedSourceIds->contains($source->chunk?->chunk_key))

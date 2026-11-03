@@ -8,6 +8,23 @@ use Illuminate\Validation\ValidationException;
 
 class ApprovedObservationContext
 {
+    public function matchesSnapshot(mixed $snapshot, array $current): bool
+    {
+        if (! is_array($snapshot)) {
+            return false;
+        }
+
+        // JSON objects have no key order. Compare only the immutable approval identity.
+        foreach (['output_id', 'approved_at', 'approved_by_user_id', 'text_sha256'] as $field) {
+            if (! array_key_exists($field, $snapshot) || ! array_key_exists($field, $current)
+                || (string) $snapshot[$field] !== (string) $current[$field]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public function for(BioimpedanceAssessment $assessment, array $context): array
     {
         $output = BioimpedanceAiAnalysisOutput::query()

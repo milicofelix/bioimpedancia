@@ -36,6 +36,35 @@ class BioimpedanceAssistantHandoffTest extends TestCase
             ->assertUnprocessable()->assertJsonValidationErrors('care_guidance');
     }
 
+    public function test_json_key_reordering_does_not_block_care_guidance_approval(): void
+    {
+        $assessment = $this->approvedAssessment();
+        $response = $this->getJson(route('bioimpedance.assessments.care-guidance.suggestion', $assessment->id))->assertOk();
+        $output = BioimpedanceAiAnalysisOutput::query()->with('request')->findOrFail($response->json('assistant.output_id'));
+        $context = $output->request->structured_context;
+        $context['approved_observation'] = array_reverse($context['approved_observation'], true);
+        $output->request->update(['structured_context' => $context]);
+
+        $this->patchJson(route('bioimpedance.assessments.care-guidance.approve', $assessment->id), [
+            'care_guidance' => $response->json('assistant.suggestion'), 'review_action' => 'approved', 'assistant_output_id' => $output->id,
+        ])->assertOk();
+        $this->assertNotNull($assessment->fresh()->care_guidance_approved_at);
+    }
+
+    public function test_report_issuance_metadata_does_not_invalidate_care_guidance(): void
+    {
+        $assessment = $this->approvedAssessment();
+        $response = $this->getJson(route('bioimpedance.assessments.care-guidance.suggestion', $assessment->id))->assertOk();
+        $this->travel(2)->seconds();
+        $assessment->update(['report_issued_at' => now(), 'report_issue_count' => 1]);
+
+        $this->patchJson(route('bioimpedance.assessments.care-guidance.approve', $assessment->id), [
+            'care_guidance' => $response->json('assistant.suggestion'), 'review_action' => 'approved',
+            'assistant_output_id' => $response->json('assistant.output_id'),
+        ])->assertOk();
+        $this->assertNotNull($assessment->fresh()->care_guidance_approved_at);
+    }
+
     public function test_changed_measurement_blocks_guidance_approval_even_with_same_timestamp(): void
     {
         $assessment = $this->approvedAssessment();
