@@ -4,11 +4,11 @@ import PwaIcon from './PwaIcon';
 const REPORT_TRIGGER_ID = 'report-scroll-top-trigger';
 const FALLBACK_SCROLL_DISTANCE = 800;
 
-export default function PwaScrollToTopButton() {
+export default function PwaScrollToTopButton({ triggerId = REPORT_TRIGGER_ID }) {
 	const [visible, setVisible] = useState(false);
 
 	useEffect(() => {
-		const trigger = document.getElementById(REPORT_TRIGGER_ID);
+		const trigger = document.getElementById(triggerId);
 		if (trigger && 'IntersectionObserver' in window) {
 			const observer = new IntersectionObserver(([entry]) => {
 				setVisible(!entry.isIntersecting && entry.boundingClientRect.top <= 120);
@@ -29,7 +29,7 @@ export default function PwaScrollToTopButton() {
 		return () => {
 			window.removeEventListener('scroll', updateFallbackVisibility);
 		};
-	}, []);
+	}, [triggerId]);
 
 	function scrollToTop() {
 		const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;

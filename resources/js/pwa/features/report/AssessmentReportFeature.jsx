@@ -1,12 +1,11 @@
-import React from 'react';
-import { canCreateReportShare } from '../clients/clientAccess';
-import ReportSharing from './ReportSharing';
+import React, { useState } from 'react';
+import { formatDate } from '../../../shared/formatters';
+import ReportExportPanel from './ReportExportPanel';
+import ReportViewSelector from './ReportViewSelector';
 import ResponsiveAssessmentReport from './ResponsiveAssessmentReport';
 import { previousAssessment } from './reportMetrics';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaButton from '../../components/ui/PwaButton';
-import PwaAlert from '../../components/ui/PwaAlert';
-import PwaIcon from '../../components/ui/PwaIcon';
 import PwaSectionHeader from '../../components/ui/PwaSectionHeader';
 import PwaState from '../../components/ui/PwaState';
 import PwaScrollToTopButton from '../../components/ui/PwaScrollToTopButton';
@@ -18,27 +17,32 @@ export default function AssessmentReportFeature({ client, assessment, pdfEnabled
 		);
 	}
 
+	return <AssessmentReportContent key={assessment.id} client={client} assessment={assessment} pdfEnabled={pdfEnabled} currentUser={currentUser} onAssessmentUpdated={onAssessmentUpdated} />;
+}
+
+function AssessmentReportContent({ client, assessment, pdfEnabled, currentUser, onAssessmentUpdated }) {
+	const [views, setViews] = useState({ active: null, analysis: false, export: false });
 	const previous = previousAssessment(client, assessment);
-	const pdfUrl = `/bioimpedance/assessments/${assessment.id}/pdf`;
+
+	function selectView(view) {
+		setViews((current) => ({ ...current, active: current.active === view ? null : view, [view]: true }));
+	}
 
 	return (
-		<div className="space-y-4">
-			<PwaScrollToTopButton />
-			<ResponsiveAssessmentReport client={client} assessment={assessment} previous={previous} />
+		<div className="min-w-0 space-y-4">
+			<PwaCard className="p-4 sm:p-5 print:hidden">
+				<PwaSectionHeader icon="fileText" eyebrow="Relatório corporal" title={client.full_name} description={`Avaliação #${assessment.id} · ${formatDate(assessment.evaluated_at)}`} />
+				<div className="mt-4"><ReportViewSelector activeView={views.active} onSelect={selectView} /></div>
+			</PwaCard>
 
-			{pdfEnabled ? <PwaCard className="p-5">
-				<PwaSectionHeader icon="fileText" eyebrow="Documento final" title="Relatório em PDF" description="Abra para conferir o documento final ou faça o download no aparelho." />
-				<div className="mt-4 grid gap-3 sm:grid-cols-2">
-					<a href={`${pdfUrl}?inline=1`} target="_blank" rel="noreferrer" className="pwa-focus flex min-h-20 items-center gap-3 rounded-2xl border border-ricosty-200 bg-white p-4 text-left text-ricosty-900 transition hover:bg-ricosty-50"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ricosty-50"><PwaIcon name="eye" size={19} /></span><span><strong className="block text-sm">Conferir PDF</strong><span className="mt-1 block text-xs text-slate-600">Abre o documento em uma nova tela.</span></span></a>
-					<a href={pdfUrl} className="pwa-focus flex min-h-20 items-center gap-3 rounded-2xl bg-gradient-to-r from-ricosty-700 to-ricosty-900 p-4 text-left text-white shadow-lg shadow-ricosty-100 transition hover:brightness-105"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10"><PwaIcon name="download" size={19} /></span><span><strong className="block text-sm">Baixar PDF</strong><span className="mt-1 block text-xs text-white/80">Salva uma cópia neste aparelho.</span></span></a>
-				</div>
-			</PwaCard> : null}
+			<section id="report-analysis-panel" hidden={views.active !== 'analysis'} aria-labelledby="report-analysis-button" className="min-w-0">
+				{views.analysis ? <ResponsiveAssessmentReport client={client} assessment={assessment} previous={previous} /> : null}
+			</section>
+			<section id="report-export-panel" hidden={views.active !== 'export'} aria-labelledby="report-export-button" className="min-w-0 print:hidden">
+				{views.export ? <ReportExportPanel assessment={assessment} pdfEnabled={pdfEnabled} currentUser={currentUser} onAssessmentUpdated={onAssessmentUpdated} /> : null}
+			</section>
 
-			{assessment.is_canceled ? (
-				<PwaAlert tone="error" title="Compartilhamento indisponível">O compartilhamento está desabilitado porque esta avaliação foi cancelada.</PwaAlert>
-			) : (
-				<ReportSharing assessment={assessment} canCreate={canCreateReportShare(currentUser)} canRevoke={canCreateReportShare(currentUser)} onAssessmentUpdated={onAssessmentUpdated} />
-			)}
+			{views.active ? <PwaScrollToTopButton key={views.active} triggerId={views.active === 'export' ? 'report-export-scroll-top-trigger' : 'report-scroll-top-trigger'} /> : null}
 		</div>
 	);
 }
