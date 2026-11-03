@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
 
 class BioimpedanceObservationAssistant
 {
-    public const PROMPT_VERSION = 'rag-client-1.3.2';
+    public const PROMPT_VERSION = 'rag-client-1.4.0';
 
     public const MODEL_NAME = 'local-validated-rag-agent';
 
@@ -137,6 +137,7 @@ class BioimpedanceObservationAssistant
         }
 
         $response = $this->generateResponse($assessment, $context, $chunks);
+        $response['provider'] ??= 'local_reference_engine';
         $validationErrors = $this->validateResponse($response, $assessment, $chunks, $context);
         if (count($validationErrors) && ($response['provider'] ?? null) === 'openai') {
             $openAiValidationErrors = $validationErrors;
@@ -153,12 +154,20 @@ class BioimpedanceObservationAssistant
             ];
         }
         $status = count($validationErrors) ? 'blocked' : $response['status'];
+        $response['fallback_used'] = filled($response['fallback_reason'] ?? null);
+        $response['attempted_provider'] = $response['provider'] === 'openai' || $response['fallback_used'] ? 'openai' : null;
 
         $request->update([
             'status' => $status,
             'validation_errors' => $validationErrors,
+            'provider' => $response['provider'],
+            'attempted_provider' => $response['attempted_provider'],
+            'fallback_used' => $response['fallback_used'],
+            'fallback_reason' => $response['fallback_reason'] ?? null,
+            'model_name' => $response['provider'] === 'openai' ? $this->modelName() : self::MODEL_NAME,
         ]);
         $response['evidence_catalog'] = $context['evidence_catalog'] ?? [];
+        $response['findings'] = $context['findings'] ?? [];
         $response['guidance_evidence_map'] = collect(['positive_points', 'attention_points', 'general_guidance'])
             ->flatMap(fn (string $section) => collect($response[$section] ?? [])->map(fn (array $point) => [
                 'section' => $section,
@@ -169,6 +178,7 @@ class BioimpedanceObservationAssistant
         $output = BioimpedanceAiAnalysisOutput::query()->create([
             'bioimpedance_ai_analysis_request_id' => $request->id,
             'raw_response' => $response,
+            'structured_claims' => $status === 'generated' ? ($context['findings'] ?? []) : [],
             'professional_observation' => $status === 'generated' ? $response['professional_observation'] : null,
             'validation_status' => count($validationErrors) ? 'failed' : 'passed',
         ]);
@@ -213,13 +223,13 @@ class BioimpedanceObservationAssistant
 
         if (! filled(config('services.openai.api_key'))) {
             if ($provider === 'openai') {
-                return $this->blockedResponse('OPENAI_API_KEY não configurada para o provedor OpenAI.');
+                return [...$this->blockedResponse('O serviço externo não está configurado. Solicite ao administrador a revisão da integração.'), 'provider' => 'openai'];
             }
 
             return [
                 ...$this->generateStructuredResponse($assessment, $context, $chunks),
                 'provider' => 'local_reference_engine',
-                'fallback_reason' => 'OPENAI_API_KEY ausente.',
+                'fallback_reason' => 'O provedor externo não está configurado.',
             ];
         }
 
@@ -231,13 +241,13 @@ class BioimpedanceObservationAssistant
             ];
         } catch (ConnectionException|RequestException $exception) {
             if ($provider === 'openai') {
-                return $this->blockedResponse('Falha na chamada OpenAI: '.$exception->getMessage());
+                return [...$this->blockedResponse('O provedor externo está indisponível. Tente novamente mais tarde.'), 'provider' => 'openai'];
             }
 
             return [
                 ...$this->generateStructuredResponse($assessment, $context, $chunks),
                 'provider' => 'local_reference_engine',
-                'fallback_reason' => 'Falha na chamada OpenAI: '.$exception->getMessage(),
+                'fallback_reason' => 'Falha de comunicação com o provedor externo.',
             ];
         }
     }
@@ -247,9 +257,11 @@ class BioimpedanceObservationAssistant
         $response = Http::withToken((string) config('services.openai.api_key'))
             ->acceptJson()
             ->asJson()
+            ->connectTimeout(10)
             ->timeout((int) config('services.openai.timeout', 45))
             ->post(rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/').'/responses', [
                 'model' => config('services.openai.model', 'gpt-5.1'),
+                'store' => false,
                 'input' => [
                     [
                         'role' => 'system',
@@ -304,6 +316,7 @@ Você é um assistente de apoio à avaliação de bioimpedância da Vita Scan.
 Gere uma observação final clara, acolhedora e adequada para constar no relatório entregue ao cliente.
 A observação será revisada e aprovada pelo profissional antes de entrar no relatório.
 Use somente o contexto estruturado e as fontes aprovadas enviadas.
+Use findings para escolher os achados mais relevantes. Diferencie valores registrados, classificações do equipamento e classificações calculadas pelo sistema. Explique as limitações dos achados escolhidos, sem listar todos os números nem repetir orientações genéricas. Não infira hábitos, sintomas ou restrições ausentes.
 Não altere, recalcule nem questione as classificações oficiais do backend.
 Não gere diagnóstico, prescrição, dieta, medicação, suplemento ou tratamento.
 Não afirme causalidade médica. Não substitua avaliação de profissional habilitado.
@@ -445,15 +458,31 @@ PROMPT;
         $bodyAge = $this->bodyAgeText($assessment);
         $warnings = $context['warnings'] ?? [];
         $profileWarning = collect(data_get($context, 'history_comparison.warnings', []))->first();
+        $measurements = collect($context['findings'] ?? [])->where('kind', 'measurement')
+            ->whereIn('metric', ['weight_kg', 'body_fat_percentage', 'lean_body_mass_kg', 'body_water_percentage'])->take(4);
+        $segmentFindings = collect($context['findings'] ?? [])->where('kind', 'segmental')->where('priority', 'review')->take(2);
+        $attentionPoints = [...$attentionPoints, ...$segmentFindings->map(fn (array $finding) => [
+            'text' => $finding['text'], 'source_chunk_ids' => $finding['source_ids'],
+        ])->all()];
         $observationParts = [
             $this->classificationObservation($context),
+            $measurements->pluck('text')->implode(' '),
+            $segmentFindings->pluck('text')->implode(' '),
+            collect($context['findings'] ?? [])->where('kind', 'equipment_index')->take(2)->pluck('text')->implode(' '),
+            $segmentFindings->isNotEmpty() ? 'As classificações por região pertencem ao equipamento e não avaliam força ou função.' : null,
             $bodyAge,
             $variation,
             $profileWarning ? 'A comparação com a avaliação anterior exige cautela: '.$profileWarning : null,
             count($warnings) ? 'Há alerta de consistência registrado: '.$warnings[0] : null,
-            'Recomenda-se acompanhar a evolução nas próximas avaliações, mantendo condições semelhantes de medição para comparar os resultados com mais segurança.',
+            data_get($context, 'history_comparison.has_previous')
+                ? 'Confira com o profissional as condições de cada medição antes de atribuir significado às diferenças.'
+                : 'Este registro é uma linha de base; ainda não há evolução individual para interpretar.',
         ];
-        $observation = collect($observationParts)->filter()->implode(' ');
+        $observation = collect($observationParts)->filter()->reduce(function (string $text, string $part): string {
+            $candidate = trim($text.' '.$part);
+
+            return mb_strlen($candidate) <= 1900 ? $candidate : $text;
+        }, '');
 
         return [
             'status' => 'generated',
@@ -522,6 +551,9 @@ PROMPT;
 
         $indicators = $assessment->analysis['indicators'] ?? [];
         foreach (self::METRIC_CHUNKS as $metric => $chunkKey) {
+            if ($metric !== 'bmi' && in_array($assessment->device_model, ['Relaxmedic', 'Bodyscan Pro'], true)) {
+                continue;
+            }
             $classification = $indicators[$metric]['classification'] ?? null;
             if (! $classification || ($indicators[$metric]['pending'] ?? false)) {
                 continue;
@@ -542,6 +574,9 @@ PROMPT;
 
         if (($response['status'] ?? null) === 'generated' && blank($response['professional_observation'] ?? null)) {
             $errors[] = 'Resposta gerada sem observação profissional.';
+        }
+        if (mb_strlen((string) ($response['professional_observation'] ?? '')) > 2000) {
+            $errors[] = 'A observação excede o tamanho permitido para revisão.';
         }
 
         if ($response['prohibited_content_detected'] ?? false) {

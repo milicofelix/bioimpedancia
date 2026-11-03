@@ -48,6 +48,7 @@ class BioimpedanceWorkflow
         private readonly ScreeningPrivacyService $screeningPrivacyService,
         private readonly BodyscanOcrProfileRegistry $bodyscanOcrProfiles,
         private readonly SegmentalBodySvgRenderer $segmentalBodySvgRenderer,
+        private readonly AssistantApprovalGuard $assistantApprovalGuard,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -761,7 +762,8 @@ class BioimpedanceWorkflow
             'assistant_output_id' => ['nullable', 'exists:bioimpedance_ai_analysis_outputs,id'],
         ]);
 
-        DB::transaction(function () use ($assessment, $request, $validated): void {
+        DB::transaction(function () use (&$assessment, $request, $validated): void {
+            $assessment = $this->assistantApprovalGuard->observation($assessment, isset($validated['assistant_output_id']) ? (int) $validated['assistant_output_id'] : null);
             $oldValues = $this->assessmentAuditValues($assessment);
             $assessment->update([
                 'notes' => $validated['notes'],
@@ -809,12 +811,6 @@ class BioimpedanceWorkflow
         $this->authorizeClinicalProfessional($request);
         abort_if($assessment->canceled_at, 422, 'Avaliação cancelada não pode receber orientações.');
         abort_if(blank($assessment->notes), 422, 'A observação profissional precisa ser aprovada antes das orientações.');
-
-        $hasApprovedObservation = BioimpedanceAiAnalysisOutput::query()
-            ->whereNotNull('approved_at')
-            ->whereHas('request', fn ($query) => $query->where('bioimpedance_assessment_id', $assessment->id)->where('purpose', 'observation'))
-            ->exists();
-        abort_unless($hasApprovedObservation, 422, 'A observação gerada precisa ser aprovada antes das orientações.');
 
         return response()->json(['assistant' => $assistant->suggest($assessment, $request->user())]);
     }
@@ -873,7 +869,8 @@ class BioimpedanceWorkflow
             ])->values()->all();
         $sources = [...$sources, ...$internalSources];
 
-        DB::transaction(function () use ($assessment, $request, $validated, $output, $sources): void {
+        DB::transaction(function () use (&$assessment, $request, $validated, $output, $sources): void {
+            $assessment = $this->assistantApprovalGuard->careGuidance($assessment, $output);
             $oldValues = $this->assessmentAuditValues($assessment);
             $assessment->update([
                 'care_guidance' => $validated['care_guidance'],

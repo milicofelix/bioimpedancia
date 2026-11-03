@@ -64,6 +64,7 @@ class CareGuidanceSemanticValidator
         foreach (is_array($response['claims'] ?? null) ? $response['claims'] : [] as $index => $claim) {
             $normalized = $this->normalizeClaim($claim, $index);
             $reasons = $this->claimErrors($normalized, $allowedSources, $chunks);
+            $reasons = [...$reasons, ...$this->contextErrors($normalized, $context)];
             if (in_array($normalized['id'], $seenClaimIds, true)) {
                 $reasons[] = 'Identificador de afirmação duplicado.';
             }
@@ -123,6 +124,8 @@ class CareGuidanceSemanticValidator
             'text' => trim((string) ($claim['text'] ?? '')),
             'confidence' => $claim['confidence'] ?? null,
             'requires_professional_review' => $claim['requires_professional_review'] ?? null,
+            'finding_ids' => array_values(array_filter(is_array($claim['finding_ids'] ?? null) ? $claim['finding_ids'] : [], 'is_string')),
+            'comparison_scope' => $claim['comparison_scope'] ?? 'none',
             'source_ids' => collect(is_array($claim['source_ids'] ?? null) ? $claim['source_ids'] : [])
                 ->filter(fn ($source) => is_string($source) && filled($source))
                 ->map(fn (string $source) => mb_substr(trim($source), 0, 160))
@@ -189,5 +192,41 @@ class CareGuidanceSemanticValidator
         }
 
         return array_values(array_unique($sources));
+    }
+
+    private function contextErrors(array $claim, array $context): array
+    {
+        $errors = [];
+        $sources = $claim['source_ids'];
+        $findingIds = collect($context['findings'] ?? [])->pluck('id')->all();
+        if (array_diff($claim['finding_ids'] ?? [], $findingIds)
+            || array_diff($claim['finding_ids'] ?? [], $sources)) {
+            $errors[] = 'O achado citado não está disponível ou não possui evidência na afirmação.';
+        }
+        $scope = $claim['comparison_scope'] ?? 'none';
+        if (! in_array($scope, ['none', 'profile_only', 'numeric_change'], true)
+            || ($scope !== 'none' && ! in_array('assessment:history-profile', $sources, true))
+            || ($scope === 'numeric_change' && ! data_get($context, 'history_comparison.automatic_interpretation_allowed', false))) {
+            $errors[] = 'A comparação proposta não é permitida pelo perfil do histórico.';
+        }
+        if (! data_get($context, 'history_comparison.automatic_interpretation_allowed', false)
+            && collect($sources)->contains(fn (string $source) => str_starts_with($source, 'assessment:segmental:history:'))) {
+            $errors[] = 'Segmentos históricos não podem sustentar a afirmação com perfis incompatíveis.';
+        }
+        if (in_array('observation:approved', $sources, true) && blank($context['professional_observation'] ?? null)) {
+            $errors[] = 'A observação aprovada não está disponível no contexto.';
+        }
+        if (in_array('who-older-adult-functional-activity', $sources, true)
+            && ($context['age_at_assessment'] ?? 0) < 65) {
+            $errors[] = 'A fonte para pessoas com 65 anos ou mais não corresponde à idade registrada.';
+        }
+        if (isset($context['approved_observation']) && in_array($claim['category'], ['nutrition_education', 'movement_education'], true)) {
+            $specificEvidence = collect($context['findings'] ?? [])->pluck('id')->push('observation:approved')->all();
+            if (! array_intersect($sources, $specificEvidence)) {
+                $errors[] = 'A orientação educativa não está vinculada a um achado disponível ou à observação aprovada.';
+            }
+        }
+
+        return $errors;
     }
 }

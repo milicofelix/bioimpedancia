@@ -3,6 +3,8 @@ import PwaButton from '../../components/ui/PwaButton';
 import PwaIcon from '../../components/ui/PwaIcon';
 import PwaAlert from '../../components/ui/PwaAlert';
 import PwaSectionHeader from '../../components/ui/PwaSectionHeader';
+import AssistantProvenance from './AssistantProvenance';
+import ObservationFindings from './ObservationFindings';
 
 function groupSourcesByDocument(sources) {
 	return [...sources.reduce((groups, source) => {
@@ -34,16 +36,18 @@ export default function ObservationSuggestion({ assistant, draft, saving, online
 				<div className="flex flex-wrap gap-2"><span className={`rounded-full px-3 py-1 text-xs font-bold ${generated ? 'bg-amber-100 text-amber-900' : 'bg-rose-100 text-rose-800'}`}>{generated ? 'Pendente de aprovação' : 'Bloqueada'}</span>{edited ? <span role="status" className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-800">Texto editado pelo profissional</span> : null}</div>
 			</div>
 
+			<AssistantProvenance assistant={assistant} />
+			<ObservationFindings findings={assistant.findings} />
 			{generated ? (
 				<>
 					<div className="mt-4 flex items-start gap-3 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-ricosty-50 p-4 text-sm text-slate-700">
 						<span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-violet-700 shadow-sm"><PwaIcon name="shield" size={19} /></span>
-						<div><p className="font-bold text-violet-950">Aprovação humana obrigatória</p><p className="mt-1 text-xs leading-5">Esta é uma sugestão da IA. Leia, corrija quando necessário e aprove somente se o conteúdo representar sua avaliação profissional.</p></div>
+						<div><p className="font-bold text-violet-950">Aprovação humana obrigatória</p><p className="mt-1 text-xs leading-5">Leia, corrija quando necessário e aprove somente se o conteúdo representar sua avaliação profissional.</p></div>
 					</div>
 					<label className="mt-4 block text-sm font-semibold text-slate-700">
 						<span className="flex items-center justify-between gap-2"><span>Observação profissional</span>{edited ? <span className="inline-flex items-center gap-1 text-xs font-bold text-violet-700"><PwaIcon name="user" size={14} />Editada pelo profissional</span> : null}</span>
 						<textarea rows="8" maxLength={2000} value={draft} onChange={(event) => onDraftChange(event.target.value)} className={`mt-2 w-full rounded-xl border px-3 py-3 font-normal leading-6 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200 ${edited ? 'border-violet-300 bg-violet-50/30' : 'border-slate-300 bg-white'}`} />
-						<span className="mt-1 flex flex-wrap items-center justify-between gap-1 text-xs font-normal"><span className={edited ? 'font-semibold text-violet-800' : 'text-slate-600'}>{edited ? 'A versão editada será registrada na auditoria.' : 'Texto original sugerido pela IA.'}</span><span className="text-slate-600">{draft.length}/2000</span></span>
+						<span className="mt-1 flex flex-wrap items-center justify-between gap-1 text-xs font-normal"><span className={edited ? 'font-semibold text-violet-800' : 'text-slate-600'}>{edited ? 'A versão editada será registrada na auditoria.' : 'Texto original da sugestão.'}</span><span className="text-slate-600">{draft.length}/2000</span></span>
 					</label>
 					{edited ? <details className="mt-3 rounded-xl border border-violet-100 bg-white px-3 py-2"><summary className="pwa-focus min-h-11 cursor-pointer rounded-lg py-2 text-xs font-bold text-violet-800">Comparar com a sugestão original</summary><p className="mt-2 whitespace-pre-wrap border-l-2 border-violet-200 pl-3 text-xs leading-5 text-slate-600">{assistant.suggestion}</p><button type="button" onClick={() => onDraftChange(assistant.suggestion)} className="pwa-focus mt-3 min-h-11 rounded-lg bg-violet-50 px-3 py-2 text-xs font-bold text-violet-800">Restaurar texto original</button></details> : null}
 
