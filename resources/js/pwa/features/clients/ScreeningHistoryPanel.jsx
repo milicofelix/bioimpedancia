@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { formatDate } from '../../../shared/formatters';
+import { formatDate, formatIssueDate } from '../../../shared/formatters';
 import PwaButton from '../../components/ui/PwaButton';
 import ScreeningProfessionalDetails from './ScreeningProfessionalDetails';
 
@@ -26,7 +26,7 @@ function Comparison({ comparison }) {
 	</div>;
 }
 
-export default function ScreeningHistoryPanel({ sessions, busyAction, canCreateInvitation = true, onNewApplication, onResend, onRevoke }) {
+export default function ScreeningHistoryPanel({ sessions, busyAction, canCreateInvitation = true, onNewApplication, onRevoke, onCancelPaper }) {
 	const [selectedSessionId, setSelectedSessionId] = useState(null);
 
 	return <div className="mt-4">
@@ -34,14 +34,17 @@ export default function ScreeningHistoryPanel({ sessions, busyAction, canCreateI
 
 		{sessions.length ? <ol className="mt-4 space-y-3">{sessions.map((session) => {
 			const status = statusPresentation(session);
+			const paper = session.access_mode === 'paper_transcription';
 
 			return <li key={session.id} className="rounded-2xl border border-slate-200 bg-white p-4">
 				<div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-extrabold text-slate-900">{session.questionnaire_name}</p><p className="mt-1 text-xs text-slate-500">{session.questionnaire_version} · criada em {formatDate(session.created_at)}</p><p className="mt-1 text-xs text-slate-600">Solicitada por {session.requested_by_name || 'Profissional não informado'}{session.is_minor_at_application ? ' · menor com responsável legal' : ''}</p></div><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${status.classes}`}>{status.label}</span></div>
+				<p className="mt-2 text-xs font-semibold text-slate-600">{paper ? `Formulário em papel · respondido em ${formatIssueDate(session.paper_completed_on)}` : 'Aplicação online anterior · histórico preservado'}</p>
 
 				{session.status === 'finalized' ? <div className="mt-3 rounded-xl bg-teal-50 p-3"><p className="text-sm font-extrabold text-teal-900">{session.questionnaire_code === 'VITA-TAA' ? 'Resultado visual descritivo' : `${session.total_score} pontos · ${session.result_description}`}</p><p className="mt-1 text-xs text-teal-800">Concluída em {formatDate(session.finalized_at)}</p></div> : null}
 				<Comparison comparison={session.comparison} />
 
-				{session.status === 'pending' ? <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Ações do convite</p><p className="mt-2 text-xs font-semibold leading-5 text-slate-700">{session.revoked_at ? 'Este acesso foi revogado. Você pode gerar um novo link para retomar o preenchimento.' : `Aguardando preenchimento. O link atual expira em ${formatDate(session.expires_at)}.`}</p><p className="mt-1 text-[11px] leading-5 text-slate-500">Link gerado {session.send_count || 1} vez(es). Gerar novamente invalida imediatamente o link anterior; nenhuma mensagem é enviada automaticamente.</p>{!canCreateInvitation ? <p className="mt-2 text-xs font-semibold text-amber-800">O histórico foi preservado, mas este cliente não pode receber um novo acesso enquanto estiver inativo ou anonimizado.</p> : null}<div className="mt-3 grid gap-2 sm:flex sm:flex-wrap"><PwaButton type="button" onClick={() => onResend(session)} disabled={!canCreateInvitation || Boolean(busyAction)} loading={busyAction === `resend-${session.id}`} variant="secondary" icon="refresh" className="w-full text-xs sm:w-auto">{session.revoked_at ? 'Criar novo acesso' : 'Gerar novo link'}</PwaButton>{!session.revoked_at ? <PwaButton type="button" onClick={() => onRevoke(session)} disabled={Boolean(busyAction)} loading={busyAction === `revoke-${session.id}`} variant="danger" icon="minus" className="w-full text-xs sm:w-auto">Revogar acesso</PwaButton> : null}</div></div> : null}
+				{paper && session.status === 'pending' ? <div className="mt-3 rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-700">Aguardando o lançamento das respostas do documento original. O questionário é interno e exige autenticação.</p><div className="mt-3 flex flex-wrap gap-2">{canCreateInvitation && session.transcription_url ? <a href={session.transcription_url} target="_blank" rel="noopener noreferrer" className="pwa-focus inline-flex min-h-11 items-center rounded-xl bg-teal-700 px-4 text-xs font-bold text-white">Abrir questionário</a> : null}<PwaButton type="button" onClick={() => onCancelPaper(session)} disabled={!canCreateInvitation || Boolean(busyAction)} loading={busyAction === `cancel-${session.id}`} variant="danger" icon="minus" className="text-xs">Cancelar lançamento</PwaButton></div></div> : null}
+				{!paper && session.status === 'pending' ? <div className="mt-3 rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-700">{session.revoked_at ? 'O convite antigo foi revogado.' : `Convite antigo disponível até ${formatDate(session.expires_at)}. Para lançar respostas do papel, crie uma nova aplicação interna.`}</p>{!session.revoked_at ? <PwaButton type="button" onClick={() => onRevoke(session)} disabled={!canCreateInvitation || Boolean(busyAction)} loading={busyAction === `revoke-${session.id}`} variant="danger" icon="minus" className="mt-3 text-xs">Revogar convite antigo</PwaButton> : null}</div> : null}
 
 				{session.status === 'finalized' ? <div className="mt-3 rounded-xl border border-teal-100 bg-teal-50/40 p-3"><p className="text-[11px] font-extrabold uppercase tracking-wide text-teal-800">Resultado e documentos</p><div className="mt-2 grid gap-2 sm:grid-cols-2"><PwaButton type="button" onClick={() => setSelectedSessionId(session.id)} variant="secondary" icon="fileText" className="w-full text-xs">Abrir resultado</PwaButton><a href={`/screening/sessions/${session.id}/client-pdf`} target="_blank" rel="noopener noreferrer" className="pwa-focus inline-flex min-h-11 items-center justify-center rounded-xl bg-teal-700 px-4 text-xs font-bold text-white hover:bg-teal-800">Abrir PDF da triagem</a></div></div> : null}
 			</li>;

@@ -40,8 +40,10 @@ Legenda: **Sim** = permitido; **Não** = negado; **Cond.** = permitido com condi
 
 | Recurso ou ação | Administrador | Profissional | Recepção | Visualizador | Condições relevantes |
 | --- | :---: | :---: | :---: | :---: | --- |
-| Criar convite de triagem | Sim | Sim | Não | Não | Módulo Triagens ativo e conta ativa |
-| Consultar, reenviar ou revogar convite | Sim | Cond. | Não | Não | Administrador acessa todos; profissional somente os próprios |
+| Criar convite de triagem (API legada) | Sim | Sim | Não | Não | Módulo Triagens ativo e conta ativa; removido da interface operacional nova |
+| Criar lançamento de formulário em papel | Sim | Sim | Não | Não | Módulo ativo, cliente ativo e versão aprovada |
+| Abrir, transcrever ou cancelar lançamento pendente | Sim | Cond. | Não | Não | Profissional somente nas próprias aplicações; conferências do documento obrigatórias para finalizar |
+| Consultar, reenviar ou revogar convite legado | Sim | Cond. | Não | Não | Administrador acessa todos; profissional somente os próprios; sessões internas não podem virar convites |
 | Revisar resultado e registrar devolutiva | Sim | Cond. | Não | Não | Profissional somente nas sessões solicitadas por ele |
 | Baixar PDF da triagem | Sim | Cond. | Não | Não | Mesma regra de propriedade da sessão |
 | Aprovar questionário | Sim | Sim | Não | Não | Questionário em estado compatível |

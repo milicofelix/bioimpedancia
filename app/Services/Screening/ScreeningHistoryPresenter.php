@@ -31,6 +31,11 @@ class ScreeningHistoryPresenter
                 'questionnaire_version' => $session->questionnaire_version,
                 'status' => $session->status,
                 'access_mode' => $session->access_mode,
+                'paper_completed_on' => $session->paper_completed_on?->toDateString(),
+                'transcribed_by_user_id' => $session->transcribed_by_user_id,
+                'transcription_url' => $session->access_mode === ScreeningSession::ACCESS_PAPER_TRANSCRIPTION
+                    && $session->status === ScreeningSession::STATUS_PENDING && ! $session->revoked_at
+                    ? route('screening.paper.show', $session) : null,
                 'requested_by_name' => $session->requested_by_name,
                 'created_at' => $session->created_at?->toIso8601String(),
                 'started_at' => $session->started_at?->toIso8601String(),

@@ -16,6 +16,7 @@ use App\Http\Controllers\OperationalReadinessController;
 use App\Http\Controllers\Screening\PublicScreeningController;
 use App\Http\Controllers\Screening\PublicScreeningResultPdfController;
 use App\Http\Controllers\Screening\ScreeningInvitationController;
+use App\Http\Controllers\Screening\ScreeningPaperTranscriptionController;
 use App\Http\Controllers\Screening\ScreeningProfessionalReviewController;
 use App\Http\Controllers\Screening\ScreeningQuestionnaireApprovalController;
 use App\Http\Controllers\Screening\ScreeningResultPdfController;
@@ -74,6 +75,10 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     Route::get('/bioimpedance/clients/{client}/privacy-export', [ClientController::class, 'exportPrivacyData'])->name('bioimpedance.clients.privacy-export');
     Route::patch('/bioimpedance/clients/{client}/anonymize', [ClientController::class, 'anonymize'])->name('bioimpedance.clients.anonymize');
     Route::middleware('clinic.module:screening')->group(function () {
+        Route::post('/screening/paper-applications', [ScreeningPaperTranscriptionController::class, 'store'])->name('screening.paper.store');
+        Route::get('/screening/sessions/{session}/transcription', [ScreeningPaperTranscriptionController::class, 'show'])->name('screening.paper.show');
+        Route::post('/screening/sessions/{session}/transcription', [ScreeningPaperTranscriptionController::class, 'complete'])->name('screening.paper.complete');
+        Route::patch('/screening/sessions/{session}/transcription/cancel', [ScreeningPaperTranscriptionController::class, 'cancel'])->name('screening.paper.cancel');
         Route::get('/screening/clients/{client}/invitations', [ScreeningInvitationController::class, 'index'])->name('screening.invitations.index');
         Route::post('/screening/invitations', [ScreeningInvitationController::class, 'store'])->name('screening.invitations.store');
         Route::post('/screening/invitations/{session}/resend', [ScreeningInvitationController::class, 'resend'])->name('screening.invitations.resend');

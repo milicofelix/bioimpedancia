@@ -32,7 +32,8 @@ class ScreeningPrivacyService
             ->whereNotNull('bioimpedance_client_id')
             ->whereNotNull('retention_expires_at')
             ->where('retention_expires_at', '<=', now())
-            ->whereIn('status', [ScreeningSession::STATUS_FINALIZED, ScreeningSession::STATUS_CANCELLED])
+            ->where(fn ($query) => $query->whereIn('status', [ScreeningSession::STATUS_FINALIZED, ScreeningSession::STATUS_CANCELLED])
+                ->orWhere('access_mode', ScreeningSession::ACCESS_PAPER_TRANSCRIPTION))
             ->orderBy('id')
             ->eachById(function (ScreeningSession $session) use (&$processed): void {
                 $this->anonymizeSession($session->id, 'retention_expired');
