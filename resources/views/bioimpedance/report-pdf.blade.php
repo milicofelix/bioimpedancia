@@ -63,6 +63,12 @@
         .trend-chart { display: block; width: 100%; height: 62px; margin-top: 3px; }
         .trend-dates { width: 100%; color: #667085; font-size: 6px; }
         .trend-dates td:last-child { text-align: right; }
+        .composition-page .content { padding-top: 8px; padding-bottom: 8px; }
+        .composition-page .box { padding: 7px; }
+        .composition-page .section-title { margin-top: 9px; margin-bottom: 5px; }
+        .composition-page .notice { margin-top: 6px; padding: 7px 10px; }
+        .composition-page .trend-chart { height: 56px; }
+        .comparison-page .segmental-comparison th, .comparison-page .segmental-comparison td { padding: 4px 6px; }
         .validation { width: 100%; border-collapse: collapse; margin-top: 8px; }
         .validation tr { page-break-inside: avoid; }
         .validation td { padding: 7px 8px; border: 1px solid #e5e7eb; background: #fff; vertical-align: top; }
@@ -376,7 +382,7 @@
     </div>
 </section>
 
-<section class="report-section">
+<section class="report-section composition-page">
     @include('bioimpedance.partials.report-header', ['pageTitle' => $hasEvolution ? 'Análise e evolução' : 'Composição corporal detalhada', 'pageNumber' => 2, 'totalSections' => $totalSections])
     <div class="content">
         <div class="section-title" style="color: {{ $secondaryColor }};">Composição corporal detalhada</div>
@@ -404,7 +410,7 @@
             </div>
         @endif
         @if($hasEvolution)
-            <p class="muted">Até seis avaliações não canceladas com contexto técnico comparável. Somente indicadores presentes nas avaliações relacionadas são exibidos.</p>
+            <p class="muted">Até seis avaliações não canceladas com contexto técnico comparável. Somente indicadores presentes nas avaliações relacionadas são exibidos. As linhas mostram tendências numéricas e não indicam melhora ou piora isoladamente.</p>
             <table class="trend-grid"><tr>
                 @foreach($comparison['trends'] as $trend)
                     @php
@@ -433,7 +439,6 @@
                     </td>
                 @endforeach
             </tr></table>
-            <p class="muted">As linhas mostram apenas tendências numéricas e não indicam melhora ou piora isoladamente.</p>
         @elseif($assessment['is_canceled'])
             <div class="summary muted">Avaliações canceladas não participam de comparações ou gráficos evolutivos.</div>
         @endif
@@ -448,7 +453,7 @@
 @endif
 
 @if($hasDetailedComparison)
-<section class="report-section">
+<section class="report-section comparison-page">
     @include('bioimpedance.partials.report-header', ['pageTitle' => 'Comparação compatível', 'pageNumber' => 3 + ($hasFitdaysDataPage ? 1 : 0), 'totalSections' => $totalSections])
     <div class="content">
         <div class="notice"><strong>{{ $comparability['label'] ?? 'Comparação descritiva' }}.</strong> Somente valores com tipo e unidade compatíveis são apresentados. As variações não representam automaticamente melhora ou piora clínica.</div>
@@ -466,6 +471,7 @@
         @if(!($comparison['impedance']['is_baseline'] ?? true) && count($comparison['impedance']['readings'] ?? []))
             <div class="section-title" style="color: {{ $secondaryColor }};">Impedância disponível nas duas avaliações</div>
             <table class="segmental-comparison">
+                <caption>Leitura elétrica técnica, preservada para comparação e sem interpretação diagnóstica.</caption>
                 <thead><tr><th>Frequência</th><th>Região</th><th>Anterior</th><th>Atual</th><th>Variação</th></tr></thead>
                 <tbody>
                 @foreach($comparison['impedance']['readings'] as $reading)
@@ -475,7 +481,6 @@
                 @endforeach
                 </tbody>
             </table>
-            <p class="muted">Leitura elétrica técnica, preservada como evidência de comparação e sem interpretação diagnóstica.</p>
         @endif
     </div>
 </section>
