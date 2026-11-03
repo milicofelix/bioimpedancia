@@ -35,6 +35,13 @@
 
         @if($splitReferencePages)
     </div>
+</section>
+<section class="report-section">
+    @include('bioimpedance.partials.report-header', [
+        'pageTitle' => 'Indicadores complementares - continuação',
+        'pageNumber' => $pageNumber,
+        'totalSections' => $totalSections,
+    ])
     <div class="content complementary-references-page">
         @endif
 
