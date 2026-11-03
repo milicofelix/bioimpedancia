@@ -9,6 +9,7 @@ import CareGuidanceEvidence from './CareGuidanceEvidence';
 import PwaAlert from '../../components/ui/PwaAlert';
 import PwaInfoCard from '../../components/ui/PwaInfoCard';
 import PwaSectionHeader from '../../components/ui/PwaSectionHeader';
+import AssistantProvenance from './AssistantProvenance';
 
 export default function CareGuidanceAssistant({ assessment, online, onApproved, onOpenReport, canOpenReport = false }) {
 	const runAction = useActionLock();
@@ -76,6 +77,7 @@ export default function CareGuidanceAssistant({ assessment, online, onApproved, 
 			<PwaSectionHeader icon="sparkles" eyebrow="Orientação" title="Próximos cuidados" description="Orientações educativas baseadas na observação aprovada, sempre sujeitas à revisão profissional." tone="teal" />
 			{assessment.care_guidance ? <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><p className="flex items-center gap-2 text-xs font-bold uppercase text-emerald-800"><PwaIcon name="check" size={15} />Conteúdo aprovado para o relatório</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{assessment.care_guidance}</p></div> : null}
 			{assistant ? <div className="mt-4 space-y-4">
+				<AssistantProvenance assistant={assistant} />
 				<PwaAlert tone="attention" title="Pendente de revisão">Confirme se as orientações são adequadas ao histórico e às limitações conhecidas do cliente.</PwaAlert>
 				{assistant.validation_errors?.length ? <PwaAlert tone="error" title="Orientação bloqueada"><ul className="list-disc pl-5">{assistant.validation_errors.map((message) => <li key={message}>{message}</li>)}</ul></PwaAlert> : null}
 				{blocked ? <PwaAlert tone="info" title="Aprovação indisponível">Gere uma nova sugestão para que somente um conteúdo aprovado pelas regras de segurança possa seguir para o relatório.</PwaAlert> : null}

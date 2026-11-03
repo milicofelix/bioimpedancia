@@ -18,6 +18,7 @@ const confidenceLabels = {
 
 export default function CareGuidanceEvidence({ assistant }) {
 	const sourcesById = Object.fromEntries((assistant.sources ?? []).map((source) => [source.id, source]));
+	const safeFallback = assistant.status === 'generated' && assistant.fallback_used;
 
 	return (
 		<div className="space-y-4">
@@ -41,7 +42,8 @@ export default function CareGuidanceEvidence({ assistant }) {
 			</div>
 
 			{assistant.blocked_claims?.length ? (
-				<PwaAlert tone="error" title={`${assistant.blocked_claims.length} trecho(s) removido(s) por segurança`}>
+				<PwaAlert tone={safeFallback ? 'attention' : 'error'} title={safeFallback ? 'Resposta externa descartada; alternativa local disponível' : `${assistant.blocked_claims.length} trecho(s) removido(s) por segurança`}>
+					{safeFallback ? <p className="mb-2">Os {assistant.blocked_claims.length} trechos abaixo não fazem parte da sugestão atual. O texto disponível acima foi gerado pelo motor local e passou pela validação; revise-o antes de aprovar.</p> : null}
 					<details><summary className="pwa-focus min-h-11 cursor-pointer rounded-lg py-2 text-xs font-bold">Ver detalhes da revisão</summary><ul className="mt-2 space-y-2 text-xs">{assistant.blocked_claims.map((claim, index) => <li key={`${claim.id}-${index}`}><strong>{claim.text || 'Trecho sem conteúdo válido'}</strong><br />{claim.blocked_reasons?.join(' ')}</li>)}</ul></details>
 				</PwaAlert>
 			) : null}

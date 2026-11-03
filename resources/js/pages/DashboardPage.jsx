@@ -18,6 +18,8 @@ import { loadBioimpedanceWorkspace, logout, processBodyscanProImage, processRela
 import { cpfMask, heightMask, normalizeInteger, phoneMask } from '../shared/inputMasks';
 import useActionLock from '../hooks/useActionLock';
 import CareGuidanceAssistant from '../pwa/features/assistant/CareGuidanceAssistant';
+import AssistantProvenance from '../pwa/features/assistant/AssistantProvenance';
+import ObservationFindings from '../pwa/features/assistant/ObservationFindings';
 import KnowledgeDocumentsPanel from '../components/bioimpedance/KnowledgeDocumentsPanel';
 import BodyscanReview from '../pwa/features/assessment/BodyscanReview';
 import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocolComplete, emptyBodyscanProtocol, updateBodyscanImpedance, updateBodyscanSegment } from '../pwa/features/assessment/bodyscanAssessmentForm';
@@ -1697,6 +1699,8 @@ export default function DashboardPage({ userName }) {
 									</div>
 									{observationAssistant ? (
 										<div className="mt-3 rounded-xl bg-white p-3">
+											<AssistantProvenance assistant={observationAssistant} />
+											<ObservationFindings findings={observationAssistant.findings} />
 											{observationAssistant.status === 'generated' ? (
 												<>
 													<textarea value={observationDraft} onChange={(event) => setObservationDraft(event.target.value)} rows="6" className={inputClass()} />

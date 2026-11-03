@@ -30,11 +30,11 @@ class BioimpedanceSegmentalClinicalContext
             ->first();
 
         $measurements = $assessment->segmentalMeasurements
-            ->map(fn (BioimpedanceSegmentalMeasurement $measurement) => $this->measurement($measurement))
+            ->map(fn (BioimpedanceSegmentalMeasurement $measurement) => $this->measurement($measurement, 'current', data_get($assessment->source_metadata, 'segmental_review_corrections', [])))
             ->values();
         $previousMeasurements = $previous?->segmentalMeasurements?->isNotEmpty()
             ? $previous->segmentalMeasurements
-                ->map(fn (BioimpedanceSegmentalMeasurement $measurement) => $this->measurement($measurement, 'history'))
+                ->map(fn (BioimpedanceSegmentalMeasurement $measurement) => $this->measurement($measurement, 'history', data_get($previous->source_metadata, 'segmental_review_corrections', [])))
                 ->values()
             : collect();
 
@@ -63,16 +63,26 @@ class BioimpedanceSegmentalClinicalContext
         ];
     }
 
-    private function measurement(BioimpedanceSegmentalMeasurement $measurement, string $scope = 'current'): array
+    private function measurement(BioimpedanceSegmentalMeasurement $measurement, string $scope = 'current', array $corrections = []): array
     {
+        $classificationEdited = collect($corrections)->contains(fn (array $correction) => ($correction['type'] ?? null) === $measurement->type
+            && ($correction['region'] ?? null) === $measurement->region
+            && ($correction['side'] ?? null) === $measurement->side
+            && array_key_exists('classification', $correction['changes'] ?? []));
+
         return [
             'evidence_id' => 'assessment:segmental:'.$scope.':'.$measurement->type.':'.$measurement->region.':'.$measurement->side,
             'type' => $measurement->type,
             'region' => $measurement->region,
             'side' => $measurement->side,
-            'mass_kg' => (float) $measurement->mass_kg,
-            'reference_percentage' => (float) $measurement->reference_percentage,
+            'mass_kg' => $measurement->mass_kg === null ? null : (float) $measurement->mass_kg,
+            'reference_percentage' => $measurement->reference_percentage === null ? null : (float) $measurement->reference_percentage,
             'device_classification' => $measurement->classification,
+            'classification_origin' => $classificationEdited ? 'professional_review' : match (data_get($measurement->raw_value, 'classification_source')) {
+                'printed' => 'equipment_report',
+                'reference_range' => 'equipment_reference_range',
+                default => 'recorded_unverified',
+            },
             'reference_version' => $measurement->reference_version,
         ];
     }

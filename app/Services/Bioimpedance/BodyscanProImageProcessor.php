@@ -45,6 +45,7 @@ class BodyscanProImageProcessor
         private readonly BodyscanSegmentalOcrCompleter $segmentalCompleter,
         private readonly BodyscanOcrProfileRegistry $ocrProfiles,
         private readonly BodyscanExtendedMetricNormalizer $extendedMetricNormalizer,
+        private readonly BodyscanGeneralMetricRecovery $generalMetricRecovery,
     ) {}
 
     public function process(UploadedFile $image): array
@@ -203,6 +204,12 @@ class BodyscanProImageProcessor
         $rawMetrics = is_array($payload['metrics'] ?? null) ? $payload['metrics'] : [];
         $rawMetricLabels = is_array($payload['metric_source_labels'] ?? null) ? $payload['metric_source_labels'] : [];
         $rawMetricTexts = is_array($payload['metric_raw_values'] ?? null) ? $payload['metric_raw_values'] : [];
+        $extendedMetrics = $this->extendedMetricNormalizer->normalize(
+            is_array($payload['extended_metrics'] ?? null) ? $payload['extended_metrics'] : [],
+            $sourceApplication,
+            $reportLayout,
+        );
+        $recoveredMetrics = $this->generalMetricRecovery->recover($rawMetrics, $extendedMetrics, $profile);
         $metrics = [];
         $fieldStatuses = [];
         $fieldStatuses['source_application'] = 'recognized';
@@ -243,6 +250,11 @@ class BodyscanProImageProcessor
                 continue;
             }
             $rawValue = $rawMetrics[$field] ?? null;
+            if (($rawValue === null || $rawValue === '') && isset($recoveredMetrics[$field])) {
+                $rawValue = $recoveredMetrics[$field]['value'];
+                $rawMetricLabels[$field] = $recoveredMetrics[$field]['label'];
+                $rawMetricTexts[$field] = $recoveredMetrics[$field]['raw_value'];
+            }
             $metrics[$field] = array_key_exists($field, self::NUMERIC_RANGES)
                 ? $this->normalizeNumber($rawValue)
                 : $this->normalizeText($rawValue);
@@ -289,11 +301,6 @@ class BodyscanProImageProcessor
             }
         }
 
-        $extendedMetrics = $this->extendedMetricNormalizer->normalize(
-            is_array($payload['extended_metrics'] ?? null) ? $payload['extended_metrics'] : [],
-            $sourceApplication,
-            $reportLayout,
-        );
         $extractedExtendedCodes = collect($extendedMetrics)->pluck('metric_code');
         foreach (BodyscanExtendedMetricCatalog::requiredForLayout($reportLayout) as $requiredCode) {
             if (! $extractedExtendedCodes->contains($requiredCode)) {
@@ -368,6 +375,7 @@ class BodyscanProImageProcessor
                 'metrics' => $rawMetrics,
                 'metric_source_labels' => $rawMetricLabels,
                 'metric_text' => $rawMetricTexts,
+                'metric_recovery' => $recoveredMetrics,
                 'printed_measurement_profile' => $rawPrintedProfile,
                 'extended_metrics' => $payload['extended_metrics'] ?? [],
                 'impedance_readings' => $payload['impedance_readings'] ?? [],

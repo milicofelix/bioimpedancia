@@ -24,6 +24,7 @@ class BioimpedanceAssistantContext
     public function __construct(
         private readonly BioimpedanceSegmentalClinicalContext $segmentalContext,
         private readonly BioimpedanceReportComparison $reportComparison,
+        private readonly AssessmentFindings $findings,
     ) {}
 
     public function for(BioimpedanceAssessment $assessment): array
@@ -70,9 +71,14 @@ class BioimpedanceAssistantContext
             )] : []),
         ])->filter()->keyBy('id')->values()->all();
 
-        return [
+        $context = [
             'measurement_profile' => [
                 'equipment' => $assessment->device_model,
+                'evaluated_at' => $assessment->evaluated_at?->toIso8601String(),
+                'reference_version' => $assessment->reference_version,
+                'age' => $assessment->age_at_assessment,
+                'sex' => $assessment->biological_sex_at_assessment,
+                'height_cm' => $assessment->height_cm_at_assessment,
                 'application' => $assessment->measurement_application,
                 'layout' => data_get($assessment->source_metadata, 'report_layout')
                     ?? $assessment->extendedMetrics->first()?->source_layout
@@ -105,6 +111,8 @@ class BioimpedanceAssistantContext
             'evidence_catalog' => $catalog,
             'evidence_ids' => collect($catalog)->pluck('id')->values()->all(),
         ];
+
+        return [...$context, 'findings' => $this->findings->from($context), 'measurement_fingerprint' => $this->findings->fingerprint($context)];
     }
 
     private function generalMetrics(BioimpedanceAssessment $assessment): array
@@ -115,12 +123,23 @@ class BioimpedanceAssistantContext
                 if ($value === null) {
                     return null;
                 }
+                $indicatorKey = match ($field) {
+                    'calculated_bmi' => 'bmi', 'body_fat_percentage' => 'body_fat',
+                    'skeletal_muscle_percentage' => 'skeletal_muscle', 'visceral_fat_level' => 'visceral_fat',
+                    default => null,
+                };
+                $indicator = $indicatorKey === null ? [] : ($assessment->analysis['indicators'][$indicatorKey] ?? []);
+                $classificationAllowed = $field === 'calculated_bmi' || $assessment->device_model === 'HBF-514C';
+                $classification = $classificationAllowed && ! ($indicator['pending'] ?? false) ? ($indicator['classification'] ?? null) : null;
 
                 return [
                     'evidence_id' => 'assessment:metric:'.$field,
                     'code' => $field,
                     ...$definition,
                     'value' => is_numeric($value) ? (float) $value : $value,
+                    'classification' => $classification,
+                    'classification_origin' => $classification ? 'backend_reference' : null,
+                    'tone' => $classification ? ($indicator['tone'] ?? null) : null,
                     'interpretation_scope' => in_array($field, ['body_age', 'visceral_fat_level'], true)
                         ? 'proprietary_non_diagnostic'
                         : 'measurement_estimate',
