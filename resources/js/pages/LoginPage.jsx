@@ -62,13 +62,13 @@ export default function LoginPage() {
     }
 
     return (
-        <main className="flex min-h-screen items-center justify-center bg-[#fbf7fa] px-4 py-10 text-slate-900 sm:px-6 lg:px-8">
-            <section className="grid w-full max-w-6xl overflow-hidden rounded-[2rem] border border-rose-100 bg-white shadow-2xl shadow-rose-200/40 lg:grid-cols-[1fr_0.9fr]">
-                <div className="flex min-h-[420px] flex-col justify-between bg-gradient-to-br from-[#f8dfe8] via-white to-[#eee6fb] p-7 sm:p-10 lg:p-12">
+        <main className="flex min-h-screen items-center justify-center bg-[#f5fafc] px-4 py-10 text-slate-900 sm:px-6 lg:px-8">
+            <section className="grid w-full max-w-6xl overflow-hidden rounded-[2rem] border border-ricosty-100 bg-white shadow-2xl shadow-ricosty-200/40 lg:grid-cols-[1fr_0.9fr]">
+                <div className="flex min-h-[420px] flex-col justify-between bg-gradient-to-br from-[#d9f4f3] via-white to-[#e0f2fe] p-7 sm:p-10 lg:p-12">
 					<VitaScanBrand headingLevel="h1" size="large" className="max-w-full" />
 
                     <div className="mt-10 max-w-xl">
-                        <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#b96f7d]">Plataforma de avaliação corporal</p>
+                        <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#08667f]">Plataforma de avaliação corporal</p>
 						<h2 className="mt-4 text-3xl font-semibold leading-tight text-[#3f3f46] sm:text-4xl">
                             Sistema profissional de avaliação corporal
 						</h2>
@@ -137,7 +137,7 @@ export default function LoginPage() {
                                     type="checkbox"
                                     checked={remember}
                                     onChange={(event) => setRemember(event.target.checked)}
-                                    className="h-4 w-4 rounded border-rose-200 text-[#b96f7d] focus:ring-rose-300"
+                                    className="h-4 w-4 rounded border-ricosty-200 text-ricosty-700 focus:ring-ricosty-300"
                                 />
                                 Manter conectado neste dispositivo
                             </label>

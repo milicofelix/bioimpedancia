@@ -83,9 +83,9 @@ const defaultClinic = {
 	address: '',
 	instagram: '',
 	website: '',
-	primary_color: '#d88b9a',
-	secondary_color: '#4a4a4a',
-	logo_url: '/images/brand/ricosty-logo.png',
+	primary_color: '#087f98',
+	secondary_color: '#052f59',
+	logo_url: '/images/brand/bioflow-mark.png',
 	contact: 'Avaliação corporal e acompanhamento estético',
 	footer_text: 'Vita Scan Análise clínica Biológica - Avaliação corporal e acompanhamento estético',
 	technical_notice: 'Os resultados de bioimpedância são estimativas e podem variar conforme hidratação, alimentação, ciclo hormonal, medicamentos e condições de medição. Este documento não substitui avaliação médica ou nutricional.',
@@ -2188,8 +2188,8 @@ function Report({ clinic, client, assessment, professional }) {
 				</button>
 			</div>
 
-			<header className="report-header relative flex flex-col gap-5 overflow-hidden border-b border-rose-200 bg-gradient-to-br from-rose-50 via-white to-stone-100 px-8 py-8 text-slate-900 sm:flex-row sm:items-center sm:justify-between">
-				<div className="pointer-events-none absolute inset-x-0 top-0 h-2" style={{ background: `linear-gradient(90deg, ${clinic.primary_color}, #f2c7cf, ${clinic.secondary_color})` }}></div>
+			<header className="report-header relative flex flex-col gap-5 overflow-hidden border-b border-ricosty-200 bg-gradient-to-br from-ricosty-50 via-white to-sky-50 px-8 py-8 text-slate-900 sm:flex-row sm:items-center sm:justify-between">
+				<div className="pointer-events-none absolute inset-x-0 top-0 h-2" style={{ background: `linear-gradient(90deg, ${clinic.primary_color}, #b2e5e6, ${clinic.secondary_color})` }}></div>
 				<div className="flex items-center gap-5">
 					<VitaScanBrand headingLevel="h1" size="large" />
 				</div>
@@ -2200,15 +2200,15 @@ function Report({ clinic, client, assessment, professional }) {
 				</div>
 			</header>
 
-			<div className="report-body bg-[#fbf8f8] px-8 py-7">
+			<div className="report-body bg-ricosty-cream px-8 py-7">
 				{assessment?.is_canceled ? (
 					<div className="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
 						<strong>Avaliação cancelada.</strong> {assessment.cancellation_reason ?? 'Registro preservado apenas para histórico.'}
 					</div>
 				) : null}
-				<section className="report-client-grid grid gap-4 rounded-2xl border border-rose-100 bg-white p-5 shadow-sm sm:grid-cols-[2fr_1fr_1fr_1fr]">
+				<section className="report-client-grid grid gap-4 rounded-2xl border border-ricosty-100 bg-white p-5 shadow-sm sm:grid-cols-[2fr_1fr_1fr_1fr]">
 					<div>
-						<p className="text-xs font-bold uppercase tracking-wide text-[#b96f7d]">Cliente</p>
+						<p className="text-xs font-bold uppercase tracking-wide text-[#08667f]">Cliente</p>
 						<h2 className="mt-2 text-2xl font-bold text-slate-950">{client.full_name}</h2>
 					</div>
 					<MiniMetric label="Idade" value={`${assessmentAge ?? '-'} anos`} />
@@ -2218,7 +2218,7 @@ function Report({ clinic, client, assessment, professional }) {
 
 				{assessment ? (
 					<>
-						<section className="report-hero-grid mt-6 grid gap-4 rounded-2xl border border-rose-100 bg-[#f8e8eb] p-5 md:grid-cols-[1fr_1fr_1.25fr]">
+						<section className="report-hero-grid mt-6 grid gap-4 rounded-2xl border border-ricosty-100 bg-ricosty-100 p-5 md:grid-cols-[1fr_1fr_1.25fr]">
 							<HeroMetric eyebrow="Visão geral" value={numberBr(assessment.weight_kg, 1)} unit="kg" />
 							<div>
 								<HeroMetric eyebrow="IMC calculado" value={numberBr(assessment.calculated_bmi, 1)} />
@@ -2231,7 +2231,7 @@ function Report({ clinic, client, assessment, professional }) {
 									<HeroMetric eyebrow="Índice de idade corporal do aparelho" value={assessment.body_age ?? '-'} unit="anos" compactEyebrow />
 									{bodyAgeDelta !== null ? (
 										<div className="pt-7 text-right">
-											<p className={`text-sm font-bold leading-5 ${bodyAgeDelta > 0 ? 'text-[#b96f7d]' : 'text-emerald-700'}`}>
+											<p className={`text-sm font-bold leading-5 ${bodyAgeDelta > 0 ? 'text-[#08667f]' : 'text-emerald-700'}`}>
 												{Math.abs(bodyAgeDelta)} anos {bodyAgeDelta > 0 ? 'acima' : 'abaixo'}
 											</p>
 											<p className="mt-1 text-xs leading-5 text-slate-500">da idade cronológica</p>
@@ -2243,7 +2243,7 @@ function Report({ clinic, client, assessment, professional }) {
 						</section>
 
 						<section className="mt-6">
-							<h3 className="text-base font-bold uppercase tracking-wide text-[#4a4a4a]">Composição corporal</h3>
+							<h3 className="text-base font-bold uppercase tracking-wide text-[#052f59]">Composição corporal</h3>
 							<div className="report-composition-grid mt-4 grid gap-4 md:grid-cols-2">
 								<ScaleCard
 									title="Gordura corporal"
@@ -2308,8 +2308,8 @@ function Report({ clinic, client, assessment, professional }) {
 							</section>
 						) : null}
 
-						<section className="mt-6 rounded-2xl border border-rose-100 bg-white p-5">
-							<h3 className="text-base font-bold uppercase tracking-wide text-[#b96f7d]">Síntese da avaliação</h3>
+						<section className="mt-6 rounded-2xl border border-ricosty-100 bg-white p-5">
+							<h3 className="text-base font-bold uppercase tracking-wide text-[#08667f]">Síntese da avaliação</h3>
 							<div className="mt-4 space-y-2 text-sm leading-6 text-slate-700">
 								<p>O IMC foi calculado automaticamente com base em peso e altura: {numberBr(assessment.calculated_bmi, 1)} kg/m², classificado como {bmiClassification}.</p>
 								{isRelaxmedic ? <p>Gordura corporal, massa magra e músculo esquelético são estimativas do equipamento. A classificação Relaxmedic não é substituída por faixas de outro modelo.</p> : <p>A gordura corporal foi classificada como {bodyFat.classification ?? '-'} e o músculo esquelético como {skeletalMuscle.classification ?? '-'}, conforme sexo, idade e referência da Omron HBF-514C.</p>}
@@ -2321,8 +2321,8 @@ function Report({ clinic, client, assessment, professional }) {
 						</section>
 
 						<section className="report-protocol-grid mt-6 grid gap-4 md:grid-cols-2">
-							<div className={`rounded-2xl p-5 ${warnings.length ? 'bg-amber-50' : 'bg-rose-50'}`}>
-								<h3 className={`text-sm font-bold uppercase tracking-wide ${warnings.length ? 'text-amber-700' : 'text-[#b96f7d]'}`}>
+							<div className={`rounded-2xl p-5 ${warnings.length ? 'bg-amber-50' : 'bg-ricosty-50'}`}>
+								<h3 className={`text-sm font-bold uppercase tracking-wide ${warnings.length ? 'text-amber-700' : 'text-[#08667f]'}`}>
 									{warnings.length ? '!' : '✓'} {validationTitle}
 								</h3>
 								<p className="mt-4 text-sm leading-6 text-slate-700">{validationText}</p>
@@ -2366,7 +2366,7 @@ function Report({ clinic, client, assessment, professional }) {
 function HeroMetric({ eyebrow, value, unit, compactEyebrow = false }) {
 	return (
 		<div>
-			<p className={`${compactEyebrow ? 'max-w-none' : ''} text-xs font-bold uppercase tracking-wide text-[#9f5f6b]`}>{eyebrow}</p>
+			<p className={`${compactEyebrow ? 'max-w-none' : ''} text-xs font-bold uppercase tracking-wide text-[#07516d]`}>{eyebrow}</p>
 			<p className="mt-3 text-5xl font-bold leading-none text-slate-900">
 				{value}
 				{unit ? <span className="ml-1 text-lg text-slate-500">{unit}</span> : null}
@@ -2384,7 +2384,7 @@ function ScaleCard({ title, value, unit, badge, tone, position = 50, labels = []
 	];
 
 	return (
-		<div className="rounded-2xl border border-rose-100 bg-white p-5 shadow-sm">
+		<div className="rounded-2xl border border-ricosty-100 bg-white p-5 shadow-sm">
 			<div className="flex items-start justify-between gap-4">
 				<p className="text-sm font-bold uppercase tracking-wide text-slate-500">{title}</p>
 				<span className={`rounded-full border px-4 py-2 text-xs font-bold ${indicatorBadgeClass(tone)}`}>{badge}</span>

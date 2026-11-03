@@ -29,11 +29,11 @@ export const segmentalAnalysisPresentation = {
 };
 
 export const segmentalBodyNeutralPalette = {
-	fill: '#f4e4e8',
-	stroke: '#934c60',
-	detail: '#c98d9b',
+	fill: '#e2f4f7',
+	stroke: '#07516d',
+	detail: '#7db6c4',
 	separator: '#ffffff',
-	sideMarker: '#7f1d3f',
+	sideMarker: '#052f59',
 };
 
 export const segmentalSideMarkers = [

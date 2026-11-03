@@ -1,8 +1,8 @@
 @extends('layouts.react')
 
 @push('head')
-    <meta name="theme-color" content="#ad3f5b" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#722a3e" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#087f98" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#07516d" media="(prefers-color-scheme: dark)">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">

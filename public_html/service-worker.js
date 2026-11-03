@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'vita-scan-pwa-v6';
+const CACHE_VERSION = 'vita-scan-pwa-v7';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const CACHE_PREFIXES = ['vita-scan-pwa-', 'ricosty-pwa-'];
 const OFFLINE_URL = '/offline.html';

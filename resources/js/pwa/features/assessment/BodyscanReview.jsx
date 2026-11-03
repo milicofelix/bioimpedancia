@@ -271,7 +271,7 @@ export default function BodyscanReview({ previewUrl, form, extraction, client, c
 			</div>
 			{confirmationAttempted && incomplete ? <div id="bodyscan-confirmation-pending"><PwaAlert tone="attention" className="mt-3" title={`Ainda não é possível confirmar · ${confirmationPendingItems.length} pendência(s)`}><p className="text-xs">Revise os itens abaixo e marque novamente a confirmação:</p><ul className="mt-2 list-disc space-y-1 pl-5">{confirmationPendingItems.map((item) => <li key={item}>{item}</li>)}</ul></PwaAlert></div> : null}
 			{firstError(errors, 'source_metadata') || firstError(errors, 'bodyscan_review_confirmed') || firstError(errors, 'segmental_measurements') ? <PwaAlert tone="error" className="mt-3" title="Não foi possível salvar">{firstError(errors, 'source_metadata') ?? firstError(errors, 'bodyscan_review_confirmed') ?? firstError(errors, 'segmental_measurements')}</PwaAlert> : null}
-			<aside className="pwa-review-dock sticky z-10 mt-4 rounded-2xl border border-ricosty-200 bg-white/95 p-3 shadow-[0_16px_40px_rgba(97,38,55,0.18)] backdrop-blur-xl" aria-label="Conclusão da conferência">
+			<aside className="pwa-review-dock sticky z-10 mt-4 rounded-2xl border border-ricosty-200 bg-white/95 p-3 shadow-[0_16px_40px_rgba(5,47,89,0.18)] backdrop-blur-xl" aria-label="Conclusão da conferência">
 				<div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(13rem,.75fr)_minmax(0,1.25fr)] sm:items-end">
 					<AthleteModeSelector compact value={form.profile?.athlete_mode_at_assessment} onChange={handleAthleteModeChange} />
 					<div className="min-w-0">

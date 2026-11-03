@@ -90,7 +90,7 @@ export default function ClientSearchList({ clients, canCreate, onCreate, onSelec
 				{visibleClients.map((client) => {
 					const status = clientStatus(client);
 					const contact = client.phone || client.email;
-					return <PwaCard as="button" type="button" key={client.id} onClick={() => onSelect(client)} aria-label={`Abrir cliente ${client.full_name}, ${status.label}`} className={`pwa-focus pwa-pressable block w-full touch-manipulation border-l-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-ricosty-300 hover:shadow-[0_16px_36px_rgba(97,38,55,0.11)] ${status.border}`}>
+					return <PwaCard as="button" type="button" key={client.id} onClick={() => onSelect(client)} aria-label={`Abrir cliente ${client.full_name}, ${status.label}`} className={`pwa-focus pwa-pressable block w-full touch-manipulation border-l-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-ricosty-300 hover:shadow-[0_16px_36px_rgba(5,47,89,0.11)] ${status.border}`}>
 						<span className="flex flex-wrap items-center gap-3">
 							<span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-sm font-black ring-1 ${status.avatar}`}>{initials(client.full_name)}</span>
 							<span className="min-w-0 flex-1"><span className="block break-words font-bold text-ricosty-950">{client.full_name}</span><span className="mt-1 flex items-center gap-1.5 break-all text-sm text-slate-600"><PwaIcon name={client.phone ? 'phone' : client.email ? 'mail' : 'alertTriangle'} size={14} className="shrink-0 text-ricosty-500" />{contact || 'Sem contato cadastrado'}</span></span>

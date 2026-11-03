@@ -195,7 +195,7 @@ function OperationalLoading() {
 		<div role="status" aria-live="polite" aria-label="Carregando área operacional" className="pwa-launch-screen pwa-shell px-4 py-5">
 			<div className="mx-auto max-w-xl">
 				<div className="mb-6 flex flex-col items-center pt-[max(1rem,env(safe-area-inset-top))] text-center">
-					<img src="/pwa/icons/icon-192.png" alt="" className="h-20 w-20 rounded-[1.4rem] shadow-[0_14px_35px_rgba(114,42,62,0.2)]" />
+					<img src="/pwa/icons/icon-192.png" alt="" className="h-20 w-20 rounded-[1.4rem] shadow-[0_14px_35px_rgba(5,47,89,0.2)]" />
 					<p className="mt-3 text-lg font-extrabold text-ricosty-950">Vita Scan</p>
 					<p className="mt-1 text-sm text-slate-600">Carregando o atendimento…</p>
 				</div>
