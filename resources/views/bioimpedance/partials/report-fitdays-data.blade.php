@@ -19,6 +19,20 @@
             @include('bioimpedance.partials.report-fitdays-impedance', ['embedded' => true])
         @endif
 
+        @if($fitdaysControlMetrics->isNotEmpty())
+            <div class="section-title weight-control-title" style="color: {{ $secondaryColor }};">Referências de controle de peso</div>
+            <table class="segmental-comparison weight-control-table">
+                <caption>Todos os valores abaixo são estimativas proprietárias do equipamento.</caption>
+                <thead><tr><th>Item</th><th>Valor apresentado</th></tr></thead>
+                <tbody>
+                @foreach($fitdaysControlMetrics as $metric)
+                    <tr><td><strong>{{ $metric['original_label'] }}</strong></td><td>{{ $extendedMetricDisplayValue($metric, 1) }}</td></tr>
+                @endforeach
+                </tbody>
+            </table>
+            <div class="notice weight-control-notice"><strong>Ressalva importante.</strong> Peso-alvo e controles de peso, gordura ou músculo não equivalem a prescrição, meta terapêutica ou recomendação nutricional.</div>
+        @endif
+
         @if($fitdaysReferenceMetrics->isNotEmpty())
             <div class="section-title" style="color: {{ $secondaryColor }};">Referências apresentadas pelo equipamento</div>
             <table class="segmental-comparison">
@@ -55,17 +69,5 @@
             </table>
         @endif
 
-        @if($fitdaysControlMetrics->isNotEmpty())
-            <div class="section-title" style="color: {{ $secondaryColor }};">Referências de controle de peso</div>
-            <table class="segmental-comparison">
-                <thead><tr><th>Item</th><th>Valor apresentado</th><th>Natureza</th></tr></thead>
-                <tbody>
-                @foreach($fitdaysControlMetrics as $metric)
-                    <tr><td><strong>{{ $metric['original_label'] }}</strong></td><td>{{ $extendedMetricDisplayValue($metric, 1) }}</td><td>Estimativa proprietária do equipamento</td></tr>
-                @endforeach
-                </tbody>
-            </table>
-            <div class="notice"><strong>Ressalva importante.</strong> Peso-alvo e controles de peso, gordura ou músculo são estimativas do equipamento. Não equivalem a prescrição, meta terapêutica ou recomendação nutricional.</div>
-        @endif
     </div>
 </section>

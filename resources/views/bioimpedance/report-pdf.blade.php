@@ -106,6 +106,12 @@
         .impedance-table thead { display: table-header-group; }
         .impedance-table tr { page-break-inside: avoid; }
         .impedance-table th, .impedance-table td { padding: 4px 5px; }
+        .weight-control-title { margin-top: 6px; margin-bottom: 3px; }
+        .weight-control-table { margin-top: 3px; page-break-inside: auto; font-size: 6.5px; }
+        .weight-control-table thead { display: table-header-group; }
+        .weight-control-table tr { page-break-inside: avoid; }
+        .weight-control-table th, .weight-control-table td { padding: 3px 5px; }
+        .weight-control-notice { margin-top: 4px; padding: 6px 8px; page-break-inside: auto; }
         .segmental-page .segmental-visual { height: 238px; }
         .segmental-page .segmental-silhouette { height: 224px; }
         .segmental-page .segmental-value { font-size: 7.5px; line-height: 1.4; }
