@@ -174,9 +174,9 @@ export default function ClientDetails({ client, currentUser, scaleModel, enabled
 			</div>
 
 			<div id="client-panel-screenings" role="tabpanel" aria-labelledby="client-tab-screenings" className={enabledModules.screening && activeTab === 'screenings' ? '' : 'hidden'}>
-				{canAccessScreenings ? <ScreeningInvitationPanel client={client} canCreateInvitation={client.is_active && !client.is_anonymized} creationUnavailableReason={client.is_anonymized ? 'Cliente anonimizado não pode receber novas triagens. Os dados remanescentes seguem as regras de retenção e auditoria.' : 'Cliente inativo não pode receber novas triagens. O histórico permanece disponível para consulta.'} /> : (
+				{enabledModules.screening && activeTab === 'screenings' && canAccessScreenings ? <ScreeningInvitationPanel client={client} canCreateInvitation={client.is_active && !client.is_anonymized} creationUnavailableReason={client.is_anonymized ? 'Cliente anonimizado não pode receber novas triagens. Os dados remanescentes seguem as regras de retenção e auditoria.' : 'Cliente inativo não pode receber novas triagens. O histórico permanece disponível para consulta.'} /> : enabledModules.screening && activeTab === 'screenings' ? (
 					<PwaAlert className="mt-4" tone="attention" title="Triagens indisponíveis para este perfil">É necessário usar uma conta de administrador ou profissional para consultar e administrar triagens.</PwaAlert>
-				)}
+				) : null}
 			</div>
 		</section>
 	);

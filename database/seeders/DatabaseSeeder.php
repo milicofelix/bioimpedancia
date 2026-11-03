@@ -27,7 +27,7 @@ class DatabaseSeeder extends Seeder
         $password = config('bioimpedance.demo_password') ?: Str::password(16);
 
         if (! config('bioimpedance.demo_password')) {
-            $this->command?->warn('RICOSTY_DEMO_PASSWORD não foi definido. Senha demo temporária gerada para este seed: '.$password);
+            $this->command?->warn('VITA_SCAN_DEMO_PASSWORD não foi definido. Senha demo temporária gerada para este seed: '.$password);
         }
 
         foreach (config('bioimpedance.demo_users', []) as $demoUser) {

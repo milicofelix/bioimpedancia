@@ -1,7 +1,7 @@
-# Validacoes Do Projeto
+# Validações do projeto
 
-Projeto: Ricostyemagrecimento
-Data: 2026-08-09
+Projeto: Vita Scan
+Revisado em: 2026-11-02
 
 ## Objetivo
 
@@ -77,11 +77,11 @@ git reset --hard
 git clean -fd
 ```
 
-## Ultima Validacao Conhecida
+## Última validação conhecida
 
-Referencia da ultima rodada registrada em conversa:
+Referência histórica da última rodada registrada:
 
 - `php artisan test`: 40 testes passaram, 373 assertions.
 - `npm run build`: passou.
 
-Esses resultados sao historicos e nao substituem nova validacao apos alteracoes.
+Esses resultados são históricos e não substituem uma nova validação após alterações. O agente deve respeitar as regras vigentes do `AGENTS.md`; quando testes ou build não puderem ser executados, o risco residual deve ser declarado na entrega.

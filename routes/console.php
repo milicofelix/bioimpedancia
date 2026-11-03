@@ -10,7 +10,7 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Artisan::command('ricosty:create-admin', function () {
+$createAdminCommand = static fn () => function () {
     $name = $this->ask('Nome do administrador');
     $email = $this->ask('E-mail do administrador');
     $password = $this->secret('Senha do administrador');
@@ -40,7 +40,13 @@ Artisan::command('ricosty:create-admin', function () {
     $this->info('Administrador criado/atualizado com sucesso.');
 
     return 0;
-})->purpose('Create or update the first Ricosty administrator securely');
+};
+
+Artisan::command('vita-scan:create-admin', $createAdminCommand())
+    ->purpose('Create or update the first Vita Scan administrator securely');
+
+Artisan::command('ricosty:create-admin', $createAdminCommand())
+    ->purpose('Legacy alias for vita-scan:create-admin');
 
 Artisan::command('screening:apply-retention', function () {
     $processed = app(ScreeningPrivacyService::class)->applyExpiredRetention();

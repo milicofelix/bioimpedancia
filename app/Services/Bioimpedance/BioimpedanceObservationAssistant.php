@@ -77,7 +77,7 @@ class BioimpedanceObservationAssistant
             ],
         ],
         [
-            'title' => 'Protocolo de medição Ricosty',
+            'title' => 'Protocolo de medição Vita Scan',
             'document_type' => 'clinic_protocol',
             'manufacturer' => null,
             'device_model' => null,
@@ -85,14 +85,14 @@ class BioimpedanceObservationAssistant
             'source_url' => null,
             'chunks' => [
                 [
-                    'chunk_key' => 'ricosty-measurement-protocol',
+                    'chunk_key' => 'vita-scan-measurement-protocol',
                     'section' => 'Condições de medição',
                     'page' => null,
                     'tags' => ['measurement_protocol', 'guidance'],
                     'content' => 'As avaliações devem ser comparadas preferencialmente em condições semelhantes de hidratação, alimentação, horário e rotina prévia, pois esses fatores podem influenciar estimativas de bioimpedância.',
                 ],
                 [
-                    'chunk_key' => 'ricosty-assistant-safety-policy',
+                    'chunk_key' => 'vita-scan-assistant-safety-policy',
                     'section' => 'Política de segurança do assistente',
                     'page' => null,
                     'tags' => ['safety_policy', 'prohibited_content'],
@@ -300,7 +300,7 @@ class BioimpedanceObservationAssistant
     private function openAiSystemPrompt(): string
     {
         return <<<'PROMPT'
-Você é um assistente de apoio à avaliação de bioimpedância da Ricosty.
+Você é um assistente de apoio à avaliação de bioimpedância da Vita Scan.
 Gere uma observação final clara, acolhedora e adequada para constar no relatório entregue ao cliente.
 A observação será revisada e aprovada pelo profissional antes de entrar no relatório.
 Use somente o contexto estruturado e as fontes aprovadas enviadas.
@@ -424,8 +424,8 @@ PROMPT;
         $requiredChunks = collect(self::METRIC_CHUNKS)
             ->filter(fn (string $chunkKey, string $metric) => filled($context['metrics'][$metric]['classification'] ?? null))
             ->values()
-            ->push('ricosty-measurement-protocol')
-            ->push('ricosty-assistant-safety-policy');
+            ->push('vita-scan-measurement-protocol')
+            ->push('vita-scan-assistant-safety-policy');
 
         if ($requiredChunks->diff($chunks->pluck('chunk_key'))->isNotEmpty()) {
             return [
@@ -462,7 +462,7 @@ PROMPT;
             'attention_points' => $attentionPoints,
             'general_guidance' => [[
                 'text' => 'Realizar avaliações em condições semelhantes para favorecer comparação entre medições.',
-                'source_chunk_ids' => ['ricosty-measurement-protocol'],
+                'source_chunk_ids' => ['vita-scan-measurement-protocol'],
             ]],
             'professional_observation' => $observation,
             'prohibited_content_detected' => false,
@@ -569,7 +569,7 @@ PROMPT;
 
     private function retrieveApprovedChunks(array $context): Collection
     {
-        $keys = collect(['ricosty-measurement-protocol', 'ricosty-assistant-safety-policy']);
+        $keys = collect(['vita-scan-measurement-protocol', 'vita-scan-assistant-safety-policy']);
         foreach (self::METRIC_CHUNKS as $metric => $chunkKey) {
             if (filled($context['metrics'][$metric]['classification'] ?? null)) {
                 $keys->push($chunkKey);

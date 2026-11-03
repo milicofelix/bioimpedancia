@@ -719,13 +719,14 @@ class BioimpedanceWorkflow
             'bioimpedance_assessment_id' => $assessment->id,
             'created_by_user_id' => $request->user()->id,
             'token_hash' => hash('sha256', $plainToken),
+            'encrypted_token' => $plainToken,
             'channel' => $validated['channel'],
             'recipient' => $validated['recipient'] ?? null,
             'message' => $message,
             'expires_at' => $expiresAt,
         ]);
 
-        $this->audit($request, 'bioimpedance_report_share.created', $share, 'Link temporário do relatório gerado', null, $this->reportSharePresenter->payload($share));
+        $this->audit($request, 'bioimpedance_report_share.created', $share, 'Link temporário do relatório gerado', null, $this->reportSharePresenter->payload($share, includeAccess: false));
 
         return response()->json([
             'share' => $this->reportSharePresenter->payload($share, $plainToken),
@@ -904,10 +905,13 @@ class BioimpedanceWorkflow
 
     public function revokeAssessmentShare(Request $request, BioimpedanceReportShare $share): JsonResponse
     {
-        $this->authorizeClinicalProfessional($request);
-        $oldValues = $this->reportSharePresenter->payload($share);
-        $share->update(['revoked_at' => now()]);
-        $this->audit($request, 'bioimpedance_report_share.revoked', $share, 'Link temporário do relatório revogado', $oldValues, $this->reportSharePresenter->payload($share->refresh()));
+        $this->authorizeWrite($request);
+        $oldValues = $this->reportSharePresenter->payload($share, includeAccess: false);
+        $share->update([
+            'revoked_at' => now(),
+            'encrypted_token' => null,
+        ]);
+        $this->audit($request, 'bioimpedance_report_share.revoked', $share, 'Link temporário do relatório revogado', $oldValues, $this->reportSharePresenter->payload($share->refresh(), includeAccess: false));
 
         return response()->json([
             'share' => $this->reportSharePresenter->payload($share),
@@ -1773,7 +1777,7 @@ class BioimpedanceWorkflow
 
     private function clientPayload(BioimpedanceClient $client): array
     {
-        return $this->workspacePresenter->client($client);
+        return $this->workspacePresenter->client($client, includeShareAccess: true);
     }
 
     private function loadClientAssessments(BioimpedanceClient $client): BioimpedanceClient
@@ -1788,7 +1792,7 @@ class BioimpedanceWorkflow
 
     private function assessmentPayload(BioimpedanceAssessment $assessment): array
     {
-        return $this->workspacePresenter->assessment($assessment);
+        return $this->workspacePresenter->assessment($assessment, includeShareAccess: true);
     }
 
     private function logoDataUri(): ?string

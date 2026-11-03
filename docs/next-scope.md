@@ -1,65 +1,39 @@
-# Proximo Escopo Recomendado
+# Próximo escopo recomendado
 
-Projeto: Ricostyemagrecimento
-Data: 2026-08-09
-Fonte: ABS Engineering OS / revisao manual Codex
+Projeto: Vita Scan
+Revisado em: 2026-11-02
 
-## Como Usar
+## Contexto atual
 
-Este arquivo registra o escopo aceito para orientar o proximo pacote em modo Execucao.
-Ao escanear o projeto novamente, o gerador de pacotes deve tratar este arquivo como fonte primaria para montar uma missao pequena, reversivel e coerente com o estado atual do projeto.
+O antigo controller central de bioimpedância foi dividido em controllers especializados e no serviço `App\Services\Bioimpedance\BioimpedanceWorkflow`. O frontend possui os fluxos web e PWA, enquanto regras críticas de autorização, validação e persistência permanecem no backend.
 
-## Escopo Aceito
+## Escopo recomendado
 
-Reduzir risco de manutencao em `app/Http/Controllers/Bioimpedance/BioimpedanceController.php` com um incremento pequeno e reversivel.
+Consolidar a confiabilidade dos fluxos críticos antes de ampliar funcionalidades.
 
-## Objetivo De Execucao
+### Entregas formalizadas
 
-Adicionar ou ajustar cobertura de caracterizacao e, somente se seguro, extrair uma responsabilidade isolada do controller sem alterar comportamento publico.
+1. Matriz de permissões para administrador, profissional, recepção e visualização.
+2. Cobertura frontend dos componentes e hooks críticos.
+3. Fluxos completos de autenticação, cliente, importação, revisão, relatório, compartilhamento, atualização do PWA e perda de conexão.
+4. Procedimentos de backup, restauração, observabilidade, recuperação de desastre, acessibilidade e checklist LGPD.
 
-## Alvos Provaveis
+As rotinas operacionais exigem validação periódica em ambiente controlado. A existência dos scripts e checklists não substitui exercício de restauração, revisão jurídica ou auditoria de acessibilidade.
 
-- `app/Http/Controllers/Bioimpedance/BioimpedanceController.php`
+## Alvos atuais
+
+- `app/Services/Bioimpedance/BioimpedanceWorkflow.php`
+- `app/Http/Controllers/Bioimpedance/`
+- `resources/js/pwa/`
+- `resources/js/pages/DashboardPage.jsx`
 - `tests/Feature/BioimpedanceModuleTest.php`
-- Servico novo em `app/Services/Bioimpedance/`, apenas se a extracao ficar pequena e clara.
+- `docs/operations/`
+- `docs/accessibility-checklist.md`
+- `docs/lgpd-checklist.md`
 
-## Fora Do Escopo
+## Restrições
 
-- Migrations, seeds ou alteracoes de banco.
-- Mudancas de frontend.
-- Dependencias novas.
-- Alteracoes de deploy, Docker ou CI.
-- Mudancas no contrato publico das rotas ou payloads.
-
-## Criterios De Aceite
-
-- Patch pequeno e revisavel.
-- Comportamento publico preservado.
-- Teste de caracterizacao cobrindo o comportamento extraido ou protegido.
-- Validacoes registradas em `docs/validations.md` ou na resposta final.
-- Rollback simples por revert do commit.
-
-## Proximo Pacote Sugerido
-
-Modo: Execucao
-
-Objetivo: Reduzir risco de manutencao em `app/Http/Controllers/Bioimpedance/BioimpedanceController.php` com um incremento pequeno e reversivel: primeiro adicionar ou ajustar cobertura de caracterizacao e, somente se seguro, extrair uma responsabilidade isolada sem alterar comportamento publico.
-
-Branch sugerida:
-
-```bash
-git switch -c codex/reduce-bioimpedance-controller-risk
-```
-
-Commit sugerido:
-
-```bash
-git c "refactor: reduce bioimpedance controller responsibility"
-```
-
-## Observacoes De Automacao
-
-- Projeto alvo: Ricostyemagrecimento.
-- Arquivos listados como alvos sao hipoteses de investigacao, nao obrigacao de edicao.
-- Se o scanner sugerir outro produto ou outro projeto, marcar como contexto incorreto antes de executar.
-- Se o patch passar de 15 arquivos, interromper e justificar antes de continuar.
+- Não adicionar dependências sem necessidade e autorização dentro da tarefa correspondente.
+- Preservar contratos públicos, dados clínicos, auditoria e compatibilidade retroativa.
+- Não usar documentos antigos como evidência de que o `BioimpedanceController.php` ainda existe.
+- Registrar toda validação conforme `docs/validations.md` e `AGENTS.md`.

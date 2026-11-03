@@ -12,6 +12,7 @@ use App\Http\Controllers\Bioimpedance\ClinicSettingsController;
 use App\Http\Controllers\Bioimpedance\KnowledgeDocumentController;
 use App\Http\Controllers\Bioimpedance\UserController;
 use App\Http\Controllers\Bioimpedance\WorkspaceController;
+use App\Http\Controllers\OperationalReadinessController;
 use App\Http\Controllers\Screening\PublicScreeningController;
 use App\Http\Controllers\Screening\PublicScreeningResultPdfController;
 use App\Http\Controllers\Screening\ScreeningInvitationController;
@@ -23,6 +24,10 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return redirect()->route('login');
 });
+
+Route::get('/up/ready', OperationalReadinessController::class)
+    ->middleware('throttle:12,1')
+    ->name('operational-readiness');
 
 Route::get('/r/{token}', [AssessmentShareController::class, 'publicReport'])
     ->middleware('clinic.module:reports')
@@ -49,7 +54,7 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [AuthenticatedSessionController::class, 'store']);
 });
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'active.user'])->group(function () {
     Route::view('/dashboard', 'dashboard')->name('dashboard');
     Route::view('/app', 'operational-app')->name('operational-app');
     Route::get('/bioimpedance', [WorkspaceController::class, 'index'])->name('bioimpedance.index');

@@ -23,9 +23,12 @@
                 <tbody>
                 @foreach($fitdaysReferenceMetrics as $metric)
                     @php
-                        $printedRange = ($metric['printed_minimum'] ?? null) !== null || ($metric['printed_maximum'] ?? null) !== null
-                            ? $br($metric['printed_minimum'] ?? null, 2).' a '.$br($metric['printed_maximum'] ?? null, 2).' '.($metric['unit'] ?? '')
-                            : (($metric['weight_proportion_percentage'] ?? null) !== null ? $br($metric['weight_proportion_percentage'], 1).' % do peso' : 'Não impressa');
+                        $rangeIsAmbiguous = ($metric['metric_code'] ?? null) === 'body_fat_percentage' && $hasAmbiguousBodyFatRange;
+                        $printedRange = $rangeIsAmbiguous
+                            ? 'Não impressa separadamente'
+                            : ((($metric['printed_minimum'] ?? null) !== null || ($metric['printed_maximum'] ?? null) !== null)
+                                ? $br($metric['printed_minimum'] ?? null, 2).' a '.$br($metric['printed_maximum'] ?? null, 2).' '.($metric['unit'] ?? '')
+                                : (($metric['weight_proportion_percentage'] ?? null) !== null ? $br($metric['weight_proportion_percentage'], 1).' % do peso' : 'Não impressa'));
                     @endphp
                     <tr>
                         <td><strong>{{ $metric['original_label'] }}</strong>@if(($metric['metric_code'] ?? null) === 'body_score')<br><span class="muted">Pontuação proprietária; não é nota clínica.</span>@endif</td>

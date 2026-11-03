@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\Bioimpedance\BioimpedanceObservationAssistant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -219,7 +220,7 @@ class BioimpedanceModuleTest extends TestCase
 
         $this->actingAs($user)->patchJson(route('bioimpedance.clinic.update'), [
             'display_name' => 'Vita Scan Análise clínica Biológica',
-            'legal_name' => 'Ricosty Clinica LTDA',
+            'legal_name' => 'Vita Scan Clínica LTDA',
             'document' => '12.345.678/0001-99',
             'phone' => '(11) 3333-4444',
             'whatsapp' => '(11) 95555-4444',
@@ -235,7 +236,7 @@ class BioimpedanceModuleTest extends TestCase
             'technical_notice' => 'Aviso técnico personalizado.',
             'scale_model' => BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDI,
         ])->assertOk()
-            ->assertJsonPath('clinic.legal_name', 'Ricosty Clinica LTDA')
+            ->assertJsonPath('clinic.legal_name', 'Vita Scan Clínica LTDA')
             ->assertJsonPath('clinic.primary_color', '#cc7a8a')
             ->assertJsonPath('clinic.footer_text', 'Rodapé personalizado da clínica')
             ->assertJsonPath('clinic.scale_model', BioimpedanceClinicSetting::SCALE_MODEL_RELAXMEDI);
@@ -266,7 +267,7 @@ class BioimpedanceModuleTest extends TestCase
         ])->assertForbidden();
 
         $this->actingAs($admin)->postJson(route('bioimpedance.users.store'), [
-            'name' => 'Recepção Ricosty',
+            'name' => 'Recepção Vita Scan',
             'email' => 'recepcao@example.com',
             'password' => 'password',
             'role' => User::ROLE_RECEPTION,
@@ -533,6 +534,16 @@ class BioimpedanceModuleTest extends TestCase
         $this->assertStringContainsString($plainUrl, $response->json('share.message'));
         $this->assertStringNotContainsString($plainToken, (string) $share->message);
         $this->assertStringNotContainsString($plainUrl, (string) $share->message);
+        $encryptedToken = DB::table('bioimpedance_report_shares')->where('id', $shareId)->value('encrypted_token');
+        $this->assertNotNull($encryptedToken);
+        $this->assertStringNotContainsString($plainToken, $encryptedToken);
+        $this->actingAs($user)->getJson(route('bioimpedance.index'))
+            ->assertOk()
+            ->assertJsonFragment(['url' => $plainUrl]);
+        $viewer = User::factory()->create(['role' => User::ROLE_VIEWER]);
+        $this->actingAs($viewer)->getJson(route('bioimpedance.index'))
+            ->assertOk()
+            ->assertJsonMissing(['url' => $plainUrl]);
         $createdAudit = AppAudit::query()
             ->where('action', 'bioimpedance_report_share.created')
             ->where('auditable_id', $shareId)
@@ -572,7 +583,46 @@ class BioimpedanceModuleTest extends TestCase
             ->assertOk()
             ->assertJsonPath('share.is_active', false);
 
+        $this->assertDatabaseHas('bioimpedance_report_shares', [
+            'id' => $shareResponse->json('share.id'),
+            'encrypted_token' => null,
+        ]);
+
         $this->get($shareResponse->json('share.url'))->assertStatus(410);
+    }
+
+    public function test_reception_can_create_and_revoke_report_share_but_viewer_cannot(): void
+    {
+        $professional = User::factory()->create(['role' => User::ROLE_PROFESSIONAL]);
+        $reception = User::factory()->create(['role' => User::ROLE_RECEPTION]);
+        $viewer = User::factory()->create(['role' => User::ROLE_VIEWER]);
+        $assessment = $this->createAssessmentForUser($professional);
+
+        $shareResponse = $this->actingAs($reception)->postJson(route('bioimpedance.assessments.shares.store', $assessment->id), [
+            'channel' => 'copy',
+            'expires_in_days' => 7,
+        ])->assertCreated();
+
+        $this->actingAs($viewer)->patchJson(route('bioimpedance.report-shares.revoke', $shareResponse->json('share.id')))
+            ->assertForbidden();
+
+        $this->actingAs($reception)->patchJson(route('bioimpedance.report-shares.revoke', $shareResponse->json('share.id')))
+            ->assertOk()
+            ->assertJsonPath('share.is_active', false);
+    }
+
+    public function test_inactivated_user_with_existing_session_loses_internal_access(): void
+    {
+        $user = User::factory()->create([
+            'role' => User::ROLE_PROFESSIONAL,
+            'inactivated_at' => now(),
+        ]);
+
+        $this->actingAs($user)->getJson(route('bioimpedance.index'))
+            ->assertUnauthorized()
+            ->assertJsonPath('message', 'Sua conta está inativa. Solicite a reativação ao administrador.');
+
+        $this->assertGuest();
     }
 
     public function test_reception_can_create_records_but_cannot_change_clinical_outputs(): void
@@ -1032,7 +1082,7 @@ class BioimpedanceModuleTest extends TestCase
                     ]],
                     'general_guidance' => [[
                         'text' => 'Manter condições semelhantes entre as medições.',
-                        'source_chunk_ids' => ['ricosty-measurement-protocol'],
+                        'source_chunk_ids' => ['vita-scan-measurement-protocol'],
                     ]],
                     'professional_observation' => 'Os resultados mostram gordura corporal elevada, músculo esquelético normal e gordura visceral normal. O IMC calculado foi classificado como sobrepeso. Recomenda-se acompanhar a evolução nas próximas avaliações, mantendo condições semelhantes de medição.',
                     'prohibited_content_detected' => false,

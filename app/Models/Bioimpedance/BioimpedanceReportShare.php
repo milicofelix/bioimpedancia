@@ -12,6 +12,7 @@ class BioimpedanceReportShare extends Model
         'bioimpedance_assessment_id',
         'created_by_user_id',
         'token_hash',
+        'encrypted_token',
         'channel',
         'recipient',
         'message',
@@ -25,6 +26,7 @@ class BioimpedanceReportShare extends Model
     protected function casts(): array
     {
         return [
+            'encrypted_token' => 'encrypted',
             'expires_at' => 'datetime',
             'revoked_at' => 'datetime',
             'viewed_at' => 'datetime',

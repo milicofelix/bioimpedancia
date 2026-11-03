@@ -76,12 +76,12 @@ class BioimpedanceCareGuidanceAssistant
             ]],
         ],
         [
-            'title' => 'Política de segurança das orientações Ricosty',
+            'title' => 'Política de segurança das orientações Vita Scan',
             'version' => '1.0.0',
             'source_url' => null,
             'chunks' => [
                 [
-                    'chunk_key' => 'ricosty-care-guidance-safety',
+                    'chunk_key' => 'vita-scan-care-guidance-safety',
                     'section' => 'Limites clínicos',
                     'tags' => ['safety', 'prohibited_content'],
                     'content' => 'Não diagnosticar doenças, interpretar exames não registrados, prescrever dieta individualizada, exercício, medicamento, vitamina ou suplemento. Não usar apenas IMC ou peso ideal do fabricante para definir meta. Não afirmar preservação muscular a partir de percentual estimado sem avaliação de força e função. Recomendações devem ser gerais, condicionadas à avaliação de profissional habilitado e baseadas somente nos dados disponíveis.',
@@ -248,7 +248,7 @@ class BioimpedanceCareGuidanceAssistant
     private function systemPrompt(): string
     {
         return <<<'PROMPT'
-Você é o agente de orientações educativas da Ricosty. Escreva em português do Brasil para o cliente, usando apenas o contexto, a observação aprovada, o histórico e as fontes fornecidas. Relacione os hábitos somente aos pontos de atenção e tendências realmente presentes, sem inventar doença, exame, colesterol, deficiência vitamínica ou contraindicação. Não diagnostique nem prescreva dieta, exercício, medicamento, vitamina ou suplemento. Não defina objetivo por IMC, peso-alvo ou peso ideal do fabricante e não afirme perda muscular, sarcopenia, assimetria clínica ou musculatura e função preservadas a partir das estimativas da balança. Não trate idade corporal como idade biológica real, WHR como diagnóstico ou pontuação corporal como medida clínica. WHR, ASMI, segmentos e impedâncias podem sustentar somente descrições cautelosas dos valores, sempre citando seus IDs de evidência. Considere aplicativo, layout e modo atleta. Se os perfis do histórico forem incompatíveis, informe isso e não classifique a diferença como melhora ou piora. Para pessoas idosas, priorize preservação de força, função, equilíbrio e autonomia, com avaliação profissional. Considere que hidratação, alimentação, horário e atividade recente podem alterar a medição. Ofereça opções gerais, realistas e graduais, sempre condicionando atividade física à capacidade e eventual liberação profissional. Não prometa resultados. Divida a resposta em afirmações independentes. Cada afirmação deve informar categoria, texto, nível de segurança, revisão profissional obrigatória e todas as fontes que a sustentam. Use os IDs das fontes fornecidas e, para dados internos, somente os IDs explicitamente disponíveis no contexto. Não esconda incertezas elevando o nível de segurança. Responda apenas no schema solicitado.
+Você é o agente de orientações educativas da Vita Scan. Escreva em português do Brasil para o cliente, usando apenas o contexto, a observação aprovada, o histórico e as fontes fornecidas. Relacione os hábitos somente aos pontos de atenção e tendências realmente presentes, sem inventar doença, exame, colesterol, deficiência vitamínica ou contraindicação. Não diagnostique nem prescreva dieta, exercício, medicamento, vitamina ou suplemento. Não defina objetivo por IMC, peso-alvo ou peso ideal do fabricante e não afirme perda muscular, sarcopenia, assimetria clínica ou musculatura e função preservadas a partir das estimativas da balança. Não trate idade corporal como idade biológica real, WHR como diagnóstico ou pontuação corporal como medida clínica. WHR, ASMI, segmentos e impedâncias podem sustentar somente descrições cautelosas dos valores, sempre citando seus IDs de evidência. Considere aplicativo, layout e modo atleta. Se os perfis do histórico forem incompatíveis, informe isso e não classifique a diferença como melhora ou piora. Para pessoas idosas, priorize preservação de força, função, equilíbrio e autonomia, com avaliação profissional. Considere que hidratação, alimentação, horário e atividade recente podem alterar a medição. Ofereça opções gerais, realistas e graduais, sempre condicionando atividade física à capacidade e eventual liberação profissional. Não prometa resultados. Divida a resposta em afirmações independentes. Cada afirmação deve informar categoria, texto, nível de segurança, revisão profissional obrigatória e todas as fontes que a sustentam. Use os IDs das fontes fornecidas e, para dados internos, somente os IDs explicitamente disponíveis no contexto. Não esconda incertezas elevando o nível de segurança. Responda apenas no schema solicitado.
 PROMPT;
     }
 
@@ -310,8 +310,8 @@ PROMPT;
             $claims[] = $this->claim('equipment-indices-limit', 'assessment_context', $indexLabels.' são índices estimados pelo equipamento. Eles precisam ser contextualizados pelo profissional e, isoladamente, não diagnosticam risco, sarcopenia ou outra condição.', 'high', collect($context['extended_indices'])->pluck('evidence_id')->all());
         }
         $claims[] = $this->claim('nutrition-general', 'nutrition_education', 'Priorize refeições variadas baseadas em alimentos in natura ou minimamente processados, incluindo frutas, legumes, verduras e feijões, e reduza a frequência de ultraprocessados e bebidas açucaradas.', 'high', ['brazil-food-guide-natural-foods', 'brazil-food-guide-ultraprocessed']);
-        $claims[] = $this->claim('movement-general', 'movement_education', 'Se estiver apto, aumente o movimento gradualmente. Caminhada, bicicleta, dança e fortalecimento são opções que devem ser adaptadas à capacidade individual e à orientação profissional.', 'high', ['who-adult-physical-activity', 'ricosty-care-guidance-safety']);
-        $claims[] = $this->claim('professional-follow-up', 'professional_follow_up', 'Defina metas pequenas com o profissional e procure avaliação individualizada antes de usar vitaminas, suplementos ou iniciar atividades incompatíveis com suas condições e limitações.', 'high', ['ricosty-care-guidance-safety']);
+        $claims[] = $this->claim('movement-general', 'movement_education', 'Se estiver apto, aumente o movimento gradualmente. Caminhada, bicicleta, dança e fortalecimento são opções que devem ser adaptadas à capacidade individual e à orientação profissional.', 'high', ['who-adult-physical-activity', 'vita-scan-care-guidance-safety']);
+        $claims[] = $this->claim('professional-follow-up', 'professional_follow_up', 'Defina metas pequenas com o profissional e procure avaliação individualizada antes de usar vitaminas, suplementos ou iniciar atividades incompatíveis com suas condições e limitações.', 'high', ['vita-scan-care-guidance-safety']);
 
         return ['claims' => $claims];
     }

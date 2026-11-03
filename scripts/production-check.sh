@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-echo "== Ricosty production check =="
+echo "== Vita Scan production check =="
 
 run_composer() {
     if command -v composer >/dev/null 2>&1; then
@@ -33,6 +33,8 @@ php artisan view:clear
 php artisan test
 run_composer audit
 run_npm audit
+run_npm run test:frontend
+run_npm run test:e2e
 run_npm run build
 
 php artisan config:cache

@@ -1,7 +1,9 @@
 <?php
 
-use App\Http\Middleware\EnsureHttps;
+use App\Http\Middleware\AttachRequestContext;
+use App\Http\Middleware\EnsureActiveUser;
 use App\Http\Middleware\EnsureClinicModuleEnabled;
+use App\Http\Middleware\EnsureHttps;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -14,6 +16,7 @@ return tap(Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
+            'active.user' => EnsureActiveUser::class,
             'clinic.module' => EnsureClinicModuleEnabled::class,
         ]);
 
@@ -22,7 +25,10 @@ return tap(Application::configure(basePath: dirname(__DIR__))
             $middleware->trustProxies(at: $trustedProxies);
         }
 
-        $middleware->append(EnsureHttps::class);
+        $middleware->append([
+            AttachRequestContext::class,
+            EnsureHttps::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
