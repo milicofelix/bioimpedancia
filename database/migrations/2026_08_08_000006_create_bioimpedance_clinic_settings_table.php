@@ -1,9 +1,8 @@
 <?php
 
-use App\Models\Bioimpedance\BioimpedanceClinicSetting;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -30,9 +29,29 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        BioimpedanceClinicSetting::query()->create(
-            Arr::except(BioimpedanceClinicSetting::DEFAULTS, ['scale_model'])
-        );
+        // Keep this insert tied to the schema created above. Application defaults
+        // may contain columns introduced by migrations that have not run yet.
+        $createdAt = now();
+
+        DB::table('bioimpedance_clinic_settings')->insert([
+            'display_name' => 'Vita Scan Análise clínica Biológica',
+            'legal_name' => 'Vita Scan Análise clínica Biológica',
+            'document' => null,
+            'phone' => null,
+            'whatsapp' => null,
+            'email' => null,
+            'address' => null,
+            'instagram' => null,
+            'website' => null,
+            'primary_color' => '#d88b9a',
+            'secondary_color' => '#4a4a4a',
+            'logo_url' => '/images/brand/ricosty-logo.png',
+            'contact' => 'Avaliação corporal e acompanhamento estético',
+            'footer_text' => 'Vita Scan Análise clínica Biológica - Avaliação corporal e acompanhamento estético',
+            'technical_notice' => 'Os resultados de bioimpedância são estimativas e podem variar conforme hidratação, alimentação, ciclo hormonal, medicamentos e condições de medição. Este documento não substitui avaliação médica ou nutricional.',
+            'created_at' => $createdAt,
+            'updated_at' => $createdAt,
+        ]);
     }
 
     public function down(): void
