@@ -123,6 +123,7 @@ class BioimpedanceWorkspacePresenter
                 $assessment->toArray(),
             );
         }
+        $analysis = $this->applyDeviceClassifications($analysis, $assessment);
 
         $approvedObservationOutput = $assessment->relationLoaded('aiAnalysisRequests')
             ? $assessment->aiAnalysisRequests
@@ -130,13 +131,14 @@ class BioimpedanceWorkspacePresenter
                 ->sortByDesc(fn ($request) => $request->output->approved_at)
                 ->first()?->output
             : BioimpedanceAiAnalysisOutput::query()
-                ->with('request')
+                ->with(['request', 'approvedBy'])
                 ->whereNotNull('approved_at')
                 ->whereHas('request', fn ($query) => $query
                     ->where('bioimpedance_assessment_id', $assessment->id)
                     ->where('purpose', 'observation'))
                 ->latest('approved_at')
                 ->first();
+        $approvedObservationOutput?->loadMissing('approvedBy');
         $hasApprovedAiObservation = $approvedObservationOutput !== null;
         $generatedObservation = data_get($approvedObservationOutput?->raw_response, 'professional_observation');
         $observationWasEdited = $hasApprovedAiObservation
@@ -253,6 +255,8 @@ class BioimpedanceWorkspacePresenter
             'care_guidance_approved_by_name' => $assessment->careGuidanceApprovedBy?->name,
             'has_approved_ai_observation' => $hasApprovedAiObservation,
             'observation_origin' => $observationOrigin,
+            'observation_reviewed_at' => $approvedObservationOutput?->approved_at?->toIso8601String(),
+            'observation_reviewed_by_name' => $approvedObservationOutput?->approvedBy?->name,
             'correction_count' => $assessment->correction_count,
             'canceled_at' => $assessment->canceled_at?->toIso8601String(),
             'cancellation_reason' => $assessment->cancellation_reason,
@@ -268,5 +272,42 @@ class BioimpedanceWorkspacePresenter
                 )->all()
                 : [],
         ];
+    }
+
+    private function applyDeviceClassifications(array $analysis, BioimpedanceAssessment $assessment): array
+    {
+        if (! $assessment->relationLoaded('extendedMetrics')) {
+            return $analysis;
+        }
+
+        $metric = $assessment->extendedMetrics->firstWhere('metric_code', 'body_fat_percentage');
+        $classification = trim((string) ($metric?->application_classification ?? ''));
+        if ($classification === '') {
+            return $analysis;
+        }
+
+        $normalized = mb_strtolower($classification);
+        $tone = match (true) {
+            str_contains($normalized, 'baixo') || str_contains($normalized, 'fino') => 'attention',
+            str_contains($normalized, 'alto') => 'danger',
+            str_contains($normalized, 'padrão'), str_contains($normalized, 'padrao'),
+            str_contains($normalized, 'normal'), str_contains($normalized, 'excelente') => 'good',
+            default => 'neutral',
+        };
+
+        data_set($analysis, 'indicators.body_fat.classification', $classification);
+        data_set($analysis, 'indicators.body_fat.tone', $tone);
+        data_set($analysis, 'indicators.body_fat.pending', false);
+        data_set($analysis, 'indicators.body_fat.classification_source', 'device');
+        data_set($analysis, 'indicators.body_fat.reference_source', 'printed_report');
+        if (is_string($analysis['summary'] ?? null)) {
+            $analysis['summary'] = preg_replace(
+                '/Gordura corporal estimada pelo equipamento em ([^;]+); sem classificação disponível para este indicador\./u',
+                'Gordura corporal estimada pelo equipamento em $1, com classificação "'.$classification.'" apresentada pelo equipamento.',
+                $analysis['summary'],
+            ) ?? $analysis['summary'];
+        }
+
+        return $analysis;
     }
 }

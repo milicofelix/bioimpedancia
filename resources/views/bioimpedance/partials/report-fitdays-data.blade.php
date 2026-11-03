@@ -15,6 +15,10 @@
             </tr></table>
         @endif
 
+        @if($hasImpedanceData)
+            @include('bioimpedance.partials.report-fitdays-impedance', ['embedded' => true])
+        @endif
+
         @if($fitdaysReferenceMetrics->isNotEmpty())
             <div class="section-title" style="color: {{ $secondaryColor }};">Referências apresentadas pelo equipamento</div>
             <table class="segmental-comparison">
@@ -23,6 +27,10 @@
                 <tbody>
                 @foreach($fitdaysReferenceMetrics as $metric)
                     @php
+                        $displayLabel = match ($metric['metric_code'] ?? null) {
+                            'proprietary_obesity_index' => 'Relação entre peso atual e peso-alvo do equipamento',
+                            default => $metric['original_label'],
+                        };
                         $rangeIsAmbiguous = ($metric['metric_code'] ?? null) === 'body_fat_percentage' && $hasAmbiguousBodyFatRange;
                         $printedRange = $rangeIsAmbiguous
                             ? 'Não impressa separadamente'
@@ -31,8 +39,14 @@
                                 : (($metric['weight_proportion_percentage'] ?? null) !== null ? $br($metric['weight_proportion_percentage'], 1).' % do peso' : 'Não impressa'));
                     @endphp
                     <tr>
-                        <td><strong>{{ $metric['original_label'] }}</strong>@if(($metric['metric_code'] ?? null) === 'body_score')<br><span class="muted">Pontuação proprietária; não é nota clínica.</span>@endif</td>
-                        <td>{{ $extendedMetricDisplayValue($metric) }}</td>
+                        <td><strong>{{ $displayLabel }}</strong>@if(($metric['metric_code'] ?? null) === 'body_score')<br><span class="muted">Pontuação proprietária; não é nota clínica.</span>@endif</td>
+                        <td>
+                            @if(($metric['metric_code'] ?? null) === 'body_balance_assessment' && count($bodyBalanceItems))
+                                @foreach($bodyBalanceItems as $balanceItem)<div><strong>{{ $balanceItem['label'] }}:</strong> {{ $balanceItem['value'] }}</div>@endforeach
+                            @else
+                                {{ $extendedMetricDisplayValue($metric) }}
+                            @endif
+                        </td>
                         <td>{{ $metric['application_classification'] ?? 'Não informada' }}</td>
                         <td>{{ $printedRange }}</td>
                     </tr>

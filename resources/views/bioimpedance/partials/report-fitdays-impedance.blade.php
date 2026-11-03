@@ -4,7 +4,7 @@
         @include('bioimpedance.partials.report-header', ['pageTitle' => 'Impedância bioelétrica', 'pageNumber' => $pageNumber, 'totalSections' => $totalSections])
         <div class="content">
 @else
-    <div class="technical-appendix keep-together">
+    <div class="technical-appendix">
         <div class="section-title" style="color: {{ $secondaryColor }};">Dados técnicos de impedância</div>
 @endif
         <div class="notice"><strong>Tabela técnica do equipamento.</strong> Valores em ohms preservados conforme a medição de origem. Servem para comparação técnica e não geram diagnóstico.</div>

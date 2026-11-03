@@ -729,7 +729,7 @@ class BodyscanProImageProcessor
             ->where('type', Segment::TYPE_FAT)
             ->sum(fn (array $segment) => is_numeric($segment['mass_kg'] ?? null) ? (float) $segment['mass_kg'] : 0.0);
         if (is_numeric($fatMass) && $segmentalFatMass > 0) {
-            $tolerance = max(1.5, (float) $fatMass * 0.05);
+            $tolerance = max(0.5, (float) $fatMass * 0.03);
             if (abs($segmentalFatMass - (float) $fatMass) > $tolerance) {
                 $suspiciousValues->push([
                     'field' => 'segmental.fat.total_mass',
