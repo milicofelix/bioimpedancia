@@ -19,6 +19,11 @@
             @include('bioimpedance.partials.report-fitdays-impedance', ['embedded' => true])
         @endif
 
+        @if($hasImpedanceData && $fitdaysControlMetrics->isNotEmpty())
+    </div>
+    <div class="content complementary-references-page">
+        @endif
+
         @if($fitdaysControlMetrics->isNotEmpty())
             <div class="section-title weight-control-title" style="color: {{ $secondaryColor }};">Referências de controle de peso</div>
             <table class="segmental-comparison weight-control-table">

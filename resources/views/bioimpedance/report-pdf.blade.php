@@ -107,6 +107,8 @@
         .impedance-table tr { page-break-inside: avoid; }
         .impedance-table th, .impedance-table td { padding: 4px 5px; }
         .weight-control-title { margin-top: 6px; margin-bottom: 3px; }
+        .complementary-references-page { page-break-before: always; border-top: 1px solid #f2c7cf; }
+        .complementary-references-page .weight-control-title { margin-top: 0; }
         .weight-control-table { margin-top: 3px; page-break-inside: auto; font-size: 6.5px; }
         .weight-control-table thead { display: table-header-group; }
         .weight-control-table tr { page-break-inside: avoid; }
