@@ -98,6 +98,17 @@
         .segmental-comparison caption { padding: 0 0 5px; color: #475467; font-size: 7px; text-align: left; }
         .segmental-legend { width: 100%; border-collapse: separate; border-spacing: 4px; margin-top: 3px; }
         .segmental-legend td { padding: 3px 5px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; font-size: 6px; text-align: center; }
+        .technical-appendix { margin-top: 10px; padding-top: 5px; border-top: 1px solid #ead5da; }
+        .technical-appendix .notice, .technical-appendix .summary { padding: 6px 8px; }
+        .impedance-table th, .impedance-table td { padding: 5px 6px; }
+        .segmental-page .segmental-visual { height: 238px; }
+        .segmental-page .segmental-silhouette { height: 224px; }
+        .segmental-page .segmental-value { font-size: 7px; line-height: 1.4; }
+        .segmental-page .segmental-value strong { font-size: 8px; }
+        .segmental-page .segmental-table { font-size: 7px; }
+        .segmental-page .segmental-table th, .segmental-page .segmental-table td { padding: 3px 4px; }
+        .segmental-summary { margin: 4px 0 6px; padding: 6px 8px; border: 1px solid #e5e7eb; border-radius: 7px; background: #fff; font-size: 7px; }
+        .review-status { color: #176b5b; font-weight: 700; }
     </style>
 </head>
 <body>
@@ -135,7 +146,7 @@
                 || in_array($metric['metric_code'] ?? null, ['waist_hip_ratio', 'asmi', 'body_score', 'proprietary_obesity_index', 'body_balance_assessment'], true)))
         ->values();
     $hasFitdaysDataPage = $isFitdays && ($fitdaysReferenceMetrics->isNotEmpty() || $fitdaysControlMetrics->isNotEmpty());
-    $hasImpedancePage = $isFitdays && $impedanceReadings->isNotEmpty();
+    $hasImpedanceData = $isFitdays && $impedanceReadings->isNotEmpty();
     $segmentalMeasurements = $assessment['segmental_measurements'] ?? [];
     $segmentalComparison = $comparison['segmental'] ?? null;
     $comparability = $comparison['comparability'] ?? null;
@@ -145,7 +156,6 @@
         || (!($comparison['impedance']['is_baseline'] ?? true) && count($comparison['impedance']['readings'] ?? []) > 0);
     $totalSections = 3
         + ($hasFitdaysDataPage ? 1 : 0)
-        + ($hasImpedancePage ? 1 : 0)
         + ($hasDetailedComparison ? 1 : 0)
         + ($hasSegmentalPage ? 1 : 0)
         + ($hasSegmentalComparison ? 1 : 0);
@@ -230,6 +240,32 @@
         'Nível de obesidade' => 'Classificação apresentada pelo equipamento; não equivale ao IMC.',
         'Tipo de corpo' => 'Classificação proprietária do equipamento; não equivale ao IMC.',
     ];
+    $fatPercentageMetric = $extendedMetricsByCode->get('body_fat_percentage');
+    $fatMassMetric = $extendedMetricsByCode->get('fat_mass');
+    $hasAmbiguousBodyFatRange = $fatPercentageMetric && $fatMassMetric
+        && ($fatPercentageMetric['printed_minimum'] ?? null) !== null
+        && ($fatPercentageMetric['printed_maximum'] ?? null) !== null
+        && abs((float) $fatPercentageMetric['printed_minimum'] - (float) ($fatMassMetric['printed_minimum'] ?? -9999)) < 0.001
+        && abs((float) $fatPercentageMetric['printed_maximum'] - (float) ($fatMassMetric['printed_maximum'] ?? -9999)) < 0.001;
+    $segmentStateLabel = fn (string $classification): string => match ($classification) {
+        'low' => 'abaixo da referência',
+        'standard' => 'dentro da referência',
+        'high' => 'acima da referência',
+        default => 'não identificada',
+    };
+    $segmentSummary = function (string $type, string $label) use ($segmentalMeasurements, $segmentStateLabel): string {
+        $items = collect($segmentalMeasurements)->where('type', $type);
+        $regions = ['arm|left' => 'braço esquerdo', 'arm|right' => 'braço direito', 'trunk|center' => 'tronco', 'leg|left' => 'perna esquerda', 'leg|right' => 'perna direita'];
+        $groups = $items->groupBy(fn (array $item) => $item['classification'] ?? 'unknown');
+        $parts = $groups->map(function ($group, string $classification) use ($regions, $segmentStateLabel): string {
+            $names = $group->map(fn (array $item) => $regions[($item['region'] ?? '').'|'.($item['side'] ?? '')] ?? 'região')->values()->all();
+            return implode(', ', $names).': '.$segmentStateLabel($classification);
+        })->values()->all();
+
+        return $label.': '.implode('; ', $parts).'.';
+    };
+    $hasReviewedObservation = in_array($assessment['observation_origin'] ?? 'none', ['professional', 'ai_edited_and_approved', 'ai_approved'], true);
+    $hasReviewedGuidance = filled($assessment['care_guidance_approved_at'] ?? null);
 @endphp
 
 @include('bioimpedance.partials.report-document-header')
@@ -334,6 +370,9 @@
         @else
             <div class="summary muted"><strong>Linha de base.</strong> Esta é a primeira avaliação não cancelada neste modelo de equipamento. Os gráficos serão exibidos quando houver uma nova medição comparável.</div>
         @endif
+        @if($hasImpedanceData)
+            @include('bioimpedance.partials.report-fitdays-impedance', ['embedded' => true])
+        @endif
     </div>
 </section>
 
@@ -341,13 +380,9 @@
     @include('bioimpedance.partials.report-fitdays-data', ['pageNumber' => 3])
 @endif
 
-@if($hasImpedancePage)
-    @include('bioimpedance.partials.report-fitdays-impedance', ['pageNumber' => 3 + ($hasFitdaysDataPage ? 1 : 0)])
-@endif
-
 @if($hasDetailedComparison)
 <section class="report-section">
-    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Comparação compatível', 'pageNumber' => 3 + ($hasFitdaysDataPage ? 1 : 0) + ($hasImpedancePage ? 1 : 0), 'totalSections' => $totalSections])
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Comparação compatível', 'pageNumber' => 3 + ($hasFitdaysDataPage ? 1 : 0), 'totalSections' => $totalSections])
     <div class="content">
         <div class="notice"><strong>{{ $comparability['label'] ?? 'Comparação descritiva' }}.</strong> Somente valores com tipo e unidade compatíveis são apresentados. As variações não representam automaticamente melhora ou piora clínica.</div>
         @if(count($comparison['metrics'] ?? []))
@@ -381,9 +416,10 @@
 
 @if($hasSegmentalPage)
 <section class="report-section segmental-page">
-    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Análise segmentar', 'pageNumber' => 3 + ($hasFitdaysDataPage ? 1 : 0) + ($hasImpedancePage ? 1 : 0) + ($hasDetailedComparison ? 1 : 0), 'totalSections' => $totalSections])
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Análise segmentar', 'pageNumber' => 3 + ($hasFitdaysDataPage ? 1 : 0) + ($hasDetailedComparison ? 1 : 0), 'totalSections' => $totalSections])
     <div class="content">
         <div class="notice"><strong>Leitura segmentar.</strong> L representa o lado esquerdo e R o lado direito. Massa, percentual de referência e classificação também são apresentados nas tabelas textuais.</div>
+        <div class="segmental-summary"><strong>Resumo descritivo.</strong> {{ $segmentSummary('fat', 'Gordura segmentar') }} {{ $segmentSummary('muscle', 'Equilíbrio muscular') }} As classificações reproduzem o equipamento e não representam diagnóstico.</div>
         <table class="segmental-grid"><tr>
             <td>@include('bioimpedance.partials.segmental-body-map', ['measurements' => $segmentalMeasurements, 'type' => 'fat', 'title' => 'Gordura segmentar'])</td>
             <td>@include('bioimpedance.partials.segmental-body-map', ['measurements' => $segmentalMeasurements, 'type' => 'muscle', 'title' => 'Equilíbrio muscular'])</td>
@@ -400,7 +436,7 @@
 
 @if($isBodyscan && $hasSegmentalComparison)
 <section class="report-section">
-    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Evolução segmentar', 'pageNumber' => 3 + ($hasFitdaysDataPage ? 1 : 0) + ($hasImpedancePage ? 1 : 0) + ($hasDetailedComparison ? 1 : 0) + ($hasSegmentalPage ? 1 : 0), 'totalSections' => $totalSections])
+    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Evolução segmentar', 'pageNumber' => 3 + ($hasFitdaysDataPage ? 1 : 0) + ($hasDetailedComparison ? 1 : 0) + ($hasSegmentalPage ? 1 : 0), 'totalSections' => $totalSections])
     <div class="content">
         <div class="notice"><strong>Comparação segmentar.</strong> Os valores mostram mudanças numéricas e não classificam melhora, piora ou problema clínico.</div>
         @foreach(['fat' => 'Gordura segmentar', 'muscle' => 'Equilíbrio muscular'] as $segmentType => $segmentTitle)
@@ -443,7 +479,7 @@
 <section class="report-section page-guidance">
     @include('bioimpedance.partials.report-header', ['pageTitle' => 'Orientações', 'pageNumber' => $totalSections, 'totalSections' => $totalSections])
     <div class="content">
-        <div class="section-title" style="color: {{ $secondaryColor }};">Interpretação profissional</div>
+        <div class="section-title" style="color: {{ $secondaryColor }};">{{ $hasReviewedObservation ? 'Síntese revisada pelo profissional' : 'Resumo dos resultados' }}</div>
         <div class="summary">
             @if($assessment['notes'])
                 <p style="white-space: pre-line;">{{ $assessment['notes'] }}</p>
@@ -451,18 +487,20 @@
                 <p class="muted">Nenhuma observação profissional foi registrada.</p>
             @endif
         </div>
-        <div class="section-title" style="color: {{ $secondaryColor }};">Orientações</div>
+        <div class="section-title" style="color: {{ $secondaryColor }};">Acompanhamento</div>
+        <div class="summary">Use esta avaliação como referência para o acompanhamento. Quando houver nova medição, procure manter horário, hidratação, alimentação recente e perfil de cálculo semelhantes para tornar a comparação mais consistente.</div>
+        <div class="section-title" style="color: {{ $secondaryColor }};">Orientações individualizadas</div>
         @if($assessment['care_guidance'] ?? null)
             @foreach($guidanceSections as $section)
                 <div class="guidance-section"><div class="guidance-section-title">{{ $section['title'] }}</div><div>{{ $section['text'] }}</div></div>
             @endforeach
             <p class="muted" style="margin: 5px 2px 0;">Conteúdo educativo; não substitui avaliação médica, nutricional ou de educação física.</p>
         @else
-            <div class="summary muted">Nenhuma orientação educativa foi registrada para esta avaliação.</div>
+            <div class="summary muted">Este campo é opcional e não recebeu orientação individualizada revisada para esta avaliação.</div>
         @endif
         <div class="section-title" style="color: {{ $secondaryColor }};">Responsável pelo relatório</div>
         <table class="validation">
-            <tr><td style="width: 50%;"><div class="label">Profissional responsável</div><strong>{{ $assessment['professional_name'] ?? 'Não informado' }}</strong></td><td><div class="label">Data da avaliação</div><strong>{{ \Illuminate\Support\Carbon::parse($assessment['evaluated_at'])->format('d/m/Y H:i') }}</strong></td></tr>
+            <tr><td style="width: 50%;"><div class="label">Profissional responsável</div><strong>{{ $assessment['professional_name'] ?? 'Não informado' }}</strong><br><span class="{{ $hasReviewedObservation || $hasReviewedGuidance ? 'review-status' : 'muted' }}">{{ $hasReviewedObservation || $hasReviewedGuidance ? 'Conteúdo profissional revisado' : 'Sem conteúdo individualizado revisado' }}</span></td><td><div class="label">Data da avaliação</div><strong>{{ \Illuminate\Support\Carbon::parse($assessment['evaluated_at'])->format('d/m/Y H:i') }}</strong></td></tr>
         </table>
         <div class="keep-together">
             <div class="section-title" style="color: {{ $secondaryColor }};">Limites do relatório</div>

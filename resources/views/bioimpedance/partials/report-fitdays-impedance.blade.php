@@ -1,8 +1,14 @@
-<section class="report-section">
-    @include('bioimpedance.partials.report-header', ['pageTitle' => 'Impedância bioelétrica', 'pageNumber' => $pageNumber, 'totalSections' => $totalSections])
-    <div class="content">
+@php($embedded = $embedded ?? false)
+@if(! $embedded)
+    <section class="report-section">
+        @include('bioimpedance.partials.report-header', ['pageTitle' => 'Impedância bioelétrica', 'pageNumber' => $pageNumber, 'totalSections' => $totalSections])
+        <div class="content">
+@else
+    <div class="technical-appendix keep-together">
+        <div class="section-title" style="color: {{ $secondaryColor }};">Dados técnicos de impedância</div>
+@endif
         <div class="notice"><strong>Tabela técnica do equipamento.</strong> Valores em ohms preservados conforme a medição de origem. Servem para comparação técnica e não geram diagnóstico.</div>
-        <table class="segmental-comparison">
+        <table class="segmental-comparison impedance-table">
             <caption>Leituras segmentares por frequência e região. Lados seguem a identificação impressa no relatório de origem.</caption>
             <thead><tr><th>Frequência</th><th>Braço direito</th><th>Braço esquerdo</th><th>Tronco</th><th>Perna direita</th><th>Perna esquerda</th></tr></thead>
             <tbody>
@@ -24,5 +30,9 @@
             </tbody>
         </table>
         <div class="summary"><strong>Escopo.</strong> A tabela documenta a leitura elétrica disponibilizada pelo equipamento. O PDF não deriva diagnóstico, composição adicional ou conduta clínica diretamente desses valores.</div>
+@if(! $embedded)
     </div>
-</section>
+    </section>
+@else
+    </div>
+@endif

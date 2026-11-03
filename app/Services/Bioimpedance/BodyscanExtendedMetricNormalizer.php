@@ -58,7 +58,45 @@ final class BodyscanExtendedMetricNormalizer
             ];
         }
 
+        $this->removeAmbiguousBodyFatRange($normalized);
+
         return array_values($normalized);
+    }
+
+    /**
+     * The technical Fitdays table prints the fat-mass range beside the value in kg
+     * and the body-fat percentage in a separate proportion column. OCR can attach
+     * that kg range to both metrics. Keep the original values and classifications,
+     * but do not persist a duplicated range as if it were a percentage reference.
+     *
+     * @param  array<string, array<string, mixed>>  $metrics
+     */
+    private function removeAmbiguousBodyFatRange(array &$metrics): void
+    {
+        $percentage = $metrics['body_fat_percentage'] ?? null;
+        $mass = $metrics['fat_mass'] ?? null;
+
+        if (! is_array($percentage) || ! is_array($mass)) {
+            return;
+        }
+
+        $percentageMinimum = $percentage['printed_minimum'] ?? null;
+        $percentageMaximum = $percentage['printed_maximum'] ?? null;
+        $massMinimum = $mass['printed_minimum'] ?? null;
+        $massMaximum = $mass['printed_maximum'] ?? null;
+
+        if ($percentageMinimum === null || $percentageMaximum === null
+            || $massMinimum === null || $massMaximum === null) {
+            return;
+        }
+
+        if (abs((float) $percentageMinimum - (float) $massMinimum) > 0.001
+            || abs((float) $percentageMaximum - (float) $massMaximum) > 0.001) {
+            return;
+        }
+
+        $metrics['body_fat_percentage']['printed_minimum'] = null;
+        $metrics['body_fat_percentage']['printed_maximum'] = null;
     }
 
     private function number(mixed $value): ?float
