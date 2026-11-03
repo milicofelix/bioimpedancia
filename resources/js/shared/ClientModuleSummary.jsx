@@ -108,7 +108,7 @@ export default function ClientModuleSummary({
 				<ModuleCard
 					type="screening"
 					title="Triagens"
-					description="Aplique questionários e acompanhe convites, resultados e devolutivas descritivas."
+					description="Registre respostas do formulário em papel e consulte resultados e devolutivas descritivas."
 					status="Instrumentos independentes da bioimpedância"
 					actionLabel="Abrir triagens"
 					onAction={onOpenScreenings}

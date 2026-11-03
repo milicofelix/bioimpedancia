@@ -1,3 +1,4 @@
+@php($internalTranscription = $internalTranscription ?? false)
 <!doctype html>
 <html lang="pt-BR">
 <head>
@@ -64,6 +65,10 @@
         <header class="header">
             <h1>{{ $screeningSession->questionnaire_name }}</h1>
             <p class="version">Versão {{ $screeningSession->questionnaire_version }}</p>
+            @if ($internalTranscription)
+                <p>Registro interno de formulário em papel · {{ $screeningSession->client->full_name }}</p>
+                <p class="version">Respondido no papel em {{ $screeningSession->paper_completed_on?->format('d/m/Y') }}</p>
+            @endif
         </header>
         <div class="content">
             @if ($completed)
@@ -71,7 +76,7 @@
                     <div>
                         <span class="success-mark" aria-hidden="true">✓</span>
                         <h2 style="margin-top: 18px">Questionário finalizado</h2>
-                        <p>Suas respostas foram registradas com segurança e não podem ser enviadas novamente.</p>
+                        <p>{{ $internalTranscription ? 'A transcrição foi registrada. Este lançamento não pode receber novas respostas; consulte o resultado e gere o PDF para entregar ao cliente.' : 'Suas respostas foram registradas com segurança e não podem ser enviadas novamente.' }}</p>
                         @if ($isScoredQuestionnaire)
                             <p class="result-score">{{ $screeningSession->total_score }} <small style="font-size: .9rem">de 30 pontos</small></p>
                             <p class="result-range">{{ $screeningSession->result_description }}</p>
@@ -106,7 +111,7 @@
                         <p class="notice"><strong>Importante:</strong> {{ $screeningSession->disclaimer_snapshot }}</p>
                         <a
                             class="pdf-button"
-                            href="{{ route('screening.public.result-pdf', ['token' => request()->route('token')]) }}"
+                            href="{{ $internalTranscription ? route('screening.sessions.client-pdf', $screeningSession) : route('screening.public.result-pdf', ['token' => request()->route('token')]) }}"
                             target="_blank"
                             rel="noopener noreferrer"
                         >Abrir resultado em PDF</a>
@@ -117,11 +122,17 @@
                 </section>
             @elseif ($identityVerified)
                 <section id="questionario" tabindex="-1" aria-labelledby="questionario-title">
-                    <h2 id="questionario-title">Responda ao questionário</h2>
-                    <p class="instructions">@if ($screeningSession->questionnaire->recall_period_days) Nas perguntas de frequência, considere os últimos {{ $screeningSession->questionnaire->recall_period_days }} dias. Não existem respostas certas ou erradas. Selecione uma alternativa em cada item. @else Escolha a forma que mais chama sua atenção neste momento. Não pense por muito tempo; esta escolha é exclusivamente descritiva e não possui finalidade diagnóstica. @endif</p>
-                    <p class="attempts">Este acesso expira em {{ $screeningSession->expires_at?->format('d/m/Y \à\s H:i') }}.</p>
+                    <h2 id="questionario-title">{{ $internalTranscription ? 'Registrar respostas do papel' : 'Responda ao questionário' }}</h2>
+                    @if ($internalTranscription)
+                        <p class="instructions">Confira o cliente, a versão e a data do formulário. Selecione exatamente as alternativas marcadas no papel, sem interpretar, completar respostas em branco ou responder pelo cliente. Este acesso é interno e não deve ser enviado ao cliente.</p>
+                        <p class="notice">{{ $screeningSession->disclaimer_snapshot }}</p>
+                        <p class="attempts">As escolhas só serão gravadas ao finalizar. Mantenha o formulário original para conferência; não há salvamento automático deste preenchimento.</p>
+                    @else
+                        <p class="instructions">@if ($screeningSession->questionnaire->recall_period_days) Nas perguntas de frequência, considere os últimos {{ $screeningSession->questionnaire->recall_period_days }} dias. Não existem respostas certas ou erradas. Selecione uma alternativa em cada item. @else Escolha a forma que mais chama sua atenção neste momento. Não pense por muito tempo; esta escolha é exclusivamente descritiva e não possui finalidade diagnóstica. @endif</p>
+                        <p class="attempts">Este acesso expira em {{ $screeningSession->expires_at?->format('d/m/Y \à\s H:i') }}.</p>
+                    @endif
 
-                    <form id="screening-form" method="post" action="{{ route('screening.public.complete', ['token' => request()->route('token')]) }}">
+                    <form id="screening-form" method="post" action="{{ $internalTranscription ? route('screening.paper.complete', $screeningSession) : route('screening.public.complete', ['token' => request()->route('token')]) }}">
                     @csrf
                     <div class="question-list">
                         @foreach ($screeningSession->questionnaire->questions as $question)
@@ -183,15 +194,29 @@
                     @error('answers')<p class="error" role="alert">{{ $message }}</p>@enderror
                     @error('answers.*')<p class="error" role="alert">{{ $message }}</p>@enderror
                     @error('session')<p class="error" role="alert">{{ $message }}</p>@enderror
+                    @if ($internalTranscription)
+                        <p id="screening-offline" class="error" role="alert" hidden>Sem conexão. As respostas ainda não foram enviadas; mantenha esta página aberta e tente novamente quando a internet voltar.</p>
+                    @endif
 
                     <div class="completion">
+                        @if ($internalTranscription)
+                            <label class="consent"><input type="checkbox" name="paper_identity_confirmed" value="1" required @checked(old('paper_identity_confirmed'))><span>Conferi que o formulário pertence a {{ $screeningSession->client->full_name }} e corresponde à versão {{ $screeningSession->questionnaire_version }}.</span></label>
+                            <label class="consent"><input type="checkbox" name="paper_consent_confirmed" value="1" required @checked(old('paper_consent_confirmed'))><span>Conferi que o consentimento do cliente foi obtido e está documentado no papel. Esta confirmação registra a minha conferência, não um aceite digital feito pelo cliente.</span></label>
+                            <details><summary>Texto de consentimento desta versão</summary><p>{{ $screeningSession->consent_text_snapshot }}</p></details>
+                            @if ($screeningSession->is_minor_at_application)
+                                <label class="consent"><input type="checkbox" name="paper_guardian_consent_confirmed" value="1" required @checked(old('paper_guardian_consent_confirmed'))><span>Conferi no papel a identificação e o consentimento do responsável legal: {{ $screeningSession->guardian_name }} ({{ $screeningSession->guardian_relationship }}).</span></label>
+                            @endif
+                            @foreach (['paper_identity_confirmed', 'paper_consent_confirmed', 'paper_guardian_consent_confirmed'] as $field)
+                                @error($field)<p class="error" role="alert">{{ $message }}</p>@enderror
+                            @endforeach
+                        @endif
                         <label class="consent" for="completion_confirmed" style="margin: 0">
                             <input id="completion_confirmed" name="completion_confirmed" type="checkbox" value="1" required @checked(old('completion_confirmed'))>
-                            <span>Revisei minhas respostas e confirmo o envio definitivo deste questionário.</span>
+                            <span>{{ $internalTranscription ? 'Comparei todas as respostas com o papel e confirmo o registro definitivo da transcrição.' : 'Revisei minhas respostas e confirmo o envio definitivo deste questionário.' }}</span>
                         </label>
                         @error('completion_confirmed')<p class="error" role="alert">{{ $message }}</p>@enderror
                     </div>
-                    <button id="screening-submit" type="submit">Finalizar e enviar respostas</button>
+                    <button id="screening-submit" type="submit">{{ $internalTranscription ? 'Finalizar transcrição e gerar resultado' : 'Finalizar e enviar respostas' }}</button>
                     </form>
                 </section>
             @else
@@ -250,7 +275,10 @@
             @endif
         </div>
     </article>
-    <footer>Este acesso é temporário, individual e não permite entrar no restante do sistema.</footer>
+    @if ($internalTranscription)
+        <p><a href="{{ route('operational-app') }}">Voltar ao atendimento</a> · O resultado também fica disponível no histórico de triagens do cliente.</p>
+    @endif
+    <footer>{{ $internalTranscription ? 'Área interna de transcrição. Acesso restrito à equipe autorizada; não compartilhe este endereço com o cliente.' : 'Este acesso é temporário, individual e não permite entrar no restante do sistema.' }}</footer>
 </main>
 <script>
     if (['#questionario', '#confirmacao'].includes(window.location.hash)) {
@@ -277,11 +305,18 @@
         button.textContent = 'Confirmando acesso…';
     });
 
-    document.getElementById('screening-form')?.addEventListener('submit', function () {
+    document.getElementById('screening-form')?.addEventListener('submit', function (event) {
+        const offlineNotice = document.getElementById('screening-offline');
+        if (@json($internalTranscription) && !navigator.onLine) {
+            event.preventDefault();
+            if (offlineNotice) offlineNotice.hidden = false;
+            return;
+        }
+        if (offlineNotice) offlineNotice.hidden = true;
         const button = document.getElementById('screening-submit');
         if (!button || button.disabled) return;
         button.disabled = true;
-        button.textContent = 'Enviando respostas…';
+        button.textContent = @json($internalTranscription ? 'Registrando transcrição…' : 'Enviando respostas…');
     });
 </script>
 </body>

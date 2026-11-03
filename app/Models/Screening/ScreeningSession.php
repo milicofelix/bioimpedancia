@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ScreeningSession extends Model
 {
+    public const ACCESS_PAPER_TRANSCRIPTION = 'paper_transcription';
+
     public const STATUS_PENDING = 'pending';
 
     public const STATUS_STARTED = 'started';
@@ -68,11 +70,17 @@ class ScreeningSession extends Model
         'access_count',
         'last_sent_at',
         'send_count',
+        'paper_completed_on',
+        'transcribed_by_user_id',
+        'paper_consent_confirmed_at',
     ];
 
     protected function casts(): array
     {
         return [
+            'paper_completed_on' => 'date',
+            'transcribed_by_user_id' => 'integer',
+            'paper_consent_confirmed_at' => 'datetime',
             'consent_accepted_at' => 'datetime',
             'guardian_consent_accepted_at' => 'datetime',
             'is_minor_at_application' => 'boolean',
@@ -127,6 +135,11 @@ class ScreeningSession extends Model
     public function requestedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requested_by_user_id');
+    }
+
+    public function transcribedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'transcribed_by_user_id');
     }
 
     public function cancelledBy(): BelongsTo

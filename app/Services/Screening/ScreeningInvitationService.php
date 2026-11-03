@@ -123,6 +123,7 @@ class ScreeningInvitationService
         return ScreeningSession::query()
             ->with(['questionnaire.questions.options', 'client', 'answers'])
             ->where('public_token_hash', hash('sha256', $plainToken))
+            ->where('access_mode', '!=', ScreeningSession::ACCESS_PAPER_TRANSCRIPTION)
             ->firstOrFail();
     }
 
@@ -317,6 +318,7 @@ class ScreeningInvitationService
     private function ensureOwnedPendingSession(ScreeningSession $session, User $requester): void
     {
         abort_unless($requester->isAdmin() || $session->requested_by_user_id === $requester->id, 403);
+        abort_if($session->access_mode === ScreeningSession::ACCESS_PAPER_TRANSCRIPTION, 422, 'Este lançamento é interno. Use o formulário de transcrição ou cancele pelo histórico.');
 
         if ($session->status !== ScreeningSession::STATUS_PENDING) {
             throw ValidationException::withMessages(['session' => 'Somente aplicações pendentes podem ter o convite alterado.']);

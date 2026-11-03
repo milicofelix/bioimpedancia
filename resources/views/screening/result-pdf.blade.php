@@ -44,7 +44,12 @@
     <h1>{{ $screeningSession->questionnaire_name }}</h1>
     <p class="meta">
         Cliente: {{ $screeningSession->client->full_name }}<br>
-        Preenchimento concluído em {{ $screeningSession->finalized_at?->format('d/m/Y \à\s H:i') }}<br>
+        @if ($screeningSession->access_mode === \App\Models\Screening\ScreeningSession::ACCESS_PAPER_TRANSCRIPTION)
+            Formulário respondido em papel em {{ $screeningSession->paper_completed_on?->format('d/m/Y') }}<br>
+            Registro no sistema concluído em {{ $screeningSession->finalized_at?->format('d/m/Y \à\s H:i') }}<br>
+        @else
+            Preenchimento concluído em {{ $screeningSession->finalized_at?->format('d/m/Y \à\s H:i') }}<br>
+        @endif
         Questionário {{ $screeningSession->questionnaire_version }} · solicitado por {{ $screeningSession->requested_by_name ?: 'Profissional responsável' }}
     </p>
 

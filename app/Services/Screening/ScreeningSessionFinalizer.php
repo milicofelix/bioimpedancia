@@ -28,7 +28,7 @@ class ScreeningSessionFinalizer
                 ->lockForUpdate()
                 ->findOrFail($session->id);
 
-            $this->assertSessionCanBeFinalized($lockedSession);
+            $this->assertSessionCanBeFinalized($request, $lockedSession);
             $selectedOptions = $this->normalizeSubmittedAnswers($submittedAnswers);
 
             try {
@@ -93,21 +93,28 @@ class ScreeningSessionFinalizer
         });
     }
 
-    private function assertSessionCanBeFinalized(ScreeningSession $session): void
+    private function assertSessionCanBeFinalized(Request $request, ScreeningSession $session): void
     {
         if ($session->status !== ScreeningSession::STATUS_STARTED) {
             throw ValidationException::withMessages(['session' => 'A aplicação precisa estar iniciada e ainda não finalizada.']);
         }
 
-        if (! $session->identity_verified_at || ! $session->consent_accepted_at) {
+        $paper = $session->access_mode === ScreeningSession::ACCESS_PAPER_TRANSCRIPTION;
+        if ($paper && (! $request->user()?->isClinicalProfessional() || ! $request->user()->isActive()
+            || $request->user()->id !== $session->transcribed_by_user_id
+            || ! $session->paper_completed_on || ! $session->paper_consent_confirmed_at)) {
+            throw ValidationException::withMessages(['session' => 'A transcrição e o consentimento no documento físico precisam ser conferidos pelo profissional.']);
+        }
+
+        if (! $paper && (! $session->identity_verified_at || ! $session->consent_accepted_at)) {
             throw ValidationException::withMessages(['session' => 'A identidade e o consentimento precisam ser confirmados antes da finalização.']);
         }
 
-        if ($session->is_minor_at_application && ! $session->guardian_consent_accepted_at) {
+        if (! $paper && $session->is_minor_at_application && ! $session->guardian_consent_accepted_at) {
             throw ValidationException::withMessages(['session' => 'O consentimento do responsável legal é obrigatório para finalizar a aplicação do menor.']);
         }
 
-        if ($session->revoked_at || ! $session->expires_at?->isFuture()) {
+        if ($session->revoked_at || (! $paper && ! $session->expires_at?->isFuture())) {
             throw ValidationException::withMessages(['session' => 'O convite expirou ou foi revogado antes da finalização.']);
         }
 
