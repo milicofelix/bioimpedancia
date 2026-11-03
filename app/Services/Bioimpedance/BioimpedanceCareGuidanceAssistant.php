@@ -310,7 +310,7 @@ PROMPT;
             $claims[] = $this->claim('equipment-indices-limit', 'assessment_context', $indexLabels.' são índices estimados pelo equipamento. Eles precisam ser contextualizados pelo profissional e, isoladamente, não diagnosticam risco, sarcopenia ou outra condição.', 'high', collect($context['extended_indices'])->pluck('evidence_id')->all());
         }
         $claims[] = $this->claim('nutrition-general', 'nutrition_education', 'Priorize refeições variadas baseadas em alimentos in natura ou minimamente processados, incluindo frutas, legumes, verduras e feijões, e reduza a frequência de ultraprocessados e bebidas açucaradas.', 'high', ['brazil-food-guide-natural-foods', 'brazil-food-guide-ultraprocessed']);
-        $claims[] = $this->claim('movement-general', 'movement_education', 'Se estiver apto, aumente o movimento gradualmente. Caminhada, bicicleta, dança e fortalecimento são opções que devem ser adaptadas à capacidade individual e à orientação profissional.', 'high', ['who-adult-physical-activity', 'vita-scan-care-guidance-safety']);
+        $claims[] = $this->claim('movement-general', 'movement_education', 'Conforme suas condições de saúde, aumente o movimento gradualmente. Caminhada, bicicleta, dança e fortalecimento são opções que devem ser adaptadas à capacidade individual e à orientação profissional.', 'high', ['who-adult-physical-activity', 'vita-scan-care-guidance-safety']);
         $claims[] = $this->claim('professional-follow-up', 'professional_follow_up', 'Defina metas pequenas com o profissional e procure avaliação individualizada antes de usar vitaminas, suplementos ou iniciar atividades incompatíveis com suas condições e limitações.', 'high', ['vita-scan-care-guidance-safety']);
 
         return ['claims' => $claims];
