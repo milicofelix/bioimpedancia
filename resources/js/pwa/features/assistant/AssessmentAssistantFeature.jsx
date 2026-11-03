@@ -136,7 +136,7 @@ export default function AssessmentAssistantFeature({ client, assessment, current
 				</PwaCard>
 			)}
 
-			{currentAssessment.has_approved_ai_observation || currentAssessment.care_guidance ? <CareGuidanceAssistant key={currentAssessment.id} assessment={currentAssessment} online={isOnline} onApproved={(updatedClient, updatedAssessment) => { setApprovedAssessment(updatedAssessment); onApproved(updatedClient, updatedAssessment); }} /> : null}
+			{currentAssessment.has_approved_ai_observation || currentAssessment.care_guidance ? <CareGuidanceAssistant key={currentAssessment.id} assessment={currentAssessment} online={isOnline} onOpenReport={onOpenReport} canOpenReport={canOpenReport} onApproved={(updatedClient, updatedAssessment) => { setApprovedAssessment(updatedAssessment); onApproved(updatedClient, updatedAssessment); }} /> : null}
 		</div>
 	);
 }

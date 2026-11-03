@@ -774,6 +774,13 @@ export default function DashboardPage({ userName }) {
 		window.setTimeout(() => document.getElementById('relatorio')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
 	}
 
+	function openSelectedClientReport() {
+		if (!enabledModules.reports || !selectedAssessment || selectedAssessment.is_canceled) return;
+
+		setClientWorkspaceTab('reports');
+		window.setTimeout(() => document.getElementById('relatorio')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+	}
+
 	function openClientScreenings() {
 		setClientWorkspaceTab('screenings');
 		window.setTimeout(() => document.getElementById('client-panel-screenings')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
@@ -1675,7 +1682,7 @@ export default function DashboardPage({ userName }) {
 								</div>
 							) : null}
 							<AssessmentDetails assessment={selectedAssessment} previousAssessment={previousSegmentalAssessment} />
-							{(selectedAssessment?.has_approved_ai_observation || selectedAssessment?.care_guidance) && !selectedAssessment.is_canceled && canClinicalProfessional ? <div className="mt-4"><CareGuidanceAssistant key={selectedAssessment.id} assessment={selectedAssessment} online={isOnline} onApproved={(updatedClient, updatedAssessment) => { setClients((current) => current.map((client) => (client.id === updatedClient.id ? updatedClient : client))); setSelectedAssessmentId(updatedAssessment.id); }} /></div> : null}
+							{(selectedAssessment?.has_approved_ai_observation || selectedAssessment?.care_guidance) && !selectedAssessment.is_canceled && canClinicalProfessional ? <div className="mt-4"><CareGuidanceAssistant key={selectedAssessment.id} assessment={selectedAssessment} online={isOnline} onOpenReport={openSelectedClientReport} canOpenReport={enabledModules.reports} onApproved={(updatedClient, updatedAssessment) => { setClients((current) => current.map((client) => (client.id === updatedClient.id ? updatedClient : client))); setSelectedAssessmentId(updatedAssessment.id); }} /></div> : null}
 
 							{selectedAssessment && !selectedAssessment.is_canceled ? (
 								<div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 p-4">

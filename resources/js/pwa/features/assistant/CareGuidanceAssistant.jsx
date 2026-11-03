@@ -10,7 +10,7 @@ import PwaAlert from '../../components/ui/PwaAlert';
 import PwaInfoCard from '../../components/ui/PwaInfoCard';
 import PwaSectionHeader from '../../components/ui/PwaSectionHeader';
 
-export default function CareGuidanceAssistant({ assessment, online, onApproved }) {
+export default function CareGuidanceAssistant({ assessment, online, onApproved, onOpenReport, canOpenReport = false }) {
 	const runAction = useActionLock();
 	const [assistant, setAssistant] = useState(null);
 	const [draft, setDraft] = useState('');
@@ -19,6 +19,7 @@ export default function CareGuidanceAssistant({ assessment, online, onApproved }
 	const [error, setError] = useState('');
 	const edited = Boolean(assistant?.suggestion && draft !== assistant.suggestion);
 	const blocked = Boolean(assistant && (assistant.status !== 'generated' || (assistant.validation_status && assistant.validation_status !== 'passed')));
+	const showOpenReport = canOpenReport && typeof onOpenReport === 'function' && Boolean(assistant || assessment.care_guidance);
 
 	useEffect(() => {
 		setAssistant(null);
@@ -82,7 +83,11 @@ export default function CareGuidanceAssistant({ assessment, online, onApproved }
 				{edited ? <p className="text-xs font-bold text-violet-700">Texto editado pelo profissional.</p> : null}
 				<CareGuidanceEvidence assistant={assistant} />
 				<div className="grid gap-2 sm:grid-cols-2"><PwaButton type="button" variant="secondary" onClick={() => { setAssistant(null); setDraft(''); }}>{blocked ? 'Voltar e tentar novamente' : 'Descartar'}</PwaButton><PwaButton type="button" icon="check" onClick={approve} disabled={blocked || saving || draft.trim().length < 100 || !online} loading={saving}>{saving ? 'Aprovando...' : blocked ? 'Aprovação bloqueada' : 'Aprovar para o relatório'}</PwaButton></div>
-			</div> : <PwaButton type="button" icon="sparkles" onClick={generate} disabled={!online} className="mt-4 w-full">{assessment.care_guidance ? 'Gerar nova sugestão' : 'Sugerir próximos cuidados'}</PwaButton>}
+			</div> : <PwaButton type="button" icon="sparkles" variant={showOpenReport ? 'secondary' : 'primary'} onClick={generate} disabled={!online} className="mt-4 w-full">{assessment.care_guidance ? 'Gerar nova sugestão' : 'Sugerir próximos cuidados'}</PwaButton>}
+			{showOpenReport ? <div className="mt-4 space-y-2">
+				{assistant ? <p className="text-sm text-slate-600">O relatório inclui somente os cuidados já aprovados. Esta sugestão só será incluída após a aprovação.</p> : null}
+				<PwaButton type="button" icon="fileText" onClick={onOpenReport} disabled={saving} className="w-full">Abrir relatório</PwaButton>
+			</div> : null}
 			{error ? <PwaAlert tone="error" title="Não foi possível concluir a ação" className="mt-3">{error}</PwaAlert> : null}
 			<PwaInfoCard icon="shield" title="Limite do assistente" className="mt-3"><p className="text-xs leading-5 text-slate-600">Vitaminas e suplementos dependem de avaliação individual e não são indicados automaticamente.</p></PwaInfoCard>
 		</PwaCard>
