@@ -16,6 +16,7 @@ class BioimpedanceWorkspacePresenter
         private readonly BioimpedanceReportSharePresenter $reportSharePresenter,
         private readonly RelaxmedicValueNormalizer $relaxmedicValueNormalizer,
         private readonly BioimpedanceAnalyzer $bioimpedanceAnalyzer,
+        private readonly BioimpedanceClientActivity $clientActivity,
     ) {}
 
     public function clinic(?BioimpedanceClinicSetting $settings = null): array
@@ -73,6 +74,7 @@ class BioimpedanceWorkspacePresenter
             'anonymized_at' => $client->anonymized_at?->toIso8601String(),
             'is_anonymized' => $client->anonymized_at !== null,
             'is_active' => $client->inactivated_at === null,
+            'last_activity_at' => $this->clientActivity->latest($client),
             'last_assessment_at' => $client->assessments->max('evaluated_at')?->toIso8601String(),
             'notes' => $client->notes,
             'assessments' => $client->assessments
@@ -92,7 +94,7 @@ class BioimpedanceWorkspacePresenter
 
     public function workspace(User $currentUser): array
     {
-        $clients = BioimpedanceClient::query()
+        $clients = $this->clientActivity->withScreeningActivity(BioimpedanceClient::query())
             ->with(['assessments' => fn ($query) => $query
                 ->with(['shares', 'careGuidanceApprovedBy', 'aiAnalysisRequests.output', 'segmentalMeasurements', 'extendedMetrics', 'impedanceReadings'])
                 ->latest('evaluated_at')])

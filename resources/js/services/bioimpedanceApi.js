@@ -10,8 +10,8 @@ export async function loadBioimpedanceWorkspace() {
 	return data;
 }
 
-export async function loadOperationalWorkspace() {
-	const { data } = await window.axios.get(endpoints.operationalWorkspace);
+export async function loadOperationalWorkspace(options = {}) {
+	const { data } = await window.axios.get(endpoints.operationalWorkspace, options);
 
 	return data;
 }

@@ -1,10 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { formatIssueDate } from '../../../shared/formatters';
+import { formatDate } from '../../../shared/formatters';
+import { clientActivityDate, compareClientRecency } from './clientRecency';
+import useClientListRefresh from '../../hooks/useClientListRefresh';
 import PwaButton from '../../components/ui/PwaButton';
 import PwaCard from '../../components/ui/PwaCard';
 import PwaIcon from '../../components/ui/PwaIcon';
 import PwaSectionHeader from '../../components/ui/PwaSectionHeader';
 import PwaState from '../../components/ui/PwaState';
+import PwaAlert from '../../components/ui/PwaAlert';
 
 function searchable(value) {
 	return String(value ?? '')
@@ -23,7 +26,8 @@ function clientStatus(client) {
 	return { label: 'Ativo', badge: 'bg-emerald-100 text-emerald-900', avatar: 'from-ricosty-100 to-ricosty-200 text-ricosty-800 ring-ricosty-200', border: 'border-l-emerald-600' };
 }
 
-export default function ClientSearchList({ clients, canCreate, onCreate, onSelect }) {
+export default function ClientSearchList({ clients, canCreate, onCreate, onSelect, onRefresh }) {
+	const { refreshError, retryRefresh } = useClientListRefresh(onRefresh);
 	const [query, setQuery] = useState('');
 	const [statusFilter, setStatusFilter] = useState('active');
 	const counts = useMemo(() => ({
@@ -48,12 +52,7 @@ export default function ClientSearchList({ clients, canCreate, onCreate, onSelec
 
 				return textMatch || digitMatch;
 			})
-			.sort((first, second) => {
-				const firstDate = first.last_assessment_at ? new Date(first.last_assessment_at).getTime() : 0;
-				const secondDate = second.last_assessment_at ? new Date(second.last_assessment_at).getTime() : 0;
-
-				return secondDate - firstDate || first.full_name.localeCompare(second.full_name, 'pt-BR');
-			});
+			.sort(compareClientRecency);
 	}, [clients, query, statusFilter]);
 
 	const visibleClients = query.trim() ? filteredClients : filteredClients.slice(0, 12);
@@ -81,6 +80,11 @@ export default function ClientSearchList({ clients, canCreate, onCreate, onSelec
 				</div>
 			</PwaCard>
 
+			{refreshError ? <PwaAlert className="mt-3" title="A lista pode estar desatualizada">
+				<p>{refreshError}</p>
+				<PwaButton type="button" onClick={retryRefresh} className="mt-2">Atualizar lista</PwaButton>
+			</PwaAlert> : null}
+
 			<div className="mt-5 flex items-center justify-between">
 				<h3 className="text-sm font-bold text-slate-800">{query.trim() ? 'Resultados da busca' : 'Clientes recentes'}</h3>
 				<span aria-live="polite" className="text-xs text-slate-500">{filteredClients.length} encontrado(s)</span>
@@ -96,7 +100,7 @@ export default function ClientSearchList({ clients, canCreate, onCreate, onSelec
 							<span className="min-w-0 flex-1"><span className="block break-words font-bold text-ricosty-950">{client.full_name}</span><span className="mt-1 flex items-center gap-1.5 break-all text-sm text-slate-600"><PwaIcon name={client.phone ? 'phone' : client.email ? 'mail' : 'alertTriangle'} size={14} className="shrink-0 text-ricosty-500" />{contact || 'Sem contato cadastrado'}</span></span>
 							<span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold uppercase ${status.badge}`}>{status.label}</span>
 						</span>
-						<span className="mt-3 flex items-center justify-between border-t border-ricosty-100 pt-2 text-xs text-slate-600"><span className="flex items-center gap-1.5"><PwaIcon name="calendar" size={14} className="text-ricosty-500" /><span>Última avaliação: <strong className="font-semibold text-slate-700">{formatIssueDate(client.last_assessment_at)}</strong></span></span><span className="flex h-8 w-8 items-center justify-center rounded-full bg-ricosty-50"><PwaIcon name="chevronRight" size={17} className="text-ricosty-600" /></span></span>
+						<span className="mt-3 flex items-center justify-between gap-2 border-t border-ricosty-100 pt-2 text-xs text-slate-600"><span className="flex min-w-0 items-center gap-1.5"><PwaIcon name="calendar" size={14} className="shrink-0 text-ricosty-500" /><span>Última atividade: <strong className="font-semibold text-slate-700">{formatDate(clientActivityDate(client))}</strong></span></span><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ricosty-50"><PwaIcon name="chevronRight" size={17} className="text-ricosty-600" /></span></span>
 					</PwaCard>;
 				})}
 			</div>
