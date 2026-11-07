@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import OperationalShell from '../pwa/components/OperationalShell';
 import ClientsFeature from '../pwa/features/clients/ClientsFeature';
 import RelaxmedicAssessmentFeature from '../pwa/features/assessment/RelaxmedicAssessmentFeature';
@@ -23,6 +23,12 @@ export default function OperationalAppPage() {
 	const [selectedAssessment, setSelectedAssessment] = useState(null);
 	const { section, navigate } = useOperationalSection();
 	const enabledModules = clinicModules(workspace?.clinic);
+	const refreshClients = useCallback(async (signal) => {
+		const data = await loadOperationalWorkspace({ signal });
+		if (!signal.aborted) {
+			setWorkspace((current) => current ? { ...current, clients: data.clients } : current);
+		}
+	}, []);
 
 	useEffect(() => {
 		registerOperationalServiceWorker();
@@ -144,6 +150,7 @@ export default function OperationalAppPage() {
 			{section === 'clientes' ? (
 				<ClientsFeature
 					clients={workspace.clients ?? []}
+					onRefresh={refreshClients}
 					currentUser={workspace.current_user}
 					scaleModel={scaleModel}
 					enabledModules={enabledModules}
