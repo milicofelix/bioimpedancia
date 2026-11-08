@@ -25,6 +25,7 @@ class BodyscanSegmentalOcrCompleter
                 ->timeout((int) config('services.openai.bodyscan_ocr_timeout', 90))
                 ->post(rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/').'/responses', [
                     'model' => $model,
+                    'reasoning' => ['effort' => config('services.openai.vision_reasoning_effort', 'medium')],
                     'store' => false,
                     'max_output_tokens' => 4200,
                     'input' => [[

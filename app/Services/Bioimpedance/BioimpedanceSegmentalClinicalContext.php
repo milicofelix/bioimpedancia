@@ -77,6 +77,8 @@ class BioimpedanceSegmentalClinicalContext
             'side' => $measurement->side,
             'mass_kg' => $measurement->mass_kg === null ? null : (float) $measurement->mass_kg,
             'reference_percentage' => $measurement->reference_percentage === null ? null : (float) $measurement->reference_percentage,
+            'reference_min_percentage' => $measurement->reference_min_percentage === null ? null : (float) $measurement->reference_min_percentage,
+            'reference_max_percentage' => $measurement->reference_max_percentage === null ? null : (float) $measurement->reference_max_percentage,
             'device_classification' => $measurement->classification,
             'classification_origin' => $classificationEdited ? 'professional_review' : match (data_get($measurement->raw_value, 'classification_source')) {
                 'printed' => 'equipment_report',

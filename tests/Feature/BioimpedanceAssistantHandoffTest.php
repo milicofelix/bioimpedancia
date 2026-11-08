@@ -99,10 +99,37 @@ class BioimpedanceAssistantHandoffTest extends TestCase
                 'source_ids' => ['brazil-food-guide-natural-foods'], 'finding_ids' => [], 'comparison_scope' => 'none',
             ]]]),
         ]]]]], 200)]);
-        $this->getJson(route('bioimpedance.assessments.care-guidance.suggestion', $assessment->id))
+        $response = $this->getJson(route('bioimpedance.assessments.care-guidance.suggestion', $assessment->id))
             ->assertOk()->assertJsonPath('assistant.status', 'generated')
             ->assertJsonPath('assistant.fallback_used', true)
             ->assertJsonPath('assistant.provider', 'local_reference_engine');
+        $output = BioimpedanceAiAnalysisOutput::query()->with('request')->findOrFail($response->json('assistant.output_id'));
+        $this->assertNotEmpty(data_get($output->raw_response, 'generation_audit.external_validation_errors'));
+        $this->assertSame([], data_get($output->raw_response, 'generation_audit.final_validation_errors'));
+        $this->assertSame('unsafe', data_get($output->raw_response, 'generation_audit.external_response.claims.0.id'));
+        $this->assertTrue($output->request->fallback_used);
+        $this->assertSame('local_reference_engine', $output->request->provider);
+        $this->assertNull($assessment->fresh()->care_guidance_approved_at);
+    }
+
+    public function test_valid_external_guidance_keeps_its_origin_and_is_not_automatically_approved(): void
+    {
+        $assessment = $this->approvedAssessment();
+        config(['bioimpedance.assistant.provider' => 'hybrid', 'services.openai.api_key' => 'fake-key']);
+        Http::preventStrayRequests();
+        $claims = [
+            ['id' => 'context', 'category' => 'assessment_context', 'text' => 'Os registros atuais devem ser contextualizados junto ao histórico e à avaliação profissional.', 'source_ids' => ['assessment:current']],
+            ['id' => 'food', 'category' => 'nutrition_education', 'text' => 'Use a síntese aprovada para conversar sobre alimentação variada, incluindo frutas, verduras e feijões, sem definir uma dieta pela balança.', 'source_ids' => ['observation:approved', 'brazil-food-guide-natural-foods']],
+            ['id' => 'movement', 'category' => 'movement_education', 'text' => 'Discuta possibilidades de caminhadas e fortalecimento com o profissional, após avaliar a capacidade e as condições individuais.', 'source_ids' => ['observation:approved', 'who-adult-physical-activity']],
+        ];
+        $payload = ['claims' => array_map(fn ($claim) => [...$claim, 'confidence' => 'moderate', 'requires_professional_review' => true, 'finding_ids' => [], 'comparison_scope' => 'none'], $claims)];
+        Http::fake(['*' => Http::response(['output' => [['content' => [['type' => 'output_text', 'text' => json_encode($payload)]]]]])]);
+        $response = $this->getJson(route('bioimpedance.assessments.care-guidance.suggestion', $assessment->id))
+            ->assertOk()->assertJsonPath('assistant.status', 'generated')
+            ->assertJsonPath('assistant.provider', 'openai')->assertJsonPath('assistant.fallback_used', false);
+        $output = BioimpedanceAiAnalysisOutput::query()->findOrFail($response->json('assistant.output_id'));
+        $this->assertSame('openai', $output->raw_response['provider']);
+        $this->assertSame([], data_get($output->raw_response, 'generation_audit.external_validation_errors'));
         $this->assertNull($assessment->fresh()->care_guidance_approved_at);
     }
 

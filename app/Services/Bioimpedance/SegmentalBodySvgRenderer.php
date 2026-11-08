@@ -60,8 +60,8 @@ class SegmentalBodySvgRenderer
         }
 
         $presentation = '<g id="pdf-side-markers" aria-hidden="true">'
-            .'<text x="111" y="397" fill="#111827" font-family="DejaVu Sans, sans-serif" font-size="18" font-weight="700">L</text>'
-            .'<text x="241" y="397" fill="#111827" font-family="DejaVu Sans, sans-serif" font-size="18" font-weight="700">R</text>'
+            .'<text x="111" y="397" fill="#111827" font-family="DejaVu Sans, sans-serif" font-size="18" font-weight="700">E</text>'
+            .'<text x="241" y="397" fill="#111827" font-family="DejaVu Sans, sans-serif" font-size="18" font-weight="700">D</text>'
             .'</g>';
 
         $svg = str_replace('</svg>', $presentation.'</svg>', $svg);

@@ -23,7 +23,7 @@ export function SegmentalDataTable({ items, heading }) {
 			<table className="w-full min-w-[34rem] border-collapse text-left text-xs">
 				<caption className="sr-only">Tabela equivalente de {heading.toLowerCase()}</caption>
 				<thead><tr className="border-b border-slate-200 text-slate-600"><th className="p-2">Região</th><th className="p-2">Lado</th><th className="p-2">Massa</th><th className="p-2">Referência</th><th className="p-2">Classificação</th></tr></thead>
-				<tbody>{items.map((item) => <tr key={item.key} className="border-b border-slate-100"><th scope="row" className="p-2 font-semibold text-slate-800">{item.label}</th><td className="p-2">{item.side === 'left' ? 'L — esquerdo' : item.side === 'right' ? 'R — direito' : 'Centro'}</td><td className="p-2">{formatSegmentalValue(item.mass_kg, ' kg')}</td><td className="p-2">{formatSegmentalValue(item.reference_percentage, '%')}</td><td className="p-2 font-semibold" style={{ color: item.state.color }}><span aria-hidden="true">{item.state.marker} </span>{item.state.label}</td></tr>)}</tbody>
+				<tbody>{items.map((item) => <tr key={item.key} className="border-b border-slate-100"><th scope="row" className="p-2 font-semibold text-slate-800">{item.label}</th><td className="p-2">{item.side === 'left' ? 'E — esquerdo' : item.side === 'right' ? 'D — direito' : 'Centro'}</td><td className="p-2">{formatSegmentalValue(item.mass_kg, ' kg')}</td><td className="p-2">{formatSegmentalValue(item.reference_percentage, '%')}</td><td className="p-2 font-semibold" style={{ color: item.state.color }}><span aria-hidden="true">{item.state.marker} </span>{item.state.label}</td></tr>)}</tbody>
 			</table>
 		</div>
 	);

@@ -7,6 +7,8 @@ use Illuminate\Support\Str;
 
 class CareGuidanceSemanticValidator
 {
+    public function __construct(private readonly ClinicalTextGuard $textGuard = new ClinicalTextGuard) {}
+
     public const CATEGORIES = [
         'assessment_context',
         'nutrition_education',
@@ -175,7 +177,7 @@ class CareGuidanceSemanticValidator
 
         $lowerText = Str::lower($claim['text']);
         foreach (self::FORBIDDEN_EXPRESSIONS as $expression) {
-            if (str_contains($lowerText, $expression)) {
+            if ($this->textGuard->contains($lowerText, $expression)) {
                 $errors[] = 'Conteúdo clínico não sustentado detectado pela barreira textual.';
                 break;
             }

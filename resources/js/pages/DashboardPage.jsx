@@ -22,6 +22,8 @@ import AssistantProvenance from '../pwa/features/assistant/AssistantProvenance';
 import ObservationFindings from '../pwa/features/assistant/ObservationFindings';
 import KnowledgeDocumentsPanel from '../components/bioimpedance/KnowledgeDocumentsPanel';
 import BodyscanReview from '../pwa/features/assessment/BodyscanReview';
+import BodyscanConsistencyNotice from '../pwa/features/assessment/BodyscanConsistencyNotice';
+import PwaAlert from '../pwa/components/ui/PwaAlert';
 import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocolComplete, emptyBodyscanProtocol, updateBodyscanImpedance, updateBodyscanSegment } from '../pwa/features/assessment/bodyscanAssessmentForm';
 import BodyscanProtocolChecklist from '../pwa/features/assessment/BodyscanProtocolChecklist';
 import BodyscanReportFormatGuide from '../pwa/features/assessment/BodyscanReportFormatGuide';
@@ -2328,6 +2330,7 @@ function Report({ clinic, client, assessment, professional }) {
 								{assessmentAge >= 60 ? <p>Para pessoas com 60 anos ou mais, objetivos devem considerar preservação de massa, força e função muscular, histórico e avaliação profissional, não apenas IMC ou peso.</p> : null}
 							</div>
 							{assessment.notes ? <p className="mt-3 text-sm text-slate-600"><strong>Observações:</strong> {assessment.notes}</p> : null}
+							{assessment.observation_review_notice ? <PwaAlert tone="attention" className="mt-3" title="Conferência da síntese">{assessment.observation_review_notice}</PwaAlert> : null}
 							{assessment.care_guidance ? <div className="mt-4 rounded-xl border border-teal-200 bg-teal-50 p-4"><p className="text-sm font-bold text-teal-900">Orientações aprovadas</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{assessment.care_guidance}</p><p className="mt-3 text-xs text-slate-600">Conteúdo educativo aprovado pelo profissional; não substitui avaliação individual de médico, nutricionista ou profissional de educação física.</p></div> : null}
 						</section>
 
@@ -2351,6 +2354,7 @@ function Report({ clinic, client, assessment, professional }) {
 								<p className="font-bold uppercase tracking-wide text-slate-800">Rastreabilidade da origem</p>
 								<p className="mt-2">Imagem {assessment.source_metadata.image_name} processada em {formatDate(assessment.source_metadata.processed_at)}. O arquivo original não foi armazenado.</p>
 								<p className="break-all">SHA-256: {assessment.source_metadata.image_sha256}</p>
+								<BodyscanConsistencyNotice warnings={assessment.source_metadata.document_consistency_review?.extracted_warnings} reviewedAt={formatDate(assessment.source_metadata.document_consistency_review?.confirmed_at)} />
 							</section>
 						) : null}
 					</>

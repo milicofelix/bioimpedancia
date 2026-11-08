@@ -3,6 +3,7 @@
 namespace App\Services\Bioimpedance;
 
 use App\Domain\Bioimpedance\BodyscanExtendedMetricCatalog;
+use App\Domain\Bioimpedance\BodyFatReportContext;
 use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceImpedanceReading;
 use App\Models\Bioimpedance\BioimpedanceSegmentalMeasurement;
@@ -91,6 +92,8 @@ class BioimpedanceAssistantContext
                 },
             ],
             'general_metrics' => $generalMetrics,
+            'finding_selection_policy' => AssessmentFindingPrioritizer::POLICY,
+            'missing_personal_context' => ['alimentação habitual', 'rotina de atividade física', 'capacidade funcional', 'doenças, medicações e limitações', 'preferências, restrições alimentares e objetivos'],
             'extended_indices' => $indices,
             'body_score_policy' => [
                 'available' => $assessment->extendedMetrics->contains('metric_code', BodyscanExtendedMetricCatalog::BODY_SCORE),
@@ -107,6 +110,7 @@ class BioimpedanceAssistantContext
                 'WHR e ASMI são índices do equipamento e não sustentam diagnóstico isolado.',
                 'Pontuação corporal não participa da interpretação clínica.',
                 'Perfis padrão e atleta usam contextos de cálculo diferentes e não devem ser tratados automaticamente como melhora ou piora.',
+                'Modo atleta é um perfil de cálculo, não evidência de condicionamento ou capacidade para exercícios.',
             ],
             'evidence_catalog' => $catalog,
             'evidence_ids' => collect($catalog)->pluck('id')->values()->all(),
@@ -131,6 +135,14 @@ class BioimpedanceAssistantContext
                 $indicator = $indicatorKey === null ? [] : ($assessment->analysis['indicators'][$indicatorKey] ?? []);
                 $classificationAllowed = $field === 'calculated_bmi' || $assessment->device_model === 'HBF-514C';
                 $classification = $classificationAllowed && ! ($indicator['pending'] ?? false) ? ($indicator['classification'] ?? null) : null;
+                $classificationOrigin = $classification ? 'backend_reference' : null;
+                $tone = $classification ? ($indicator['tone'] ?? null) : null;
+                if ($field === 'body_fat_percentage' && ! $classificationAllowed
+                    && ($recorded = BodyFatReportContext::classification($assessment->extendedMetrics))) {
+                    $classification = $recorded['classification'];
+                    $classificationOrigin = $recorded['classification_origin'];
+                    $tone = $recorded['tone'];
+                }
 
                 return [
                     'evidence_id' => 'assessment:metric:'.$field,
@@ -138,8 +150,8 @@ class BioimpedanceAssistantContext
                     ...$definition,
                     'value' => is_numeric($value) ? (float) $value : $value,
                     'classification' => $classification,
-                    'classification_origin' => $classification ? 'backend_reference' : null,
-                    'tone' => $classification ? ($indicator['tone'] ?? null) : null,
+                    'classification_origin' => $classificationOrigin,
+                    'tone' => $tone,
                     'interpretation_scope' => in_array($field, ['body_age', 'visceral_fat_level'], true)
                         ? 'proprietary_non_diagnostic'
                         : 'measurement_estimate',

@@ -24,8 +24,12 @@ return [
 
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
-        'model' => env('OPENAI_MODEL', 'gpt-5.1'),
-        'vision_model' => env('OPENAI_VISION_MODEL', env('OPENAI_MODEL', 'gpt-5.1')),
+        'model' => env('OPENAI_MODEL', 'gpt-6.1-terra'),
+        'vision_model' => env('OPENAI_VISION_MODEL', env('OPENAI_MODEL', 'gpt-6.1-terra')),
+        // Explicit trial setting, independently configurable for agents and OCR.
+        'reasoning_effort' => env('OPENAI_REASONING_EFFORT', 'medium'),
+        'vision_reasoning_effort' => env('OPENAI_VISION_REASONING_EFFORT', env('OPENAI_REASONING_EFFORT', 'medium')),
+        'assistant_max_output_tokens' => (int) env('OPENAI_ASSISTANT_MAX_OUTPUT_TOKENS', 6000),
         'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
         'timeout' => (int) env('OPENAI_TIMEOUT', 45),
         'bodyscan_ocr_timeout' => (int) env('OPENAI_BODYSCAN_OCR_TIMEOUT', 90),
