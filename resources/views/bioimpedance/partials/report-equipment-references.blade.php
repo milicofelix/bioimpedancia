@@ -1,9 +1,12 @@
-<div class="section-title" style="color: {{ $secondaryColor }};">{{ $referenceTableTitle }}</div>
-<table class="segmental-comparison">
-    <caption>Classificações e limites reproduzem os dados extraídos, sem conversão em diagnóstico clínico.</caption>
-    <thead><tr><th>Indicador</th><th>Valor apresentado</th><th>Classificação apresentada</th><th>Referência informada</th></tr></thead>
+{{-- Bounded tables avoid DomPDF's automatic header/caption pagination across a long table. --}}
+@foreach(collect($referenceTableMetrics)->chunk(5) as $referenceChunk)
+<div class="equipment-reference-block">
+    <div class="section-title" style="color: {{ $secondaryColor }};">{{ $referenceTableTitle }}{{ $loop->first ? '' : ' - continuação' }}</div>
+    <p class="equipment-reference-note">Classificações e limites reproduzem os dados extraídos, sem conversão em diagnóstico clínico.</p>
+<table class="equipment-reference-table" aria-label="{{ $referenceTableTitle }}">
+    <thead><tr><th scope="col" style="width: 34%;">Indicador</th><th scope="col" style="width: 18%;">Valor apresentado</th><th scope="col" style="width: 20%;">Classificação apresentada</th><th scope="col" style="width: 28%;">Referência informada</th></tr></thead>
     <tbody>
-    @foreach($referenceTableMetrics as $metric)
+    @foreach($referenceChunk as $metric)
         @php
             $displayLabel = match ($metric['metric_code'] ?? null) {
                 'proprietary_obesity_index' => 'Índice de obesidade informado pelo equipamento',
@@ -34,3 +37,5 @@
     @endforeach
     </tbody>
 </table>
+</div>
+@endforeach

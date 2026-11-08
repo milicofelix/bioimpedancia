@@ -111,6 +111,16 @@
         .segmental-comparison th { background: #eef8fa; color: #475467; text-transform: uppercase; }
         .segmental-comparison tr { page-break-inside: avoid; }
         .segmental-comparison caption { padding: 0 0 5px; color: #475467; font-size: 7px; text-align: left; }
+        /* Reference tables use short, explicit blocks instead of automatically repeated headers. */
+        .equipment-reference-block { margin-top: 8px; page-break-inside: avoid; }
+        .equipment-reference-block .section-title { margin: 0 0 4px; }
+        .equipment-reference-note { margin: 0 0 5px; color: #475467; font-size: 7px; }
+        .equipment-reference-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; margin: 0; font-size: 7px; line-height: 1.4; }
+        .equipment-reference-table thead { display: table-row-group; }
+        .equipment-reference-table tr { height: auto; page-break-inside: avoid; }
+        .equipment-reference-table th, .equipment-reference-table td { height: auto; padding: 5px; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: top; overflow-wrap: break-word; word-wrap: break-word; }
+        .equipment-reference-table th { border-top: 1px solid #e5e7eb; background: #eef8fa; color: #475467; text-transform: uppercase; }
+        .equipment-reference-table th:first-child, .equipment-reference-table td:first-child { border-left: 1px solid #e5e7eb; }
         .segmental-legend { width: 100%; border-collapse: separate; border-spacing: 4px; margin-top: 3px; }
         .segmental-legend td { padding: 3px 5px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; font-size: 6px; text-align: center; }
         .technical-appendix { margin-top: 7px; padding-top: 3px; border-top: 1px solid #cde6ea; }
