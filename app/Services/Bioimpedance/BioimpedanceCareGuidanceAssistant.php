@@ -152,7 +152,7 @@ class BioimpedanceCareGuidanceAssistant
                     'external_validation_errors' => $externalValidationErrors,
                     'final_validation_errors' => $validationErrors,
                     'external_response' => $externalPayload,
-                    'attempted_model' => $generation['attempted_provider'] ? (string) config('services.openai.model', 'gpt-5.1') : null,
+                    'attempted_model' => $generation['attempted_provider'] ? (string) config('services.openai.model') : null,
                 ],
             ],
             'structured_claims' => $validation['accepted_claims'],
@@ -218,7 +218,9 @@ class BioimpedanceCareGuidanceAssistant
             $response = Http::withToken((string) config('services.openai.api_key'))
                 ->acceptJson()->asJson()->connectTimeout(10)->timeout((int) config('services.openai.timeout', 45))
                 ->post(rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/').'/responses', [
-                    'model' => config('services.openai.model', 'gpt-5.1'),
+                    'model' => config('services.openai.model'),
+                    'reasoning' => ['effort' => config('services.openai.reasoning_effort', 'medium')],
+                    'max_output_tokens' => (int) config('services.openai.assistant_max_output_tokens', 6000),
                     'store' => false,
                     'input' => [
                         ['role' => 'system', 'content' => [['type' => 'input_text', 'text' => $this->systemPrompt()]]],
@@ -471,7 +473,7 @@ PROMPT;
 
     private function modelName(): string
     {
-        return filled(config('services.openai.api_key')) ? (string) config('services.openai.model', 'gpt-5.1') : 'local-care-guidance-agent';
+        return filled(config('services.openai.api_key')) ? (string) config('services.openai.model') : 'local-care-guidance-agent';
     }
 
     private function outputText(array $response): string

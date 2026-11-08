@@ -95,7 +95,8 @@ class RelaxmedicImageProcessor
             ->asJson()
             ->timeout((int) config('services.openai.timeout', 45))
             ->post(rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/').'/responses', [
-                'model' => config('services.openai.vision_model', config('services.openai.model', 'gpt-5.1')),
+                'model' => config('services.openai.vision_model'),
+                'reasoning' => ['effort' => config('services.openai.vision_reasoning_effort', 'medium')],
                 'store' => false,
                 'max_output_tokens' => 3000,
                 'input' => [[
@@ -138,7 +139,7 @@ class RelaxmedicImageProcessor
             'size_bytes' => strlen($contents),
             'sha256' => hash('sha256', $contents),
             'processed_at' => now()->toIso8601String(),
-            'processor_model' => (string) config('services.openai.vision_model', config('services.openai.model', 'gpt-5.1')),
+            'processor_model' => (string) config('services.openai.vision_model'),
         ];
         $result['image'] = [
             ...$imageMetadata,

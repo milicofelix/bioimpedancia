@@ -168,7 +168,7 @@ class BioimpedanceObservationAssistant
             'external_validation_errors' => $response['blocked_provider_errors'] ?? [],
             'final_validation_errors' => $validationErrors,
             'external_response' => $externalResponse,
-            'attempted_model' => $response['attempted_provider'] ? (string) config('services.openai.model', 'gpt-5.1') : null,
+            'attempted_model' => $response['attempted_provider'] ? (string) config('services.openai.model') : null,
         ];
 
         $request->update([
@@ -223,7 +223,7 @@ class BioimpedanceObservationAssistant
     private function modelName(): string
     {
         return filled(config('services.openai.api_key'))
-            ? (string) config('services.openai.model', 'gpt-5.1')
+            ? (string) config('services.openai.model')
             : self::MODEL_NAME;
     }
 
@@ -274,7 +274,9 @@ class BioimpedanceObservationAssistant
             ->connectTimeout(10)
             ->timeout((int) config('services.openai.timeout', 45))
             ->post(rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/').'/responses', [
-                'model' => config('services.openai.model', 'gpt-5.1'),
+                'model' => config('services.openai.model'),
+                'reasoning' => ['effort' => config('services.openai.reasoning_effort', 'medium')],
+                'max_output_tokens' => (int) config('services.openai.assistant_max_output_tokens', 6000),
                 'store' => false,
                 'input' => [
                     [

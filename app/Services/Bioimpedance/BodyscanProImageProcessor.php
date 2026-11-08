@@ -56,7 +56,7 @@ class BodyscanProImageProcessor
         }
 
         $contents = $this->jpegInspector->contents($image);
-        $processorModel = (string) config('services.openai.vision_model', config('services.openai.model', 'gpt-5.1'));
+        $processorModel = (string) config('services.openai.vision_model');
         $response = Http::withToken($apiKey)
             ->acceptJson()
             ->asJson()
@@ -64,6 +64,7 @@ class BodyscanProImageProcessor
             ->timeout((int) config('services.openai.bodyscan_ocr_timeout', 90))
             ->post(rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/').'/responses', [
                 'model' => $processorModel,
+                'reasoning' => ['effort' => config('services.openai.vision_reasoning_effort', 'medium')],
                 'store' => false,
                 'max_output_tokens' => 9000,
                 'input' => [[
