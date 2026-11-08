@@ -27,7 +27,8 @@ class AssessmentFindings
                 'classification_origin' => $metric['classification_origin'] ?? null,
                 'classification' => $metric['classification'] ?? null,
                 'text' => $metric['label'].': '.$this->number($metric['value']).' '.$metric['unit']
-                    .(empty($metric['classification']) ? '' : '; classificação '.$metric['classification'].' pela referência do sistema').'.',
+                    .(empty($metric['classification']) ? '' : '; classificação '.$metric['classification']
+                        .(($metric['classification_origin'] ?? null) === 'equipment_report' ? ' no relatório do equipamento' : ' pela referência do sistema')).'.',
                 'source_ids' => [$metric['evidence_id']],
                 'limitations' => ['Valor registrado; não permite inferir diagnóstico, hábitos ou capacidade funcional.'],
             ];

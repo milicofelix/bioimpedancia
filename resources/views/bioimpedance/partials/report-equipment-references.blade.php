@@ -10,6 +10,11 @@
         @php
             $displayLabel = match ($metric['metric_code'] ?? null) {
                 'proprietary_obesity_index' => 'Índice de obesidade informado pelo equipamento',
+                'skeletal_muscle' => match (trim((string) ($metric['unit'] ?? ''))) {
+                    'kg' => 'Massa de músculo esquelético (kg)',
+                    '%' => 'Músculo esquelético (proporção em %)',
+                    default => $metric['original_label'],
+                },
                 default => $metric['original_label'],
             };
             $readingIssue = \App\Domain\Bioimpedance\BodyscanMetricIntegrity::readingIssue($metric);

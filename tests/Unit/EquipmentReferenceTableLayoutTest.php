@@ -36,6 +36,17 @@ class EquipmentReferenceTableLayoutTest extends TestCase
         $this->assertStringNotContainsString('class="section-title"', $html);
     }
 
+    public function test_skeletal_muscle_mass_has_an_explicit_mass_label(): void
+    {
+        $html = $this->renderReferences([[
+            'metric_code' => 'skeletal_muscle', 'original_label' => 'Músculo esquelético',
+            'numeric_value' => 39.5, 'unit' => 'kg',
+        ]]);
+
+        $this->assertStringContainsString('Massa de músculo esquelético (kg)', $html);
+        $this->assertStringContainsString('39.5 kg', $html);
+    }
+
     private function renderReferences(array $metrics): string
     {
         return view('bioimpedance.partials.report-equipment-references', [

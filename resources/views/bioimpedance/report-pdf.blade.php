@@ -217,22 +217,14 @@
         return (string) ($metric['text_value'] ?? $metric['raw_extracted_value'] ?? '-');
     };
     $displayClassification = fn ($indicator, $fallback = '-') => $indicator['classification'] ?? $fallback;
-    $bodyFatDeviceMetric = $extendedMetricsByCode->get('body_fat_percentage');
-    $deviceTone = function (?string $classification): string {
-        $normalized = mb_strtolower(trim((string) $classification));
-        return match (true) {
-            str_contains($normalized, 'baixo') || str_contains($normalized, 'fino') => 'attention',
-            str_contains($normalized, 'alto') => 'danger',
-            str_contains($normalized, 'padrão') || str_contains($normalized, 'padrao') || str_contains($normalized, 'normal') || str_contains($normalized, 'excelente') => 'good',
-            default => 'neutral',
-        };
-    };
+    $recordedBodyFat = \App\Domain\Bioimpedance\BodyFatReportContext::classification($extendedMetrics);
+    $observationReviewNotice = \App\Domain\Bioimpedance\BodyFatReportContext::observationReviewNotice($assessment['notes'] ?? null, $extendedMetrics);
     $bodyFatReportIndicator = $bodyFat;
-    if (filled($bodyFatDeviceMetric['application_classification'] ?? null)) {
+    if ($recordedBodyFat !== null) {
         $bodyFatReportIndicator = [
             ...$bodyFat,
-            'classification' => $bodyFatDeviceMetric['application_classification'],
-            'tone' => $deviceTone($bodyFatDeviceMetric['application_classification']),
+            'classification' => $recordedBodyFat['classification'],
+            'tone' => $recordedBodyFat['tone'],
             'pending' => false,
         ];
     }
@@ -241,10 +233,10 @@
         'o equipamento não forneceu uma classificação textual para este indicador',
         $assessment['analysis']['summary'] ?? 'Síntese indisponível.',
     );
-    if (filled($bodyFatDeviceMetric['application_classification'] ?? null)) {
+    if ($recordedBodyFat !== null) {
         $executiveSummary = preg_replace(
             '/Gordura corporal estimada pelo equipamento em ([^;]+); sem classificação disponível para este indicador\./u',
-            'Gordura corporal estimada pelo equipamento em $1, com classificação "'.$bodyFatDeviceMetric['application_classification'].'" apresentada pelo equipamento.',
+            'Gordura corporal estimada pelo equipamento em $1, com classificação "'.$recordedBodyFat['classification'].'" apresentada pelo equipamento.',
             $executiveSummary,
         ) ?? $executiveSummary;
     }
@@ -340,18 +332,7 @@
     $hasEvolution = ($comparison['history_count'] ?? 0) >= 2 && count($comparison['trends'] ?? []);
     $bodyBalanceMetric = $extendedMetricsByCode->get('body_balance_assessment');
     $bodyBalanceText = trim((string) ($bodyBalanceMetric['text_value'] ?? $bodyBalanceMetric['raw_extracted_value'] ?? ''));
-    $bodyBalanceItems = collect(['Superior', 'Mais baixo', 'Parte superior'])->map(function (string $label, int $index) use ($bodyBalanceText): ?array {
-        $labels = ['Superior', 'Mais baixo', 'Parte superior'];
-        $start = mb_stripos($bodyBalanceText, $label);
-        if ($start === false) {
-            return null;
-        }
-        $valueStart = $start + mb_strlen($label);
-        $nextLabel = $labels[$index + 1] ?? null;
-        $nextStart = $nextLabel ? mb_stripos($bodyBalanceText, $nextLabel, $valueStart) : false;
-        $value = trim(mb_substr($bodyBalanceText, $valueStart, $nextStart === false ? null : $nextStart - $valueStart));
-        return $value !== '' ? ['label' => $label, 'value' => $value] : null;
-    })->filter()->values()->all();
+    $bodyBalanceItems = \App\Services\Bioimpedance\BodyBalanceReportFormatter::items($bodyBalanceText);
     $segmentalFatTotal = collect($segmentalMeasurements)->where('type', 'fat')->sum(fn (array $item) => is_numeric($item['mass_kg'] ?? null) ? (float) $item['mass_kg'] : 0.0);
     $segmentalFatDifference = is_numeric($assessment['fat_mass_kg'] ?? null) && $segmentalFatTotal > 0
         ? abs($segmentalFatTotal - (float) $assessment['fat_mass_kg'])
@@ -378,7 +359,7 @@
             <td class="box hero" style="width: 25%;"><div class="label">Peso</div><div class="metric-value">{{ $br($assessment['weight_kg']) }} <span class="metric-unit">kg</span></div></td>
             <td class="box hero" style="width: 25%;"><div class="label">IMC calculado</div><div class="metric-value">{{ $br($assessment['calculated_bmi']) }}</div><span class="badge {{ $tone($bmi) }}">{{ $displayClassification($bmi) }}</span></td>
             <td class="box hero" style="width: 25%;"><div class="label">Gordura corporal</div><div class="metric-value">{{ $br($assessment['body_fat_percentage']) }} <span class="metric-unit">%</span></div>@if(!($bodyFatReportIndicator['pending'] ?? false))<span class="badge {{ $tone($bodyFatReportIndicator) }}">{{ $displayClassification($bodyFatReportIndicator, 'Estimativa') }}</span><div class="muted" style="margin-top: 3px;">Classificação do equipamento</div>@else<div class="muted" style="margin-top: 6px;">Estimativa do equipamento</div>@endif</td>
-            <td class="box hero" style="width: 25%;"><div class="label">Músculo esquelético</div><div class="metric-value">{{ $br($assessment['skeletal_muscle_percentage']) }} <span class="metric-unit">%</span></div>@if(!($muscle['pending'] ?? false))<span class="badge {{ $tone($muscle) }}">{{ $displayClassification($muscle, 'Estimativa') }}</span>@else<div class="muted" style="margin-top: 6px;">Estimativa do equipamento</div>@endif</td>
+            <td class="box hero" style="width: 25%;"><div class="label">Músculo esquelético (proporção)</div><div class="metric-value">{{ $br($assessment['skeletal_muscle_percentage']) }} <span class="metric-unit">%</span></div><div class="muted" style="margin-top: 3px;">Percentual do peso corporal; não é massa em kg.</div>@if(!($muscle['pending'] ?? false))<span class="badge {{ $tone($muscle) }}">{{ $displayClassification($muscle, 'Estimativa') }}</span>@else<div class="muted" style="margin-top: 6px;">Estimativa do equipamento</div>@endif</td>
         </tr></table>
         <div class="summary"><div class="section-title" style="margin-top: 0; color: {{ $primaryColor }};">Síntese da avaliação</div><p>{{ $executiveSummary }}</p></div>
         @if($isRelaxmedic)
@@ -404,7 +385,7 @@
     <div class="content">
         <div class="section-title" style="color: {{ $secondaryColor }};">Composição corporal detalhada</div>
         <table class="grid">
-            <tr><td class="box" style="width: 50%;">@include('bioimpedance.partials.pdf-scale', ['title' => 'Gordura corporal', 'value' => $br($assessment['body_fat_percentage']).' %', 'indicator' => $bodyFatReportIndicator])</td><td class="box">@include('bioimpedance.partials.pdf-scale', ['title' => 'Músculo esquelético', 'value' => $br($assessment['skeletal_muscle_percentage']).' %', 'indicator' => $muscle])</td></tr>
+            <tr><td class="box" style="width: 50%;">@include('bioimpedance.partials.pdf-scale', ['title' => 'Gordura corporal', 'value' => $br($assessment['body_fat_percentage']).' %', 'indicator' => $bodyFatReportIndicator])</td><td class="box">@include('bioimpedance.partials.pdf-scale', ['title' => 'Músculo esquelético (proporção)', 'value' => $br($assessment['skeletal_muscle_percentage']).' %', 'indicator' => $muscle])</td></tr>
             <tr><td class="box">@include('bioimpedance.partials.pdf-scale', ['title' => 'Gordura visceral', 'value' => $br($assessment['visceral_fat_level'], $isRelaxmedic ? 1 : 0).' nível', 'indicator' => $visceral])<div class="muted" style="margin-top: 5px;">Índice do dispositivo; não representa quantidade em kg.</div></td><td class="box"><div class="label">IMC calculado</div><div class="metric-value">{{ $br($assessment['calculated_bmi']) }}</div><span class="badge {{ $tone($bmi) }}">{{ $displayClassification($bmi) }}</span><div class="muted" style="margin-top: 5px;">Calculado com peso e altura. Deve ser interpretado com composição corporal, histórico e contexto individual.</div></td></tr>
         </table>
         @if($isRelaxmedic && count($compositionDetailMetrics))
@@ -566,7 +547,7 @@
 </section>
 @endif
 
-<section class="report-section page-guidance {{ mb_strlen((string) ($assessment['notes'] ?? '').(string) ($assessment['care_guidance'] ?? '').(string) ($clinic['technical_notice'] ?? '')) > 3600 ? 'guidance-dense' : '' }}">
+<section class="report-section page-guidance {{ mb_strlen((string) ($assessment['notes'] ?? '').(string) ($assessment['care_guidance'] ?? '').(string) $observationReviewNotice.(string) ($clinic['technical_notice'] ?? '')) > 3600 ? 'guidance-dense' : '' }}">
     @include('bioimpedance.partials.report-header', ['pageTitle' => 'Orientações', 'pageNumber' => $totalSections, 'totalSections' => $totalSections])
     <div class="content">
         <div class="section-title" style="color: {{ $secondaryColor }};">{{ $hasReviewedObservation ? 'Síntese revisada pelo profissional' : 'Resumo dos resultados' }}</div>
@@ -577,6 +558,7 @@
                 <p class="muted">Nenhuma observação profissional foi registrada.</p>
             @endif
         </div>
+        @if($observationReviewNotice)<div class="notice"><strong>Conferência da síntese.</strong> {{ $observationReviewNotice }}</div>@endif
         @if(! ($assessment['care_guidance'] ?? null))
             <div class="section-title" style="color: {{ $secondaryColor }};">Acompanhamento</div>
             <div class="summary">Use esta avaliação como referência para o acompanhamento. Quando houver nova medição, procure manter horário, hidratação, alimentação recente e perfil de cálculo semelhantes para tornar a comparação mais consistente.</div>

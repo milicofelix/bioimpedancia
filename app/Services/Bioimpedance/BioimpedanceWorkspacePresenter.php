@@ -3,6 +3,7 @@
 namespace App\Services\Bioimpedance;
 
 use App\Domain\Bioimpedance\ScaleModel;
+use App\Domain\Bioimpedance\BodyFatReportContext;
 use App\Models\Bioimpedance\BioimpedanceAiAnalysisOutput;
 use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceClient;
@@ -251,6 +252,9 @@ class BioimpedanceWorkspacePresenter
             'analysis' => $analysis,
             'source_metadata' => $assessment->source_metadata,
             'notes' => $assessment->notes,
+            'observation_review_notice' => $assessment->relationLoaded('extendedMetrics')
+                ? BodyFatReportContext::observationReviewNotice($assessment->notes, $assessment->extendedMetrics)
+                : null,
             'care_guidance' => $assessment->care_guidance,
             'care_guidance_sources' => $assessment->care_guidance_sources ?? [],
             'care_guidance_approved_at' => $assessment->care_guidance_approved_at?->toIso8601String(),
@@ -282,23 +286,14 @@ class BioimpedanceWorkspacePresenter
             return $analysis;
         }
 
-        $metric = $assessment->extendedMetrics->firstWhere('metric_code', 'body_fat_percentage');
-        $classification = trim((string) ($metric?->application_classification ?? ''));
-        if ($classification === '') {
+        $recorded = BodyFatReportContext::classification($assessment->extendedMetrics);
+        if ($recorded === null) {
             return $analysis;
         }
-
-        $normalized = mb_strtolower($classification);
-        $tone = match (true) {
-            str_contains($normalized, 'baixo') || str_contains($normalized, 'fino') => 'attention',
-            str_contains($normalized, 'alto') => 'danger',
-            str_contains($normalized, 'padrão'), str_contains($normalized, 'padrao'),
-            str_contains($normalized, 'normal'), str_contains($normalized, 'excelente') => 'good',
-            default => 'neutral',
-        };
+        $classification = $recorded['classification'];
 
         data_set($analysis, 'indicators.body_fat.classification', $classification);
-        data_set($analysis, 'indicators.body_fat.tone', $tone);
+        data_set($analysis, 'indicators.body_fat.tone', $recorded['tone']);
         data_set($analysis, 'indicators.body_fat.pending', false);
         data_set($analysis, 'indicators.body_fat.classification_source', 'device');
         data_set($analysis, 'indicators.body_fat.reference_source', 'printed_report');
