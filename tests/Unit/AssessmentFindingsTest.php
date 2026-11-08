@@ -35,6 +35,7 @@ class AssessmentFindingsTest extends TestCase
         $specific = $composer->claims(['findings' => [[
             'id' => 'assessment:segmental:current:fat:trunk:center',
             'kind' => 'segmental', 'metric' => 'fat', 'priority' => 'review',
+            'text' => 'Gordura segmentar no tronco: Alto no relatório de origem (250,0% da referência).',
         ]]]);
         $this->assertNotSame($baseline[0]['text'], $specific[0]['text']);
         $this->assertStringContainsString('Não há informação sobre sua alimentação', $baseline[0]['text']);

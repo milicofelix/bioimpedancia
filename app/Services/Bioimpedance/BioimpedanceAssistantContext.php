@@ -91,6 +91,8 @@ class BioimpedanceAssistantContext
                 },
             ],
             'general_metrics' => $generalMetrics,
+            'finding_selection_policy' => AssessmentFindingPrioritizer::POLICY,
+            'missing_personal_context' => ['alimentação habitual', 'rotina de atividade física', 'capacidade funcional', 'doenças, medicações e limitações', 'preferências, restrições alimentares e objetivos'],
             'extended_indices' => $indices,
             'body_score_policy' => [
                 'available' => $assessment->extendedMetrics->contains('metric_code', BodyscanExtendedMetricCatalog::BODY_SCORE),
@@ -107,6 +109,7 @@ class BioimpedanceAssistantContext
                 'WHR e ASMI são índices do equipamento e não sustentam diagnóstico isolado.',
                 'Pontuação corporal não participa da interpretação clínica.',
                 'Perfis padrão e atleta usam contextos de cálculo diferentes e não devem ser tratados automaticamente como melhora ou piora.',
+                'Modo atleta é um perfil de cálculo, não evidência de condicionamento ou capacidade para exercícios.',
             ],
             'evidence_catalog' => $catalog,
             'evidence_ids' => collect($catalog)->pluck('id')->values()->all(),

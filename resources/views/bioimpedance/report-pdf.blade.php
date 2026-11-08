@@ -79,6 +79,9 @@
         .page-guidance .summary p, .page-guidance .notice p, .page-guidance .guidance p { margin-top: 3px; margin-bottom: 3px; }
         .page-guidance .validation { margin-top: 5px; }
         .page-guidance .validation td { padding: 5px 7px; }
+        .report-closing { page-break-inside: avoid; }
+        .report-closing .report-limits { font-size: 8px; line-height: 1.35; }
+        .report-limits p { margin: 3px 0 0; }
         .segmental-page .content { padding: 8px 12px; }
         .segmental-page .notice { margin-top: 4px; padding: 6px 8px; }
         .segmental-grid { width: 100%; border-collapse: separate; border-spacing: 5px; table-layout: fixed; page-break-inside: avoid; }
@@ -559,8 +562,10 @@
                 <p class="muted">Nenhuma observação profissional foi registrada.</p>
             @endif
         </div>
-        <div class="section-title" style="color: {{ $secondaryColor }};">Acompanhamento</div>
-        <div class="summary">Use esta avaliação como referência para o acompanhamento. Quando houver nova medição, procure manter horário, hidratação, alimentação recente e perfil de cálculo semelhantes para tornar a comparação mais consistente.</div>
+        @if(! ($assessment['care_guidance'] ?? null))
+            <div class="section-title" style="color: {{ $secondaryColor }};">Acompanhamento</div>
+            <div class="summary">Use esta avaliação como referência para o acompanhamento. Quando houver nova medição, procure manter horário, hidratação, alimentação recente e perfil de cálculo semelhantes para tornar a comparação mais consistente.</div>
+        @endif
         <div class="section-title" style="color: {{ $secondaryColor }};">Orientações educativas</div>
         @if($assessment['care_guidance'] ?? null)
             @foreach($guidanceSections as $section)
@@ -570,13 +575,12 @@
         @else
             <div class="summary muted">Este campo é opcional e não recebeu orientação individualizada revisada para esta avaliação.</div>
         @endif
-        <div class="section-title" style="color: {{ $secondaryColor }};">Responsável pelo relatório</div>
-        <table class="validation">
-            <tr><td style="width: 50%;"><div class="label">Profissional responsável</div><strong>{{ $responsibleProfessionalName }}</strong><br><span class="{{ $hasRecordedProfessionalReview ? 'review-status' : 'muted' }}">{{ $hasRecordedProfessionalReview ? 'Revisão registrada por '.$reviewedByName.' em '.\Illuminate\Support\Carbon::parse($reviewedAt)->format('d/m/Y H:i') : 'Sem revisão profissional identificada com responsável e data' }}</span></td><td><div class="label">Data da avaliação</div><strong>{{ \Illuminate\Support\Carbon::parse($assessment['evaluated_at'])->format('d/m/Y H:i') }}</strong></td></tr>
-        </table>
-        <div class="keep-together">
-            <div class="section-title" style="color: {{ $secondaryColor }};">Limites do relatório</div>
-            <div class="summary"><p>{{ $clinic['technical_notice'] }}</p></div>
+        <div class="report-closing">
+            <div class="section-title" style="color: {{ $secondaryColor }};">Responsável e limites do relatório</div>
+            <table class="validation">
+                <tr><td style="width: 50%;"><div class="label">Profissional responsável</div><strong>{{ $responsibleProfessionalName }}</strong><br><span class="{{ $hasRecordedProfessionalReview ? 'review-status' : 'muted' }}">{{ $hasRecordedProfessionalReview ? 'Revisão registrada por '.$reviewedByName.' em '.\Illuminate\Support\Carbon::parse($reviewedAt)->format('d/m/Y H:i') : 'Sem revisão profissional identificada com responsável e data' }}</span></td><td><div class="label">Data da avaliação</div><strong>{{ \Illuminate\Support\Carbon::parse($assessment['evaluated_at'])->format('d/m/Y H:i') }}</strong></td></tr>
+                <tr><td colspan="2" class="report-limits"><strong>Limites do relatório</strong><p>{{ $clinic['technical_notice'] }}</p></td></tr>
+            </table>
         </div>
     </div>
 </section>

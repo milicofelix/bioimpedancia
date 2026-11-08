@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
 
 class BioimpedanceObservationAssistant
 {
-    public const PROMPT_VERSION = 'rag-client-1.4.0';
+    public const PROMPT_VERSION = 'rag-client-1.5.0';
 
     public const MODEL_NAME = 'local-validated-rag-agent';
 
@@ -25,6 +25,8 @@ class BioimpedanceObservationAssistant
         private readonly KnowledgeSourceSnapshot $sourceSnapshot,
         private readonly PublishedKnowledgeSourceRepository $publishedSources,
         private readonly BioimpedanceAssistantContext $assistantContext,
+        private readonly AssessmentNarrative $narrative,
+        private readonly ClinicalTextGuard $textGuard,
     ) {}
 
     private const DEFAULT_DOCUMENTS = [
@@ -139,7 +141,9 @@ class BioimpedanceObservationAssistant
         $response = $this->generateResponse($assessment, $context, $chunks);
         $response['provider'] ??= 'local_reference_engine';
         $validationErrors = $this->validateResponse($response, $assessment, $chunks, $context);
+        $externalResponse = null;
         if (count($validationErrors) && ($response['provider'] ?? null) === 'openai') {
+            $externalResponse = $response;
             $openAiValidationErrors = $validationErrors;
             $localResponse = [
                 ...$this->generateStructuredResponse($assessment, $context, $chunks),
@@ -156,6 +160,16 @@ class BioimpedanceObservationAssistant
         $status = count($validationErrors) ? 'blocked' : $response['status'];
         $response['fallback_used'] = filled($response['fallback_reason'] ?? null);
         $response['attempted_provider'] = $response['provider'] === 'openai' || $response['fallback_used'] ? 'openai' : null;
+        $generationAudit = [
+            'provider' => $response['provider'],
+            'attempted_provider' => $response['attempted_provider'],
+            'fallback_used' => $response['fallback_used'],
+            'fallback_reason' => $response['fallback_reason'] ?? null,
+            'external_validation_errors' => $response['blocked_provider_errors'] ?? [],
+            'final_validation_errors' => $validationErrors,
+            'external_response' => $externalResponse,
+            'attempted_model' => $response['attempted_provider'] ? (string) config('services.openai.model', 'gpt-5.1') : null,
+        ];
 
         $request->update([
             'status' => $status,
@@ -177,7 +191,7 @@ class BioimpedanceObservationAssistant
 
         $output = BioimpedanceAiAnalysisOutput::query()->create([
             'bioimpedance_ai_analysis_request_id' => $request->id,
-            'raw_response' => $response,
+            'raw_response' => [...$response, 'generation_audit' => $generationAudit],
             'structured_claims' => $status === 'generated' ? ($context['findings'] ?? []) : [],
             'professional_observation' => $status === 'generated' ? $response['professional_observation'] : null,
             'validation_status' => count($validationErrors) ? 'failed' : 'passed',
@@ -317,6 +331,7 @@ Gere uma observação final clara, acolhedora e adequada para constar no relató
 A observação será revisada e aprovada pelo profissional antes de entrar no relatório.
 Use somente o contexto estruturado e as fontes aprovadas enviadas.
 Use findings para escolher os achados mais relevantes. Diferencie valores registrados, classificações do equipamento e classificações calculadas pelo sistema. Explique as limitações dos achados escolhidos, sem listar todos os números nem repetir orientações genéricas. Não infira hábitos, sintomas ou restrições ausentes.
+Siga finding_selection_policy. Considere todas as regiões e resuma grupos com a mesma classificação, citando todas as evidências envolvidas; nunca selecione apenas as primeiras posições da lista. Destaque o tronco quando seu percentual relativo à referência se destacar dentro da gordura segmentar, sem interpretar esse percentual como gordura regional ou risco clínico. Não compare percentuais de referência de gordura e músculo como se fossem equivalentes. Mencione a ausência de histórico uma única vez e só quando history_comparison.has_previous for falso. Se houver histórico incompatível, explique a incompatibilidade em vez de chamar a avaliação de inicial. Não enumere WHR, ASMI e idade corporal sem utilidade para a síntese. Limite a observação a 1800 caracteres e priorize interpretação descritiva fundamentada, não um inventário de medidas.
 Não altere, recalcule nem questione as classificações oficiais do backend.
 Não gere diagnóstico, prescrição, dieta, medicação, suplemento ou tratamento.
 Não afirme causalidade médica. Não substitua avaliação de profissional habilitado.
@@ -455,34 +470,29 @@ PROMPT;
         $positivePoints = $this->pointsByTone($context, ['good'], $chunks);
         $attentionPoints = $this->pointsByTone($context, ['warning', 'danger', 'attention'], $chunks);
         $variation = $this->variationText($assessment, $context['previous_assessment'] ?? null);
-        $bodyAge = $this->bodyAgeText($assessment);
         $warnings = $context['warnings'] ?? [];
         $profileWarning = collect(data_get($context, 'history_comparison.warnings', []))->first();
-        $measurements = collect($context['findings'] ?? [])->where('kind', 'measurement')
-            ->whereIn('metric', ['weight_kg', 'body_fat_percentage', 'lean_body_mass_kg', 'body_water_percentage'])->take(4);
-        $segmentFindings = collect($context['findings'] ?? [])->where('kind', 'segmental')->where('priority', 'review')->take(2);
-        $attentionPoints = [...$attentionPoints, ...$segmentFindings->map(fn (array $finding) => [
-            'text' => $finding['text'], 'source_chunk_ids' => $finding['source_ids'],
-        ])->all()];
+        $segmentPoints = $this->narrative->segmentPoints($context);
+        $reviewIds = collect($context['findings'] ?? [])->where('priority', 'review')->pluck('id')->all();
+        $segmentAttention = array_values(array_filter($segmentPoints, fn ($point) => count(array_intersect($point['source_chunk_ids'], $reviewIds)) > 0));
+        $attentionPoints = [...$attentionPoints, ...$segmentAttention];
         $observationParts = [
-            $this->classificationObservation($context),
-            $measurements->pluck('text')->implode(' '),
-            $segmentFindings->pluck('text')->implode(' '),
-            collect($context['findings'] ?? [])->where('kind', 'equipment_index')->take(2)->pluck('text')->implode(' '),
-            $segmentFindings->isNotEmpty() ? 'As classificações por região pertencem ao equipamento e não avaliam força ou função.' : null,
-            $bodyAge,
+            $this->narrative->composition($context),
+            collect($segmentPoints)->pluck('text')->implode(' '),
+            $segmentPoints ? 'Percentuais segmentares são relativos às referências do equipamento, não percentuais de gordura local. Essas estimativas não comprovam força, função ou diagnóstico.' : null,
             $variation,
             $profileWarning ? 'A comparação com a avaliação anterior exige cautela: '.$profileWarning : null,
             count($warnings) ? 'Há alerta de consistência registrado: '.$warnings[0] : null,
-            data_get($context, 'history_comparison.has_previous')
-                ? 'Confira com o profissional as condições de cada medição antes de atribuir significado às diferenças.'
-                : 'Este registro é uma linha de base; ainda não há evolução individual para interpretar.',
+            ! data_get($context, 'history_comparison.has_previous')
+                ? 'Esta avaliação é uma linha de base: medições futuras em condições semelhantes permitirão acompanhar tendências, com revisão profissional.'
+                : 'Confira com o profissional as condições de cada medição antes de atribuir significado às diferenças.',
         ];
-        $observation = collect($observationParts)->filter()->reduce(function (string $text, string $part): string {
-            $candidate = trim($text.' '.$part);
-
-            return mb_strlen($candidate) <= 1900 ? $candidate : $text;
-        }, '');
+        $observation = collect($observationParts)->filter()->implode(' ');
+        if (mb_strlen($observation) > 1900) {
+            // Compact groups rather than silently discard regions or the conclusion.
+            $observationParts[1] = $this->narrative->compactSegments($context);
+            $observation = collect($observationParts)->filter()->implode(' ');
+        }
 
         return [
             'status' => 'generated',
@@ -519,7 +529,7 @@ PROMPT;
             'seu peso ideal é', 'pontuação corporal indica', 'pontuação corporal demonstra',
             'pontuação corporal confirma', 'whr indica', 'whr demonstra',
         ] as $forbidden) {
-            if (str_contains($text, $forbidden)) {
+            if ($this->textGuard->contains($text, $forbidden)) {
                 $errors[] = 'Conteúdo proibido detectado: '.$forbidden;
             }
         }
@@ -699,44 +709,10 @@ PROMPT;
             ->all();
     }
 
-    private function classificationObservation(array $context): string
-    {
-        $metrics = $context['metrics'];
-        $segments = [];
-        foreach ([
-            'body_fat' => 'gordura corporal',
-            'skeletal_muscle' => 'músculo esquelético',
-            'visceral_fat' => 'gordura visceral',
-        ] as $key => $label) {
-            if (filled($metrics[$key]['classification'] ?? null)) {
-                $segments[] = $label.' '.mb_strtolower($metrics[$key]['classification']);
-            }
-        }
-
-        $sentence = $segments
-            ? 'Os resultados mostram '.implode(', ', $segments).'.'
-            : 'A avaliação foi registrada com os indicadores disponíveis.';
-
-        if (filled($metrics['bmi']['classification'] ?? null)) {
-            $sentence .= ' O IMC calculado foi de '.$this->number($metrics['bmi']['value'], 1).' kg/m², classificado como '.mb_strtolower($metrics['bmi']['classification']).'.';
-        }
-
-        return $sentence;
-    }
-
-    private function bodyAgeText(BioimpedanceAssessment $assessment): ?string
-    {
-        if ($assessment->body_age === null || $assessment->age_at_assessment === null) {
-            return null;
-        }
-
-        return 'O equipamento apresentou idade corporal estimada de '.$assessment->body_age.' anos; esse índice proprietário não representa idade biológica real nem produz diagnóstico.';
-    }
-
     private function variationText(BioimpedanceAssessment $assessment, ?array $previous): ?string
     {
         if (! $previous) {
-            return 'Esta avaliação servirá como linha de base para comparação nas próximas medições.';
+            return null;
         }
 
         $manufacturerEstimate = in_array($assessment->device_model, ['Relaxmedic', 'Bodyscan Pro'], true);
