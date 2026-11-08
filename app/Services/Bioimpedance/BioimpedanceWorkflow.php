@@ -1292,6 +1292,19 @@ class BioimpedanceWorkflow
             'ocr_raw_values' => $validated['source_metadata']['raw_values'],
             'side_consistency' => $validated['source_metadata']['side_consistency'],
             'segmental_review_corrections' => $segmentalReviewCorrections,
+            // Recompute from signed extraction and reviewed values, never trust browser warnings.
+            'document_consistency_review' => [
+                'extracted_warnings' => (new BodyscanDocumentConsistency)->warnings(
+                    $validated['source_metadata']['metrics'],
+                    $validated['source_metadata']['segmental_measurements'],
+                ),
+                'confirmed_warnings' => (new BodyscanDocumentConsistency)->warnings(
+                    ['fat_mass_kg' => $request->input('fat_mass_kg')],
+                    $segments,
+                ),
+                'confirmed_at' => now()->toIso8601String(),
+                'confirmed_by_user_id' => $request->user()->id,
+            ],
             'impedance_review_corrections' => $impedanceReviewCorrections,
             'review_confirmed_at' => now()->toIso8601String(),
             'reviewed_by_user_id' => $request->user()->id,

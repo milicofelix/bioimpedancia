@@ -492,7 +492,7 @@
 <section class="report-section segmental-page">
     @include('bioimpedance.partials.report-header', ['pageTitle' => 'Análise segmentar', 'pageNumber' => 3 + ($hasFitdaysDataPage ? 1 : 0) + ($hasDetailedComparison ? 1 : 0), 'totalSections' => $totalSections])
     <div class="content">
-        <div class="notice"><strong>Leitura segmentar.</strong> L representa o lado esquerdo e R o lado direito. Massa, percentual de referência e classificação também são apresentados nas tabelas textuais.</div>
+        <div class="notice"><strong>Leitura segmentar.</strong> E representa o lado esquerdo e D o lado direito. Massa, percentual de referência e classificação também são apresentados nas tabelas textuais.</div>
         <div class="segmental-summary"><strong>Resumo descritivo.</strong> {{ $segmentSummary('fat', 'Gordura segmentar') }} {{ $segmentSummary('muscle', 'Equilíbrio muscular') }} As classificações reproduzem o equipamento e não representam diagnóstico.</div>
         @if($hasSegmentalFatDifference)<div class="notice"><strong>Conferência técnica.</strong> A soma arredondada da gordura segmentar ({{ $br($segmentalFatTotal) }} kg) difere da massa gorda total ({{ $br($assessment['fat_mass_kg']) }} kg) em {{ $br($segmentalFatDifference) }} kg. Os valores originais foram preservados e devem ser conferidos no relatório de origem.</div>@endif
         <table class="segmental-grid"><tr>

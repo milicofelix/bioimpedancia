@@ -23,7 +23,7 @@
 @endphp
 <div class="segmental-map keep-together">
     <div class="segmental-title">{{ $title }}</div>
-    <div class="segmental-subtitle">Vista frontal · L = esquerdo · R = direito</div>
+    <div class="segmental-subtitle">Vista frontal · E = esquerdo · D = direito</div>
     <table class="segmental-visual" role="presentation">
         @foreach([
             ['arm|left', 'arm|right'],

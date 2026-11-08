@@ -366,6 +366,7 @@ class BodyscanProImageProcessor
             'extended_metrics' => $extendedMetrics,
             'impedance_readings' => $impedanceReadings,
             'segmental_measurements' => $segmentalMeasurements,
+            'consistency_warnings' => (new BodyscanDocumentConsistency)->warnings($metrics, $segmentalMeasurements),
             'side_consistency' => $sideConsistency,
             'missing_fields' => $missingFields->unique()->values()->all(),
             'suspicious_values' => $suspiciousValues->unique(fn (array $item) => $item['field'].'|'.$item['reason'])->values()->all(),
@@ -731,20 +732,6 @@ class BodyscanProImageProcessor
                 'value' => (float) $leanMass + (float) $fatMass,
                 'reason' => 'A soma de massa magra e massa gorda difere do peso total. Confira os três valores.',
             ]);
-        }
-
-        $segmentalFatMass = collect($segments)
-            ->where('type', Segment::TYPE_FAT)
-            ->sum(fn (array $segment) => is_numeric($segment['mass_kg'] ?? null) ? (float) $segment['mass_kg'] : 0.0);
-        if (is_numeric($fatMass) && $segmentalFatMass > 0) {
-            $tolerance = max(0.5, (float) $fatMass * 0.03);
-            if (abs($segmentalFatMass - (float) $fatMass) > $tolerance) {
-                $suspiciousValues->push([
-                    'field' => 'segmental.fat.total_mass',
-                    'value' => round($segmentalFatMass, 2),
-                    'reason' => 'A soma da gordura segmentar difere da massa gorda total além da tolerância de leitura. Confira especialmente o tronco e as pernas.',
-                ]);
-            }
         }
 
         foreach ($segments as $segment) {

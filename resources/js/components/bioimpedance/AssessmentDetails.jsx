@@ -7,6 +7,7 @@ import {
 import { formatDate, numberBr } from '../../shared/formatters';
 import SegmentalBodyMap from './SegmentalBodyMap';
 import SegmentalComparison from './SegmentalComparison';
+import BodyscanConsistencyNotice from '../../pwa/features/assessment/BodyscanConsistencyNotice';
 import {
 	assessmentComparability,
 	commonExtendedMetricComparisons,
@@ -74,6 +75,7 @@ export default function AssessmentDetails({ assessment, previousAssessment }) {
 					<p className="mt-1">Arquivo: {assessment.source_metadata.image_name} • imagem não armazenada</p>
 					<p className="break-all">SHA-256: {assessment.source_metadata.image_sha256}</p>
 					<p>Processada em {formatDate(assessment.source_metadata.processed_at)} • conferida em {formatDate(assessment.source_metadata.review_confirmed_at)}</p>
+					<BodyscanConsistencyNotice warnings={assessment.source_metadata.document_consistency_review?.extracted_warnings} reviewedAt={formatDate(assessment.source_metadata.document_consistency_review?.confirmed_at)} />
 				</div>
 			) : null}
 		</div>

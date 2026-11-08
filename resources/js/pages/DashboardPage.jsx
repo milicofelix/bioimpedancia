@@ -22,6 +22,7 @@ import AssistantProvenance from '../pwa/features/assistant/AssistantProvenance';
 import ObservationFindings from '../pwa/features/assistant/ObservationFindings';
 import KnowledgeDocumentsPanel from '../components/bioimpedance/KnowledgeDocumentsPanel';
 import BodyscanReview from '../pwa/features/assessment/BodyscanReview';
+import BodyscanConsistencyNotice from '../pwa/features/assessment/BodyscanConsistencyNotice';
 import { bodyscanAssessmentPayload, bodyscanFormFromExtraction, bodyscanProtocolComplete, emptyBodyscanProtocol, updateBodyscanImpedance, updateBodyscanSegment } from '../pwa/features/assessment/bodyscanAssessmentForm';
 import BodyscanProtocolChecklist from '../pwa/features/assessment/BodyscanProtocolChecklist';
 import BodyscanReportFormatGuide from '../pwa/features/assessment/BodyscanReportFormatGuide';
@@ -2351,6 +2352,7 @@ function Report({ clinic, client, assessment, professional }) {
 								<p className="font-bold uppercase tracking-wide text-slate-800">Rastreabilidade da origem</p>
 								<p className="mt-2">Imagem {assessment.source_metadata.image_name} processada em {formatDate(assessment.source_metadata.processed_at)}. O arquivo original não foi armazenado.</p>
 								<p className="break-all">SHA-256: {assessment.source_metadata.image_sha256}</p>
+								<BodyscanConsistencyNotice warnings={assessment.source_metadata.document_consistency_review?.extracted_warnings} reviewedAt={formatDate(assessment.source_metadata.document_consistency_review?.confirmed_at)} />
 							</section>
 						) : null}
 					</>

@@ -37,8 +37,8 @@ export const segmentalBodyNeutralPalette = {
 };
 
 export const segmentalSideMarkers = [
-	{ label: 'L', x: 111, y: 396 },
-	{ label: 'R', x: 241, y: 396 },
+	{ label: 'E', x: 111, y: 396 },
+	{ label: 'D', x: 241, y: 396 },
 ];
 
 export function segmentalState(classification) {

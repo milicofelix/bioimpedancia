@@ -10,6 +10,7 @@ import { bodyscanLayoutPresentation, isVerticalBodyscanLayout } from './Bodyscan
 import PwaAlert from '../../components/ui/PwaAlert';
 import PwaInfoCard from '../../components/ui/PwaInfoCard';
 import PwaSectionHeader from '../../components/ui/PwaSectionHeader';
+import BodyscanConsistencyNotice from './BodyscanConsistencyNotice';
 
 const valueFields = ['mass_kg', 'reference_percentage', 'classification', 'reference_min_percentage', 'reference_max_percentage'];
 const segmentFieldLabels = {
@@ -99,7 +100,7 @@ function SegmentSection({ title, type, segments, statuses, errors, onUpdate }) {
 	return (
 		<section className="rounded-2xl border border-slate-200 bg-white p-4">
 			<div className="flex items-center gap-2"><PwaIcon name="clipboard" size={18} /><h3 className="font-bold text-slate-950">{title}</h3></div>
-			<p className="mt-1 text-xs text-slate-600"><strong>L</strong> = lado esquerdo · <strong>R</strong> = lado direito</p>
+			<p className="mt-1 text-xs text-slate-600"><strong>E</strong> = lado esquerdo · <strong>D</strong> = lado direito</p>
 			<div className="mt-3 space-y-3">
 				{segments.map(({ segment, index }) => {
 					const prefix = `segmental.${type}.${segment.region}.${segment.side}`;
@@ -233,6 +234,7 @@ export default function BodyscanReview({ previewUrl, form, extraction, client, c
 			{extraction?.side_consistency?.possible_swap ? <PwaAlert tone="error" className="mt-3" title="Possível troca entre os lados">Confira os marcadores L (esquerdo) e R (direito) diretamente na imagem.</PwaAlert> : null}
 			{qualityWarnings.length ? <details className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm"><summary className="pwa-focus flex min-h-11 cursor-pointer items-center gap-2 rounded-lg font-bold"><PwaIcon name="image" size={17} />Qualidade da imagem <span className="ml-auto rounded-full bg-amber-200 px-2 py-0.5 text-xs">{qualityWarnings.length}</span></summary><p className="mb-2 text-xs text-amber-900">Estas mensagens tratam apenas de nitidez, resolução ou enquadramento.</p><ul className="list-disc space-y-1 pl-5">{qualityWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></details> : null}
 			{readingWarnings.length ? <details className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm"><summary className="pwa-focus flex min-h-11 cursor-pointer items-center gap-2 rounded-lg font-bold"><PwaIcon name="alertTriangle" size={17} />Campos para conferir <span className="ml-auto rounded-full bg-amber-200 px-2 py-0.5 text-xs">{readingWarnings.length}</span></summary><p className="mb-2 text-xs text-amber-900">Confira somente os textos, números, unidades ou lados que não puderam ser lidos com segurança.</p><ul className="list-disc space-y-1 pl-5">{readingWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></details> : null}
+			<BodyscanConsistencyNotice warnings={extraction?.consistency_warnings} />
 			<div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-950">
 				<div className="flex flex-wrap items-center gap-2"><strong>Layout detectado:</strong><span>{layoutPresentation ? `${layoutPresentation.application} · ${layoutPresentation.label}` : 'Não identificado'}</span>{layoutPresentation ? <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${layoutPresentation.tone === 'recommended' ? 'bg-emerald-100 text-emerald-800' : 'bg-white text-sky-800'}`}>{layoutPresentation.badge}</span> : null}</div>
 				{extraction?.layout_profile_version ? <span className="mt-1 block text-sky-800">Perfil de leitura: {extraction.layout_profile_version}</span> : null}
@@ -275,7 +277,7 @@ export default function BodyscanReview({ previewUrl, form, extraction, client, c
 				<div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(13rem,.75fr)_minmax(0,1.25fr)] sm:items-end">
 					<AthleteModeSelector compact value={form.profile?.athlete_mode_at_assessment} onChange={handleAthleteModeChange} />
 					<div className="min-w-0">
-						<label className={`mb-2 flex cursor-pointer items-start gap-2 rounded-xl border px-3 py-2 text-xs font-semibold ${confirmationAttempted && incomplete ? 'border-amber-300 bg-amber-50 text-amber-950' : 'border-ricosty-100 bg-ricosty-50/70 text-slate-700'}`}><input type="checkbox" checked={confirmed} onChange={(event) => handleConfirmationChange(event.target.checked)} aria-describedby={confirmationAttempted && incomplete ? 'bodyscan-confirmation-pending' : undefined} className="mt-0.5 h-5 w-5 shrink-0" /><span>Confirmo que conferi a imagem, o perfil, as métricas, os segmentos e a impedância disponível.</span></label>
+						<label className={`mb-2 flex cursor-pointer items-start gap-2 rounded-xl border px-3 py-2 text-xs font-semibold ${confirmationAttempted && incomplete ? 'border-amber-300 bg-amber-50 text-amber-950' : 'border-ricosty-100 bg-ricosty-50/70 text-slate-700'}`}><input type="checkbox" checked={confirmed} onChange={(event) => handleConfirmationChange(event.target.checked)} aria-describedby={confirmationAttempted && incomplete ? 'bodyscan-confirmation-pending' : undefined} className="mt-0.5 h-5 w-5 shrink-0" /><span>Confirmo que conferi a imagem, o perfil, as métricas, os segmentos e a impedância disponível.{extraction?.consistency_warnings?.length ? ' Também comparei os valores da divergência de soma com o documento original, preservando os números impressos.' : ''}</span></label>
 						<div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
 							<span className={`inline-flex items-center gap-1.5 font-bold ${!online ? 'text-rose-800' : incomplete || !confirmed ? 'text-amber-800' : 'text-emerald-800'}`}><PwaIcon name={!online ? 'wifiOff' : incomplete || !confirmed ? 'alertTriangle' : 'check'} size={15} />{!online ? 'Sem conexão para salvar' : incomplete ? `${confirmationPendingItems.length} pendência(s)` : confirmed ? 'Conferência pronta' : 'Falta confirmar a conferência'}</span>
 							{incomplete ? <button type="button" onClick={showPendingItems} className="pwa-focus min-h-9 rounded-lg px-2 font-bold text-ricosty-700 hover:bg-ricosty-50">Ver pendências</button> : null}

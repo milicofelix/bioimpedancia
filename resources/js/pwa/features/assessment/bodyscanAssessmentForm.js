@@ -1,11 +1,11 @@
 import { assessmentFromExtraction, maskRelaxmedicValue, relaxmedicAssessmentPayload } from './relaxmedicAssessmentForm';
 
 export const segmentLabels = {
-	'arm|left': 'Braço esquerdo (L)',
-	'arm|right': 'Braço direito (R)',
+	'arm|left': 'Braço esquerdo (E)',
+	'arm|right': 'Braço direito (D)',
 	'trunk|center': 'Tronco',
-	'leg|left': 'Perna esquerda (L)',
-	'leg|right': 'Perna direita (R)',
+	'leg|left': 'Perna esquerda (E)',
+	'leg|right': 'Perna direita (D)',
 };
 
 export const segmentClassificationOptions = [
