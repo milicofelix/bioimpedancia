@@ -204,11 +204,16 @@ class BodyscanProImageProcessor
         $rawMetrics = is_array($payload['metrics'] ?? null) ? $payload['metrics'] : [];
         $rawMetricLabels = is_array($payload['metric_source_labels'] ?? null) ? $payload['metric_source_labels'] : [];
         $rawMetricTexts = is_array($payload['metric_raw_values'] ?? null) ? $payload['metric_raw_values'] : [];
+        $extendedReadingIssues = [];
         $extendedMetrics = $this->extendedMetricNormalizer->normalize(
             is_array($payload['extended_metrics'] ?? null) ? $payload['extended_metrics'] : [],
             $sourceApplication,
             $reportLayout,
+            $extendedReadingIssues,
         );
+        foreach ($extendedReadingIssues as $issue) {
+            $suspiciousValues->push($issue);
+        }
         $recoveredMetrics = $this->generalMetricRecovery->recover($rawMetrics, $extendedMetrics, $profile);
         $metrics = [];
         $fieldStatuses = [];
@@ -923,6 +928,7 @@ Extraia as métricas gerais pelos nomes dos rótulos: no RelaxFit use o bloco "�
 Use exclusivamente os aliases do perfil identificado. Para cada métrica, retorne em metric_source_labels o rótulo exato encontrado e em metric_raw_values o texto integral da linha ou célula que sustenta o valor.
 Para campos que o perfil não oferece, retorne null em metrics, metric_source_labels e metric_raw_values. Não marque esses campos como ilegíveis ou ausentes.
 Extraia em extended_metrics somente indicadores realmente impressos e permitidos no layout identificado. Preserve rótulo, valor bruto, unidade, classificação do aplicativo, limites impressos e proporção do peso. Não derive limites nem classificações.
+Leia gordura subcutânea pelo próprio rótulo e pelo percentual impresso (em Outros indicadores no relatório técnico): não associe a esse rótulo a massa em kg ou o percentual relativo à referência da gordura do tronco. weight_proportion_percentage é exclusivamente a proporção do peso impressa na tabela de composição, nunca um percentual de referência segmentar. Preserve o índice de obesidade impresso sem recalculá-lo a partir do peso-alvo exibido.
 No Fitdays técnico podem existir WHR, Pontuação corporal, Peso-alvo recomendado, controles de peso/gordura/músculo, Obesidade (peso atual/Peso alvo), ASMI e Avaliação do equilíbrio corporal.
 No Fitdays vertical extraia WHR, Peso-alvo recomendado, controles de peso/gordura/músculo e o contexto das métricas gerais permitidas quando impressos.
 Use os códigos: waist_hip_ratio, body_score, recommended_target_weight, weight_control, fat_control, muscle_control, proprietary_obesity_index, asmi e body_balance_assessment.

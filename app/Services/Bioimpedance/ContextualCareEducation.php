@@ -26,11 +26,8 @@ class ContextualCareEducation
             $movementEvidence = array_filter([$generalMuscle['id'] ?? null]);
         }
 
-        $nutritionContext = collect([$fat['text'] ?? null, $bmi['text'] ?? null])->filter()->implode(' ');
-        $nutrition = $nutritionContext
-            ? $nutritionContext.' '.$this->nutritionFocus($bmi, $fat)
-            : 'Não há informação sobre sua alimentação nesta avaliação; as medidas não permitem deduzir como são suas refeições.';
-        $nutrition .= ' Como possibilidades educativas para discutir na consulta, arroz e feijão, verduras, legumes e frutas podem compor refeições variadas. Compare essas opções com a presença de refrigerantes, biscoitos e outros ultraprocessados na sua rotina, sem presumir que você os consome. Quantidades e substituições dependem de preferências, restrições e avaliação nutricional.';
+        $nutrition = $this->nutritionFocus($bmi, $fat);
+        $nutrition .= ' A distribuição da gordura não determina quais alimentos consumir ou evitar. Como orientação geral, e não tratamento de gordura em uma região, arroz e feijão, verduras, legumes e frutas podem compor refeições variadas. Discuta com o profissional sua alimentação habitual, preferências e restrições antes de definir quantidades ou substituições; a balança não informa esses hábitos.';
 
         $movement = $muscleOverview
             ? $muscleOverview.' '.$this->movementFocus($muscle->all())
@@ -38,7 +35,7 @@ class ContextualCareEducation
         $movement .= $older
             ? ' Para discutir com o profissional: caminhadas confortáveis, equilíbrio com apoio e fortalecimento adaptado, após avaliar segurança e autonomia.'
             : ' Possibilidades gerais a discutir: caminhadas confortáveis, pausas para se movimentar e fortalecimento orientado, como sentar e levantar quando adequado à sua capacidade.';
-        $movement .= ' Rotina e limitações não foram registradas; escolha e progressão exigem avaliação individual e eventual liberação profissional, sem definir carga, duração ou frequência pela balança.';
+        $movement .= ' Registre com o profissional condicionamento atual, limitações, sintomas e objetivos antes de escolher atividades. IMC e estimativas musculares não bastam; escolha e progressão exigem avaliação individual e eventual liberação profissional, sem carga, duração ou frequência definidas pela balança.';
 
         $hasPrevious = data_get($context, 'history_comparison.has_previous', false);
         $followUp = ! $hasPrevious

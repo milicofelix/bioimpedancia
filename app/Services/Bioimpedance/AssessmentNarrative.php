@@ -13,9 +13,9 @@ class AssessmentNarrative
         if ($groups->isEmpty()) {
             return '';
         }
-        $text = ($type === Segment::TYPE_FAT ? 'Gordura segmentar' : 'Equilíbrio muscular').' registrado: '
+        $text = 'Na análise segmentar de '.($type === Segment::TYPE_FAT ? 'gordura' : 'massa muscular').', as estimativas foram classificadas como '
             .$groups->map(fn ($group, $classification) => (Segment::CLASSIFICATION_LABELS[$classification] ?? 'Não identificada')
-                .' em '.$group->pluck('region_label')->filter()->implode(', '))->implode('; ').'.';
+                .($group->count() === 5 ? ' nas cinco regiões avaliadas' : ' em '.$group->pluck('region_label')->filter()->implode(', ')))->implode('; ').'.';
         if (collect($findings)->where('metric', $type)->contains('classification_origin', 'recorded_unverified')) {
             $text .= ' Há classificações cuja origem precisa ser conferida.';
         }
@@ -29,7 +29,7 @@ class AssessmentNarrative
             ->groupBy(fn (array $finding) => implode('|', [$finding['metric'], $finding['classification'], $finding['classification_origin']]))
             ->map(function ($group): array {
                 $first = $group->first();
-                $type = $first['metric'] === Segment::TYPE_FAT ? 'Gordura segmentar' : 'Equilíbrio muscular';
+                $type = $first['metric'] === Segment::TYPE_FAT ? 'gordura' : 'massa muscular';
                 $regions = $group->pluck('region_label')->filter()->implode(', ');
                 $origin = match ($first['classification_origin']) {
                     'equipment_report' => 'no relatório de origem',
@@ -37,12 +37,19 @@ class AssessmentNarrative
                     'professional_review' => 'na revisão profissional',
                     default => 'com origem não verificada',
                 };
-                $text = $type.': '.(Segment::CLASSIFICATION_LABELS[$first['classification']] ?? 'Não identificada').' '.$origin.' em '.$group->count()
-                    .($group->count() === 1 ? ' região' : ' regiões').' ('.$regions.').';
+                $description = match ($first['classification']) {
+                    Segment::CLASSIFICATION_HIGH => 'acima das referências do equipamento',
+                    Segment::CLASSIFICATION_LOW => 'abaixo das referências do equipamento',
+                    Segment::CLASSIFICATION_STANDARD => 'dentro das referências do equipamento',
+                    default => 'sem classificação identificada',
+                };
+                $scope = $group->count() === 5 ? 'nas cinco regiões avaliadas' : 'em '.$regions;
+                $text = 'A análise segmentar apresentou estimativas de '.$type.' '.$description.' '.$scope
+                    .' (classificação '.(Segment::CLASSIFICATION_LABELS[$first['classification']] ?? 'Não identificada').' '.$origin.').';
                 $percentages = $group->filter(fn ($finding) => is_numeric($finding['reference_percentage'] ?? null));
                 if ($first['metric'] === Segment::TYPE_FAT && $percentages->isNotEmpty()) {
                     $largest = $percentages->sortByDesc('reference_percentage')->first();
-                    $text .= ' Maior percentual relativo à referência desse grupo: '.$largest['region_label'].' ('.number_format($largest['reference_percentage'], 1, ',', '.').'%).';
+                    $text .= ' O maior percentual relativo à referência nesse grupo foi registrado em '.mb_strtolower($largest['region_label']).' ('.number_format($largest['reference_percentage'], 1, ',', '.').'%).';
                 }
 
                 return ['text' => $text, 'source_chunk_ids' => $group->pluck('id')->all()];
@@ -56,7 +63,7 @@ class AssessmentNarrative
         $fat = collect($findings)->where('kind', 'segmental')->where('metric', 'fat')
             ->filter(fn ($finding) => is_numeric($finding['reference_percentage'] ?? null))->sortByDesc('reference_percentage')->first();
         if ($fat) {
-            $parts[] = 'Maior percentual relativo na gordura segmentar: '.$fat['region_label'].' ('.number_format($fat['reference_percentage'], 1, ',', '.').'% da referência).';
+            $parts[] = 'O maior percentual relativo à referência da gordura segmentar foi registrado em '.mb_strtolower($fat['region_label']).' ('.number_format($fat['reference_percentage'], 1, ',', '.').'%).';
         }
 
         return implode(' ', array_filter($parts));

@@ -79,6 +79,11 @@
         .page-guidance .summary p, .page-guidance .notice p, .page-guidance .guidance p { margin-top: 3px; margin-bottom: 3px; }
         .page-guidance .validation { margin-top: 5px; }
         .page-guidance .validation td { padding: 5px 7px; }
+        .page-guidance.guidance-dense { font-size: 8.2px; line-height: 1.32; }
+        .page-guidance.guidance-dense .content { padding: 8px 16px; }
+        .page-guidance.guidance-dense .summary, .page-guidance.guidance-dense .guidance-section { margin-top: 4px; padding: 5px 8px; }
+        .page-guidance.guidance-dense .section-title { margin-top: 6px; margin-bottom: 3px; }
+        .page-guidance.guidance-dense .validation td { padding: 4px 6px; }
         .report-closing { page-break-inside: avoid; }
         .report-closing .report-limits { font-size: 8px; line-height: 1.35; }
         .report-limits p { margin: 3px 0 0; }
@@ -551,7 +556,7 @@
 </section>
 @endif
 
-<section class="report-section page-guidance">
+<section class="report-section page-guidance {{ mb_strlen((string) ($assessment['notes'] ?? '').(string) ($assessment['care_guidance'] ?? '').(string) ($clinic['technical_notice'] ?? '')) > 3600 ? 'guidance-dense' : '' }}">
     @include('bioimpedance.partials.report-header', ['pageTitle' => 'Orientações', 'pageNumber' => $totalSections, 'totalSections' => $totalSections])
     <div class="content">
         <div class="section-title" style="color: {{ $secondaryColor }};">{{ $hasReviewedObservation ? 'Síntese revisada pelo profissional' : 'Resumo dos resultados' }}</div>

@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
 
 class BioimpedanceObservationAssistant
 {
-    public const PROMPT_VERSION = 'rag-client-1.5.0';
+    public const PROMPT_VERSION = 'rag-client-1.6.0';
 
     public const MODEL_NAME = 'local-validated-rag-agent';
 
@@ -337,6 +337,7 @@ Não gere diagnóstico, prescrição, dieta, medicação, suplemento ou tratamen
 Não afirme causalidade médica. Não substitua avaliação de profissional habilitado.
 Para dados Relaxmedic, trate composição corporal e idade corporal como estimativas proprietárias, gordura visceral como índice do dispositivo e TMB como estimativa que não equivale ao gasto energético total. Não aplique faixas Omron nem conclua que força ou função muscular estão preservadas.
 Para dados Bodyscan, não conclua perda muscular, assimetria clínica ou preservação funcional com base nos segmentos. Descreva somente valores e tendências, ressalvando condições de medição e necessidade de avaliação profissional.
+Use redação natural para grupos de regiões, sem frases telegráficas como "Gordura segmentar: Alto em 5 regiões". Preserve a classificação literal do equipamento e diferencie percentual relativo à referência de percentual de gordura local. Quando measurement_profile.athlete_mode for verdadeiro, informe uma única vez que o perfil Atleta foi registrado e que sua adequação deve ser confirmada com o profissional, pois influencia as estimativas; não afirme que ele é adequado nem que o cliente é atleta.
 WHR e ASMI são índices estimados pelo equipamento: não diagnostique risco, sarcopenia ou qualquer condição a partir deles. Nunca trate idade corporal como idade biológica real, peso-alvo do aplicativo como peso ideal prescritivo ou pontuação corporal como nota clínica.
 Considere o aplicativo, o layout e o modo atleta registrados. Quando o histórico indicar mudança entre modo atleta e padrão ou perfis incompatíveis, informe a incompatibilidade e não descreva a diferença como melhora ou piora.
 Cada afirmação baseada na avaliação deve citar os IDs do catálogo de evidências fornecido.
@@ -479,6 +480,8 @@ PROMPT;
         $observationParts = [
             $this->narrative->composition($context),
             collect($segmentPoints)->pluck('text')->implode(' '),
+            data_get($context, 'measurement_profile.athlete_mode') === true
+                ? 'O perfil Atleta está registrado nesta medição. Confirme sua adequação com o profissional, pois esse perfil influencia as estimativas de composição corporal.' : null,
             $segmentPoints ? 'Percentuais segmentares são relativos às referências do equipamento, não percentuais de gordura local. Essas estimativas não comprovam força, função ou diagnóstico.' : null,
             $variation,
             $profileWarning ? 'A comparação com a avaliação anterior exige cautela: '.$profileWarning : null,

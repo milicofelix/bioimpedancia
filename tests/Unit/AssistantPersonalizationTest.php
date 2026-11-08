@@ -26,7 +26,7 @@ class AssistantPersonalizationTest extends TestCase
             $this->assertSame('trunk', $fat[0]['region']);
             $points = (new AssessmentNarrative)->segmentPoints($context);
             $this->assertCount(10, array_unique(collect($points)->pluck('source_chunk_ids')->flatten()->all()));
-            $this->assertStringContainsString('Maior percentual relativo à referência desse grupo: tronco', $points[0]['text']);
+            $this->assertStringContainsString('maior percentual relativo à referência nesse grupo foi registrado em tronco', $points[0]['text']);
             $this->assertStringContainsString($profile ? '335,7%' : '316,5%', $points[0]['text']);
         }
     }
@@ -77,7 +77,8 @@ class AssistantPersonalizationTest extends TestCase
         $this->assertStringContainsString('não justificam, sozinhas, treinar mais um membro', $male[1]['text']);
         $this->assertStringContainsString('Todas as regiões registradas estão em Padrão', $female[1]['text']);
         foreach ([$male, $female] as $claims) {
-            $this->assertStringContainsString('tronco', $claims[0]['text']);
+            $this->assertStringContainsString('A distribuição da gordura não determina quais alimentos consumir ou evitar', $claims[0]['text']);
+            $this->assertStringNotContainsString('Gordura segmentar no tronco:', $claims[0]['text']);
             $this->assertStringContainsString('arroz e feijão', $claims[0]['text']);
             $this->assertStringContainsString('caminhadas', $claims[1]['text']);
             $this->assertStringContainsString('eventual liberação profissional', $claims[1]['text']);

@@ -3,12 +3,13 @@
 namespace App\Services\Bioimpedance;
 
 use App\Domain\Bioimpedance\BodyscanExtendedMetricCatalog;
+use App\Domain\Bioimpedance\BodyscanMetricIntegrity;
 use Illuminate\Support\Str;
 
 final class BodyscanExtendedMetricNormalizer
 {
     /** @return list<array<string, mixed>> */
-    public function normalize(array $items, string $application, string $layout): array
+    public function normalize(array $items, string $application, string $layout, array &$readingIssues = []): array
     {
         $availableCodes = BodyscanExtendedMetricCatalog::availableForLayout($layout);
         $normalized = [];
@@ -56,6 +57,10 @@ final class BodyscanExtendedMetricNormalizer
                 'raw_extracted_value' => $rawValue,
                 'reference_version' => BodyscanExtendedMetricCatalog::REFERENCE_VERSION,
             ];
+            if ($issue = BodyscanMetricIntegrity::readingIssue($normalized[$code])) {
+                $readingIssues[] = ['field' => 'extended_metrics.'.$code, 'value' => $rawValue, 'reason' => $issue];
+                unset($normalized[$code]);
+            }
         }
 
         $this->removeAmbiguousBodyFatRange($normalized);
