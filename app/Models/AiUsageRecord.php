@@ -6,7 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class AiUsageRecord extends Model
 {
+    public const HISTORICAL_OPENING_OPERATION = 'historical_opening';
+
     public const OPERATIONS = [
+        self::HISTORICAL_OPENING_OPERATION => 'Consumo histórico consolidado',
         'bodyscan_ocr' => 'OCR Bodyscan',
         'bodyscan_segmental_ocr' => 'OCR segmentar — segunda leitura',
         'relaxmedic_ocr' => 'OCR Relaxmedic',
