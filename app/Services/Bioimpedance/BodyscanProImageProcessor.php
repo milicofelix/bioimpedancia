@@ -8,9 +8,9 @@ use App\Domain\Bioimpedance\BodyscanOcrProfileRegistry;
 use App\Domain\Bioimpedance\ScaleModel;
 use App\Models\Bioimpedance\BioimpedanceSegmentalMeasurement as Segment;
 use App\Models\Bioimpedance\BioimpedanceImpedanceReading as ImpedanceReading;
+use App\Services\Ai\OpenAiResponsesClient;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -46,6 +46,7 @@ class BodyscanProImageProcessor
         private readonly BodyscanOcrProfileRegistry $ocrProfiles,
         private readonly BodyscanExtendedMetricNormalizer $extendedMetricNormalizer,
         private readonly BodyscanGeneralMetricRecovery $generalMetricRecovery,
+        private readonly OpenAiResponsesClient $openAi,
     ) {}
 
     public function process(UploadedFile $image): array
@@ -57,32 +58,27 @@ class BodyscanProImageProcessor
 
         $contents = $this->jpegInspector->contents($image);
         $processorModel = (string) config('services.openai.vision_model');
-        $response = Http::withToken($apiKey)
-            ->acceptJson()
-            ->asJson()
-            ->connectTimeout(10)
-            ->timeout((int) config('services.openai.bodyscan_ocr_timeout', 90))
-            ->post(rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/').'/responses', [
-                'model' => $processorModel,
-                'reasoning' => ['effort' => config('services.openai.vision_reasoning_effort', 'medium')],
-                'store' => false,
-                'max_output_tokens' => 9000,
-                'input' => [[
-                    'role' => 'user',
-                    'content' => [
-                        ['type' => 'input_text', 'text' => $this->prompt()],
-                        ['type' => 'input_image', 'image_url' => 'data:image/jpeg;base64,'.base64_encode($contents), 'detail' => 'high'],
-                    ],
-                ]],
-                'text' => [
-                    'format' => [
-                        'type' => 'json_schema',
-                        'name' => 'bodyscan_pro_bioimpedance_extraction',
-                        'strict' => true,
-                        'schema' => $this->responseSchema(),
-                    ],
+        $response = $this->openAi->send('bodyscan_ocr', [
+            'model' => $processorModel,
+            'reasoning' => ['effort' => config('services.openai.vision_reasoning_effort', 'medium')],
+            'store' => false,
+            'max_output_tokens' => 9000,
+            'input' => [[
+                'role' => 'user',
+                'content' => [
+                    ['type' => 'input_text', 'text' => $this->prompt()],
+                    ['type' => 'input_image', 'image_url' => 'data:image/jpeg;base64,'.base64_encode($contents), 'detail' => 'high'],
                 ],
-            ])
+            ]],
+            'text' => [
+                'format' => [
+                    'type' => 'json_schema',
+                    'name' => 'bodyscan_pro_bioimpedance_extraction',
+                    'strict' => true,
+                    'schema' => $this->responseSchema(),
+                ],
+            ],
+        ], (int) config('services.openai.bodyscan_ocr_timeout', 90))
             ->throw()
             ->json();
 

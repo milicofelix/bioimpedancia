@@ -9,10 +9,10 @@ use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceKnowledgeChunk;
 use App\Models\Bioimpedance\BioimpedanceKnowledgeDocument;
 use App\Models\User;
+use App\Services\Ai\OpenAiResponsesClient;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 class BioimpedanceObservationAssistant
@@ -27,6 +27,7 @@ class BioimpedanceObservationAssistant
         private readonly BioimpedanceAssistantContext $assistantContext,
         private readonly AssessmentNarrative $narrative,
         private readonly ClinicalTextGuard $textGuard,
+        private readonly OpenAiResponsesClient $openAi,
     ) {}
 
     private const DEFAULT_DOCUMENTS = [
@@ -268,44 +269,39 @@ class BioimpedanceObservationAssistant
 
     private function generateOpenAiResponse(array $context, Collection $chunks): array
     {
-        $response = Http::withToken((string) config('services.openai.api_key'))
-            ->acceptJson()
-            ->asJson()
-            ->connectTimeout(10)
-            ->timeout((int) config('services.openai.timeout', 45))
-            ->post(rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/').'/responses', [
-                'model' => config('services.openai.model'),
-                'reasoning' => ['effort' => config('services.openai.reasoning_effort', 'medium')],
-                'max_output_tokens' => (int) config('services.openai.assistant_max_output_tokens', 6000),
-                'store' => false,
-                'input' => [
-                    [
-                        'role' => 'system',
-                        'content' => [[
-                            'type' => 'input_text',
-                            'text' => $this->openAiSystemPrompt(),
-                        ]],
-                    ],
-                    [
-                        'role' => 'user',
-                        'content' => [[
-                            'type' => 'input_text',
-                            'text' => json_encode([
-                                'contexto_estruturado' => $context,
-                                'fontes_aprovadas' => $this->sourcesForPrompt($chunks),
-                            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
-                        ]],
-                    ],
+        $response = $this->openAi->send('body_observation', [
+            'model' => config('services.openai.model'),
+            'reasoning' => ['effort' => config('services.openai.reasoning_effort', 'medium')],
+            'max_output_tokens' => (int) config('services.openai.assistant_max_output_tokens', 6000),
+            'store' => false,
+            'input' => [
+                [
+                    'role' => 'system',
+                    'content' => [[
+                        'type' => 'input_text',
+                        'text' => $this->openAiSystemPrompt(),
+                    ]],
                 ],
-                'text' => [
-                    'format' => [
-                        'type' => 'json_schema',
-                        'name' => 'bioimpedance_observation_suggestion',
-                        'strict' => true,
-                        'schema' => $this->openAiResponseSchema(),
-                    ],
+                [
+                    'role' => 'user',
+                    'content' => [[
+                        'type' => 'input_text',
+                        'text' => json_encode([
+                            'contexto_estruturado' => $context,
+                            'fontes_aprovadas' => $this->sourcesForPrompt($chunks),
+                        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
+                    ]],
                 ],
-            ])
+            ],
+            'text' => [
+                'format' => [
+                    'type' => 'json_schema',
+                    'name' => 'bioimpedance_observation_suggestion',
+                    'strict' => true,
+                    'schema' => $this->openAiResponseSchema(),
+                ],
+            ],
+        ])
             ->throw()
             ->json();
 

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Bioimpedance\AdminDashboardController;
 use App\Http\Controllers\Bioimpedance\AiAnalysisController;
+use App\Http\Controllers\Bioimpedance\AiUsageController;
 use App\Http\Controllers\Bioimpedance\AssessmentController;
 use App\Http\Controllers\Bioimpedance\AssessmentImportController;
 use App\Http\Controllers\Bioimpedance\AssessmentReportController;
@@ -61,6 +62,7 @@ Route::middleware(['auth', 'active.user'])->group(function () {
     Route::get('/bioimpedance', [WorkspaceController::class, 'index'])->name('bioimpedance.index');
     Route::get('/bioimpedance/operational', [WorkspaceController::class, 'operational'])->name('bioimpedance.operational.index');
     Route::get('/bioimpedance/admin-dashboard', AdminDashboardController::class)->name('bioimpedance.admin-dashboard');
+    Route::get('/bioimpedance/ai-usage', AiUsageController::class)->name('bioimpedance.ai-usage');
     Route::get('/bioimpedance/knowledge-documents', [KnowledgeDocumentController::class, 'index'])->name('bioimpedance.knowledge-documents.index');
     Route::post('/bioimpedance/knowledge-documents', [KnowledgeDocumentController::class, 'store'])->name('bioimpedance.knowledge-documents.store');
     Route::patch('/bioimpedance/knowledge-documents/{document}/transition', [KnowledgeDocumentController::class, 'transition'])->name('bioimpedance.knowledge-documents.transition');
