@@ -9,10 +9,10 @@ use App\Models\Bioimpedance\BioimpedanceAssessment;
 use App\Models\Bioimpedance\BioimpedanceKnowledgeChunk;
 use App\Models\Bioimpedance\BioimpedanceKnowledgeDocument;
 use App\Models\User;
+use App\Services\Ai\OpenAiResponsesClient;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Http;
 
 class BioimpedanceCareGuidanceAssistant
 {
@@ -27,6 +27,7 @@ class BioimpedanceCareGuidanceAssistant
         private readonly ContextualCareEducation $careEducation,
         private readonly AssessmentFindingPrioritizer $findingPrioritizer,
         private readonly AssessmentNarrative $narrative,
+        private readonly OpenAiResponsesClient $openAi,
     ) {}
 
     private const SOURCE_DEFINITIONS = [
@@ -215,26 +216,24 @@ class BioimpedanceCareGuidanceAssistant
         }
 
         try {
-            $response = Http::withToken((string) config('services.openai.api_key'))
-                ->acceptJson()->asJson()->connectTimeout(10)->timeout((int) config('services.openai.timeout', 45))
-                ->post(rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/').'/responses', [
-                    'model' => config('services.openai.model'),
-                    'reasoning' => ['effort' => config('services.openai.reasoning_effort', 'medium')],
-                    'max_output_tokens' => (int) config('services.openai.assistant_max_output_tokens', 6000),
-                    'store' => false,
-                    'input' => [
-                        ['role' => 'system', 'content' => [['type' => 'input_text', 'text' => $this->systemPrompt()]]],
-                        ['role' => 'user', 'content' => [['type' => 'input_text', 'text' => json_encode([
-                            'contexto' => $context,
-                            'fontes' => $chunks->map(fn ($chunk) => ['id' => $chunk->chunk_key, 'conteudo' => $chunk->content])->values()->all(),
-                            'fontes_internas_disponiveis' => collect([
-                                ...($context['evidence_ids'] ?? []),
-                                filled($context['professional_observation'] ?? null) ? 'observation:approved' : null,
-                            ])->filter()->values()->all(),
-                        ], JSON_UNESCAPED_UNICODE)]]],
-                    ],
-                    'text' => ['format' => ['type' => 'json_schema', 'name' => 'care_guidance', 'strict' => true, 'schema' => $this->schema()]],
-                ])->throw()->json();
+            $response = $this->openAi->send('care_guidance', [
+                'model' => config('services.openai.model'),
+                'reasoning' => ['effort' => config('services.openai.reasoning_effort', 'medium')],
+                'max_output_tokens' => (int) config('services.openai.assistant_max_output_tokens', 6000),
+                'store' => false,
+                'input' => [
+                    ['role' => 'system', 'content' => [['type' => 'input_text', 'text' => $this->systemPrompt()]]],
+                    ['role' => 'user', 'content' => [['type' => 'input_text', 'text' => json_encode([
+                        'contexto' => $context,
+                        'fontes' => $chunks->map(fn ($chunk) => ['id' => $chunk->chunk_key, 'conteudo' => $chunk->content])->values()->all(),
+                        'fontes_internas_disponiveis' => collect([
+                            ...($context['evidence_ids'] ?? []),
+                            filled($context['professional_observation'] ?? null) ? 'observation:approved' : null,
+                        ])->filter()->values()->all(),
+                    ], JSON_UNESCAPED_UNICODE)]]],
+                ],
+                'text' => ['format' => ['type' => 'json_schema', 'name' => 'care_guidance', 'strict' => true, 'schema' => $this->schema()]],
+            ])->throw()->json();
 
             $payload = json_decode($this->outputText($response), true);
             if (! is_array($payload)) {

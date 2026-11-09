@@ -4,47 +4,43 @@ namespace App\Services\Bioimpedance;
 
 use App\Domain\Bioimpedance\BodyscanOcrProfileRegistry;
 use App\Models\Bioimpedance\BioimpedanceSegmentalMeasurement as Segment;
+use App\Services\Ai\OpenAiResponsesClient;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
-use Illuminate\Support\Facades\Http;
 
 class BodyscanSegmentalOcrCompleter
 {
     public function __construct(
         private readonly BodyscanOcrProfileRegistry $ocrProfiles,
         private readonly BodyscanSegmentalImagePreparer $imagePreparer,
+        private readonly OpenAiResponsesClient $openAi,
     ) {}
 
     public function complete(string $imageContents, string $model, array $segments, ?string $reportLayout = null): array
     {
         try {
-            $response = Http::withToken((string) config('services.openai.api_key'))
-                ->acceptJson()
-                ->asJson()
-                ->connectTimeout(10)
-                ->timeout((int) config('services.openai.bodyscan_ocr_timeout', 90))
-                ->post(rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/').'/responses', [
-                    'model' => $model,
-                    'reasoning' => ['effort' => config('services.openai.vision_reasoning_effort', 'medium')],
-                    'store' => false,
-                    'max_output_tokens' => 4200,
-                    'input' => [[
-                        'role' => 'user',
-                        'content' => [
-                            ['type' => 'input_text', 'text' => $this->prompt($segments, $reportLayout)],
-                            ['type' => 'input_image', 'image_url' => 'data:image/jpeg;base64,'.base64_encode($imageContents), 'detail' => 'high'],
-                            ...$this->preparedImageContent($imageContents, $reportLayout),
-                        ],
-                    ]],
-                    'text' => [
-                        'format' => [
-                            'type' => 'json_schema',
-                            'name' => 'bodyscan_segmental_completion',
-                            'strict' => true,
-                            'schema' => $this->schema(),
-                        ],
+            $response = $this->openAi->send('bodyscan_segmental_ocr', [
+                'model' => $model,
+                'reasoning' => ['effort' => config('services.openai.vision_reasoning_effort', 'medium')],
+                'store' => false,
+                'max_output_tokens' => 4200,
+                'input' => [[
+                    'role' => 'user',
+                    'content' => [
+                        ['type' => 'input_text', 'text' => $this->prompt($segments, $reportLayout)],
+                        ['type' => 'input_image', 'image_url' => 'data:image/jpeg;base64,'.base64_encode($imageContents), 'detail' => 'high'],
+                        ...$this->preparedImageContent($imageContents, $reportLayout),
                     ],
-                ])
+                ]],
+                'text' => [
+                    'format' => [
+                        'type' => 'json_schema',
+                        'name' => 'bodyscan_segmental_completion',
+                        'strict' => true,
+                        'schema' => $this->schema(),
+                    ],
+                ],
+            ], (int) config('services.openai.bodyscan_ocr_timeout', 90))
                 ->throw()
                 ->json();
         } catch (ConnectionException|RequestException) {

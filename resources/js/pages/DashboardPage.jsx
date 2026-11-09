@@ -21,6 +21,7 @@ import CareGuidanceAssistant from '../pwa/features/assistant/CareGuidanceAssista
 import AssistantProvenance from '../pwa/features/assistant/AssistantProvenance';
 import ObservationFindings from '../pwa/features/assistant/ObservationFindings';
 import KnowledgeDocumentsPanel from '../components/bioimpedance/KnowledgeDocumentsPanel';
+import AiUsageReportPanel from '../components/bioimpedance/AiUsageReportPanel';
 import BodyscanReview from '../pwa/features/assessment/BodyscanReview';
 import BodyscanConsistencyNotice from '../pwa/features/assessment/BodyscanConsistencyNotice';
 import PwaAlert from '../pwa/components/ui/PwaAlert';
@@ -1518,6 +1519,7 @@ export default function DashboardPage({ userName }) {
 						</section>
 					) : null}
 
+					{currentUser?.is_admin ? <AiUsageReportPanel /> : null}
 					{currentUser?.is_admin ? <KnowledgeDocumentsPanel /> : null}
 
 					{currentUser?.is_admin ? (

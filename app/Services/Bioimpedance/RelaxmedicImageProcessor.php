@@ -2,9 +2,9 @@
 
 namespace App\Services\Bioimpedance;
 
+use App\Services\Ai\OpenAiResponsesClient;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 class RelaxmedicImageProcessor
@@ -12,6 +12,7 @@ class RelaxmedicImageProcessor
     public function __construct(
         private readonly RelaxmedicValueNormalizer $valueNormalizer,
         private readonly BioimpedanceJpegInspector $jpegInspector,
+        private readonly OpenAiResponsesClient $openAi,
     ) {}
 
     private const METRIC_FIELDS = [
@@ -90,38 +91,34 @@ class RelaxmedicImageProcessor
 
         $contents = $this->jpegInspector->contents($image);
 
-        $response = Http::withToken($apiKey)
-            ->acceptJson()
-            ->asJson()
-            ->timeout((int) config('services.openai.timeout', 45))
-            ->post(rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/').'/responses', [
-                'model' => config('services.openai.vision_model'),
-                'reasoning' => ['effort' => config('services.openai.vision_reasoning_effort', 'medium')],
-                'store' => false,
-                'max_output_tokens' => 3000,
-                'input' => [[
-                    'role' => 'user',
-                    'content' => [
-                        [
-                            'type' => 'input_text',
-                            'text' => $this->prompt(),
-                        ],
-                        [
-                            'type' => 'input_image',
-                            'image_url' => 'data:image/jpeg;base64,'.base64_encode($contents),
-                            'detail' => 'high',
-                        ],
+        $response = $this->openAi->send('relaxmedic_ocr', [
+            'model' => config('services.openai.vision_model'),
+            'reasoning' => ['effort' => config('services.openai.vision_reasoning_effort', 'medium')],
+            'store' => false,
+            'max_output_tokens' => 3000,
+            'input' => [[
+                'role' => 'user',
+                'content' => [
+                    [
+                        'type' => 'input_text',
+                        'text' => $this->prompt(),
                     ],
-                ]],
-                'text' => [
-                    'format' => [
-                        'type' => 'json_schema',
-                        'name' => 'relaxmedic_bioimpedance_extraction',
-                        'strict' => true,
-                        'schema' => $this->responseSchema(),
+                    [
+                        'type' => 'input_image',
+                        'image_url' => 'data:image/jpeg;base64,'.base64_encode($contents),
+                        'detail' => 'high',
                     ],
                 ],
-            ])
+            ]],
+            'text' => [
+                'format' => [
+                    'type' => 'json_schema',
+                    'name' => 'relaxmedic_bioimpedance_extraction',
+                    'strict' => true,
+                    'schema' => $this->responseSchema(),
+                ],
+            ],
+        ])
             ->throw()
             ->json();
 
